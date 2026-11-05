@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Multi-tenant Organizations ───────────────────────────────────────────────
+
+model Organization {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  zeroDataRetention Boolean @default(true)
+  createdAt        DateTime @default(now())
+  users            User[]
+  guidelines       GuidelineDocument[]
+  visualTokens     VisualToken[]
+  submissions      Submission[]
+  auditLogs        AuditLog[]
+  subscription     Subscription?
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  password     String   @default("demo1234")
+  role         String // creator | reviewer | contractor | admin
+  department   String?
+  orgName      String?
+  avatarColor  String   @default("#0F766E")
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  submissions  Submission[]
+  auditLogs    AuditLog[]
+  revisions    Revision[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── Stage 1: Ground-Truth Repository & Brand Tokenization ───────────────────
+
+model GuidelineDocument {
+  id         String   @id @default(cuid())
+  orgId      String
+  title      String
+  docType    String // guideline | datasheet | terminology | banned_words | trademark | tone
+  content    String
+  sourceName String?
+  status     String   @default("indexed") // processing | indexed
+  chunkCount Int      @default(0)
+  version    String   @default("1.0")
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  chunks     KnowledgeChunk[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model KnowledgeChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  orgId      String
+  chunkIndex Int
+  text       String
+  ruleTag    String? // e.g. CLAIM-01, VOICE-02, TM-01
+  keywords   String   @default("") // pre-tokenized for lexical (sparse) retrieval
+  document   GuidelineDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+}
+
+model VisualToken {
+  id         String   @id @default(cuid())
+  orgId      String
+  tokenType  String // color | typography | logo
+  name       String
+  value      String // hex code / font spec / image data or path
+  secondary  String? // e.g. text-on color for contrast pairing
+  usageNotes String?
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+}
+
+// ─── Stage 2-4: Submissions, Inspections, Findings, Revisions, Audit ─────────
+
+model Submission {
+  id              String   @id @default(cuid())
+  orgId           String
+  authorId        String
+  title           String
+  contentType     String   @default("text") // text | banner
+  content         String   @default("")
+  imageData       String? // data URL or public path for banners
+  imagePalette    String? // JSON string of extracted hex colors (client-side canvas)
+  status          String   @default("draft") // draft | in_review | changes_requested | approved
+  complianceScore Int? // 0-100
+  scanCount       Int      @default(0)
+  currentVersion  Int      @default(1)
+  department      String?
+  creatorNote     String?
+  author          User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  findings        Finding[]
+  revisions       Revision[]
+  auditLogs       AuditLog[]
+  inspections     Inspection[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Inspection {
+  id             String   @id @default(cuid())
+  submissionId   String
+  stageA         String   @default("{}") // JSON deterministic pre-filter results
+  stageB         String   @default("{}") // JSON RAG + vision results
+  durationMs     Int      @default(0)
+  complianceScore Int     @default(0)
+  submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+}
+
+model Finding {
+  id             String   @id @default(cuid())
+  submissionId   String
+  severity       String // critical | warning | minor
+  category       String // claim | tone | visual | style | trademark
+  flaggedText    String
+  ruleCitation   String // verbatim rule / fact citation
+  sourceDoc      String
+  rationale      String
+  suggestion     String? // one-click rewrite
+  suggestedHex   String? // for visual findings
+  stage          String   @default("ai") // deterministic | ai | vision
+  status         String   @default("open") // open | resolved | overridden
+  overrideNote   String?
+  resolvedAt     DateTime?
+  submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+}
+
+model Revision {
+  id            String   @id @default(cuid())
+  submissionId  String
+  version       Int
+  content       String
+  changeSummary String?
+  authorId      String
+  author        User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  submission    Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  orgId        String
+  submissionId String?
+  actorId      String
+  action       String // SIGN_OFF | APPROVAL | CHANGES_REQUESTED | SUBMITTED | SCAN | OVERRIDE | SUBSCRIPTION
+  details      String   @default("{}") // JSON
+  contentHash  String // SHA-256 of (prevHash + payload)
+  prevHash     String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actor        User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  submission   Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+}
+
+// ─── Stripe Billing ──────────────────────────────────────────────────────────
+
+model Subscription {
+  id               String   @id @default(cuid())
+  orgId            String   @unique
+  tier             String   @default("starter") // starter | growth | enterprise
+  status           String   @default("active") // active | trialing | past_due | canceled
+  scanLimit        Int      @default(50) // -1 = unlimited
+  scansUsed        Int      @default(0)
+  seats            Int      @default(5)
+  priceCents       Int      @default(4900)
+  stripeCustomerId String?
+  currentPeriodEnd DateTime?
+  organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
