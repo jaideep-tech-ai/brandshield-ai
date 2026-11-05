@@ -168,9 +168,9 @@ export function FindingsView() {
           <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading workspace…
         </div>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* ── Left pane: annotated content ── */}
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <Card>
               <CardContent className="p-5 sm:p-6">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -236,7 +236,7 @@ export function FindingsView() {
           </div>
 
           {/* ── Right pane: findings ── */}
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                 <FileSearch className="h-4 w-4 text-teal-700" /> Findings

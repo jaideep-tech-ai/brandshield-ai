@@ -131,9 +131,9 @@ export function DashboardView() {
         </Card>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Recent activity */}
-        <Card className="lg:col-span-2">
+        <Card className="min-w-0 lg:col-span-2">
           <CardContent className="p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><LayoutDashboard className="h-4 w-4 text-teal-700" /> Recent submissions</h2>
@@ -165,7 +165,7 @@ export function DashboardView() {
         </Card>
 
         {/* Side rail */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <Card>
             <CardContent className="p-5">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800"><Building2 className="h-4 w-4 text-teal-700" /> Workspace status</h2>

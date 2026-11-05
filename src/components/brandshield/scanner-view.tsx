@@ -180,9 +180,9 @@ export function ScannerView() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Composer */}
-        <Card className="lg:col-span-3">
+        <Card className="min-w-0 lg:col-span-3">
           <CardContent className="p-5 sm:p-6">
             <Tabs value={tab} onValueChange={(v) => { setTab(v); reset(); }}>
               <TabsList className="grid w-full grid-cols-2 rounded-xl">
@@ -293,7 +293,7 @@ export function ScannerView() {
         </Card>
 
         {/* Right rail: results / recent */}
-        <div className="space-y-6 lg:col-span-2">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <AnimatePresence mode="wait">
             {outcome ? (
               <motion.div key="outcome" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="space-y-4">

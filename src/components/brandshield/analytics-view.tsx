@@ -101,9 +101,9 @@ export function AnalyticsView() {
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Scan trend */}
-        <Card className="lg:col-span-2">
+        <Card className="min-w-0 lg:col-span-2">
           <CardContent className="p-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><TrendingUp className="h-4 w-4 text-teal-700" /> Governance velocity — last 14 days</h3>
             <div className="mt-4 h-56">
@@ -160,9 +160,9 @@ export function AnalyticsView() {
         </Card>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Top violated rules */}
-        <Card>
+        <Card className="min-w-0">
           <CardContent className="p-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><ArrowUpDown className="h-4 w-4 text-teal-700" /> Top violated rules</h3>
             {d.topViolatedRules.length === 0 ? (

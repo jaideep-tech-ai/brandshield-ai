@@ -142,7 +142,7 @@ export function SettingsView() {
   // Loading skeleton
   if (sessionLoading || !session) {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto max-w-[1100px] space-y-6 px-4 py-6 sm:px-6">
         <Skeleton className="h-8 w-56" />
         {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-40 rounded-2xl" />
@@ -154,7 +154,7 @@ export function SettingsView() {
   // ── Non-admin gate ──
   if (!isAdmin) {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto max-w-[1100px] space-y-6 px-4 py-6 sm:px-6">
         <motion.div {...fadeUp(0)}>
           <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Settings</h1>
           <p className="mt-1 text-sm text-slate-600">Organization profile and governance controls.</p>
@@ -202,7 +202,7 @@ export function SettingsView() {
   const members = team.data ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1100px] space-y-6 px-4 py-6 sm:px-6">
       <motion.div {...fadeUp(0)}>
         <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Settings</h1>
         <p className="mt-1 text-sm text-slate-600">
@@ -213,7 +213,7 @@ export function SettingsView() {
       {/* 1 — Organization */}
       <motion.div {...fadeUp(1)}>
         <SectionCard icon={Building2} title="Organization" description="Workspace identity and data-governance controls.">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="org-name" className="text-slate-700">Organization name</Label>
               <Input id="org-name" readOnly value={session.orgName} className="border-slate-200 bg-slate-50 text-slate-600" />

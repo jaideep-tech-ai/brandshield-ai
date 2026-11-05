@@ -204,16 +204,17 @@ export function AuthView({ onBack }: { onBack: () => void }) {
         </aside>
 
         {/* ── Auth panel ── */}
-        <div className="p-5 sm:p-8">
-          <div className="flex items-center justify-between">
+        <div className="min-w-0 p-5 sm:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={onBack}
-              className="-ml-2 gap-1.5 text-slate-500 hover:text-slate-900"
+              className="-ml-2 h-8 gap-1.5 px-2 text-slate-500 hover:text-slate-900"
             >
               <ArrowLeft className="size-4" />
-              Back to overview
+              <span className="hidden sm:inline">Back to overview</span>
+              <span className="sm:hidden">Back</span>
             </Button>
             <Badge
               title={
@@ -229,8 +230,9 @@ export function AuthView({ onBack }: { onBack: () => void }) {
               )}
             >
               <Flame className="size-3 text-orange-500" />
-              Firebase Auth
-              <span className={cn("ml-0.5 rounded px-1 py-px text-[10px] font-semibold", firebaseConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600")}>
+              <span className="hidden sm:inline">Firebase Auth</span>
+              <span className="sm:hidden">Firebase</span>
+              <span className={cn("ml-0.5 whitespace-nowrap rounded px-1 py-px text-[10px] font-semibold", firebaseConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600")}>
                 {firebaseConnected ? "Connected" : "Local mode"}
               </span>
             </Badge>

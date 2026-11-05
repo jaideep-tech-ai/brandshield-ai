@@ -210,7 +210,7 @@ export function KnowledgeView() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6">
       {/* Header */}
       <motion.div {...fadeUp(0)} className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -269,7 +269,7 @@ export function KnowledgeView() {
           </div>
 
           {guidelines.isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Card key={i} className="rounded-2xl border-slate-200 shadow-sm">
                   <CardContent className="space-y-3 p-6">
@@ -302,7 +302,7 @@ export function KnowledgeView() {
               )}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {docs.map((doc, i) => {
                 const meta = DOC_TYPE_META[doc.docType] ?? { label: doc.docType, cls: "bg-slate-100 text-slate-700 border-slate-200" };
                 return (
@@ -394,7 +394,7 @@ export function KnowledgeView() {
           {visualTokens.isLoading ? (
             <div className="space-y-6">
               <Skeleton className="h-5 w-40" />
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-44 rounded-2xl" />
                 ))}
@@ -414,7 +414,7 @@ export function KnowledgeView() {
                     No color tokens yet — the vision stage skips WCAG checks until a palette exists.
                   </p>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {colorTokens.map((token, i) => (
                       <motion.div key={token.id} {...fadeUp(i)}>
                         <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm transition-shadow hover:shadow-md">
@@ -513,7 +513,7 @@ export function KnowledgeView() {
                     No logo tokens yet.
                   </p>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {logoTokens.map((token, i) => (
                       <motion.div key={token.id} {...fadeUp(i)}>
                         <Card className="rounded-2xl border-slate-200 shadow-sm">

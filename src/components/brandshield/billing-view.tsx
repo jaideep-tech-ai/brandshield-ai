@@ -119,7 +119,7 @@ export function BillingView() {
   const checkoutPrice = checkout ? TIER_META[checkout.tier].price : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1100px] space-y-6 px-4 py-6 sm:px-6">
       {/* Header */}
       <motion.div {...fadeUp(0)} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -143,7 +143,7 @@ export function BillingView() {
       {/* Current plan */}
       {subscription.isLoading || !sub ? (
         <Card className="rounded-2xl border-slate-200 shadow-sm">
-          <CardContent className="grid gap-6 p-6 lg:grid-cols-[1.2fr_1fr]">
+          <CardContent className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-3">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-6 w-56" />
@@ -156,7 +156,7 @@ export function BillingView() {
       ) : (
         <motion.div {...fadeUp(1)}>
           <Card className="rounded-2xl border-slate-200 shadow-sm">
-            <CardContent className="grid gap-6 p-6 lg:grid-cols-[1.2fr_1fr]">
+            <CardContent className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[1.2fr_1fr]">
               {/* Plan identity */}
               <div className="flex flex-col items-start gap-2">
                 <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Current plan</span>
@@ -250,7 +250,7 @@ export function BillingView() {
       )}
 
       {/* Pricing grid */}
-      <div className="grid gap-5 pt-2 lg:grid-cols-3 lg:gap-6">
+      <div className="grid grid-cols-1 gap-5 pt-2 lg:grid-cols-3 lg:gap-6">
         {TIER_ORDER.map((tier, i) => {
           const meta = TIER_META[tier];
           const isCurrent = sub?.tier === tier;
