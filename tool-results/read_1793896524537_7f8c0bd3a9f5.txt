@@ -1,0 +1,473 @@
+     1→import { createHash } from "crypto";
+     2→import { db } from "@/lib/db";
+     3→import { chunkDocument } from "./engine";
+     4→
+     5→// ─── Seed content: Nimbus Labs brand governance workspace ────────────────────
+     6→
+     7→const VOICE_PLAYBOOK = `NIMBUSPAY VOICE & TONE PLAYBOOK v3.2
+     8→
+     9→RULE VOICE-01: NimbusPay speaks as a friendly expert. We are confident, warm, and precise — never hypey, never cold. Write like a knowledgeable colleague, not a salesperson.
+    10→
+    11→RULE VOICE-02: Plain language wins. Prefer short sentences (under 22 words). Avoid legalese in marketing copy; legal disclaimers belong in product surfaces, not campaigns.
+    12→
+    13→RULE VOICE-03: Hype is banned. Do not use superlatives (best, fastest, world-class, revolutionary) unless backed by a cited, verifiable third-party benchmark in the approved facts repository.
+    14→
+    15→RULE VOICE-04: Never use absolute guarantees ("guaranteed", "risk-free", "100% safe", "can't fail"). Financial products require hedged, factual phrasing such as "designed to", "typically", "on average".
+    16→
+    17→RULE VOICE-05: Celebrate customer outcomes with real numbers from the approved Product Facts datasheet only. Any performance metric must trace to that document.
+    18→
+    19→RULE STYLE-01: Punctuation. Single exclamation marks only, at most one per paragraph. Never combine "?!" or "!!". Bold or emphasized text replaces ALL-CAPS shouting.
+    20→
+    21→RULE STYLE-02: Sentence case for headlines. Title Case is reserved for product names and official campaign titles registered with Brand Ops.
+    22→
+    23→VOICE DESCRIPTORS: friendly-expert, precise, optimistic, transparent, calm confidence, plain-spoken, customer-championing.
+    24→AVOIDS: slang, hype adjectives, legalese, urgency pressure tactics, unexplained jargon.`;
+    25→
+    26→const PRODUCT_FACTS = `NIMBUSPAY PRODUCT FACTS — APPROVED DATASHEET Q3 2025 (Source of Truth)
+    27→
+    28→FACT PD-01: NimbusPay processes payments in 32 currencies across 14 markets.
+    29→
+    30→FACT PD-02: Standard settlement time is 2 business days for verified merchants. Express settlement (same-day) is available on the Scale plan in 6 markets.
+    31→
+    32→FACT PD-03: NimbusPay maintains a 99.95% uptime SLA over the trailing 12 months, independently audited.
+    33→
+    34→FACT PD-04: Active merchant count: 14,238 verified businesses as of the Q3 2025 report.
+    35→
+    36→FACT PD-05: Average merchant onboarding time is 27 minutes using the guided API and pre-built checkout components.
+    37→
+    38→FACT PD-06: Standard processing fee is 1.9% + $0.30 per transaction. Volume discounts begin at $80k monthly volume.
+    39→
+    40→FACT PD-07: NimbusPay was founded in 2019 and is SOC 2 Type II certified and PCI DSS Level 1 compliant.
+    41→
+    42→FACT PD-08: NimbusPay partners with 46 licensed regional banks for local acquiring.
+    43→
+    44→FACT PD-09: Merchant churn reduction: merchants using NimbusPay Smart Retries recover 11.4% more failed payments on average (internal measurement, Q1–Q3 2025).
+    45→
+    46→FACT PD-10: The company does NOT publish average merchant ROI figures. No ROI multiplier claims are approved for any channel.`;
+    47→
+    48→const TRADEMARK_RULES = `TRADEMARK & NAMING RULES — NIMBUSPAY LEGAL
+    49→
+    50→RULE TM-01: NimbusPay|® — The master brand "NimbusPay" is a registered trademark. The first prominent use in any asset must carry the ® glyph. Always written as one word, camel case: "NimbusPay". Never "Nimbus Pay", "nimbuspay", or "NIMBUSPAY" in running copy.
+    51→
+    52→RULE TM-02: Nimbus Shield|™ — The fraud-protection suite "Nimbus Shield" carries the ™ glyph on first use per asset.
+    53→
+    54→RULE TM-03: Product names are always camel case single words: PayLinks™, SmartRetries™, CheckoutOS™.
+    55→
+    56→RULE TM-04: Do not use the ® or ™ glyph in headlines larger than 48px; use a legal footnote instead.`;
+    57→
+    58→const BANNED_WORDS = `BANNED & RESTRICTED TERMS — NIMBUSPAY MARKETING LEGAL LIST v7
+    59→(Any appearance in external copy is a blocking violation)
+    60→
+    61→guaranteed
+    62→guarantees
+    63→risk-free
+    64→100% safe
+    65→can't fail
+    66→world's best
+    67→world-class
+    68→revolutionary
+    69→cheapest
+    70→instantly
+    71→instantly approved
+    72→miracle
+    73→magic
+    74→hack
+    75→unbeatable
+    76→zero risk
+    77→no risk
+    78→effortless
+    79→overnight success
+    80→get rich
+    81→fastest ever
+    82→#1
+    83→number one`;
+    84→
+    85→const TERMINOLOGY = `NIMBUSPAY TERMINOLOGY LIST — SAY THIS, NOT THAT
+    86→
+    87→TERM LG-01: Say "customer" or "merchant" — never "user" in external copy.
+    88→TERM LG-02: Say "workspace" — never "dashboard" for the merchant home.
+    89→TERM LG-03: Say "payout" — never "withdrawal" (positive framing).
+    90→TERM LG-04: Say "team members" — never "seats" in customer-facing copy.
+    91→TERM LG-05: Currency amounts: "$1,240.50" — symbol, thousands separator, two decimals.
+    92→TERM LG-06: Say "sign in" not "log in"; say "set up" (verb) not "setup" (verb).`;
+    93→
+    94→// ─── Visual tokens ───────────────────────────────────────────────────────────
+    95→
+    96→const SHIELD_LOGO_SVG =
+    97→  "data:image/svg+xml;base64," +
+    98→  Buffer.from(
+    99→    `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14B8A6"/><stop offset="1" stop-color="#0F766E"/></linearGradient></defs><path d="M48 6 84 20v26c0 22-15 38-36 44C27 84 12 68 12 46V20L48 6z" fill="url(#g)"/><path d="M32 47l11 11 22-23" stroke="#F8FAFC" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+   100→  ).toString("base64");
+   101→
+   102→// ─── Seed helper ─────────────────────────────────────────────────────────────
+   103→
+   104→function chain(entries: { action: string; actorId: string; details: Record<string, unknown>; ts: Date }[]) {
+   105→  let prev = "GENESIS";
+   106→  return entries.map((e) => {
+   107→    const contentHash = createHash("sha256")
+   108→      .update(JSON.stringify({ prevHash: prev, ...e, ts: e.ts.getTime() }))
+   109→      .digest("hex");
+   110→    const row = { ...e, prevHash: prev, contentHash };
+   111→    prev = contentHash;
+   112→    return row;
+   113→  });
+   114→}
+   115→
+   116→let seedPromise: Promise<void> | null = null;
+   117→
+   118→export function ensureSeed(): Promise<void> {
+   119→  if (!seedPromise) {
+   120→    seedPromise = seedInternal().catch((e) => {
+   121→      seedPromise = null;
+   122→      throw e;
+   123→    });
+   124→  }
+   125→  return seedPromise;
+   126→}
+   127→
+   128→async function seedInternal(): Promise<void> {
+   129→  const existing = await db.organization.findUnique({ where: { slug: "nimbus-labs" } });
+   130→  if (existing) return;
+   131→
+   132→  // ── Organization + users
+   133→  const org = await db.organization.create({
+   134→    data: { name: "Nimbus Labs", slug: "nimbus-labs", zeroDataRetention: true },
+   135→  });
+   136→
+   137→  const [ava, marcus, priya, elena] = await Promise.all(
+   138→    [
+   139→      { email: "ava@nimbus.demo", name: "Ava Chen", role: "creator", department: "Content Studio", avatarColor: "#0F766E" },
+   140→      { email: "marcus@nimbus.demo", name: "Marcus Reed", role: "reviewer", department: "Brand & Legal", avatarColor: "#B45309" },
+   141→      { email: "priya@pixelworks.demo", name: "Priya Sharma", role: "contractor", department: "PixelWorks Agency", avatarColor: "#7C2D12" },
+   142→      { email: "elena@nimbus.demo", name: "Elena Rodriguez", role: "admin", department: "Marketing Leadership", avatarColor: "#4D7C0F" },
+   143→    ].map((u) => db.user.create({ data: { ...u, orgId: org.id, password: "demo1234" } }))
+   144→  );
+   145→
+   146→  // ── Guideline documents + chunks
+   147→  const docs: { title: string; docType: string; content: string }[] = [
+   148→    { title: "Voice & Tone Playbook", docType: "tone", content: VOICE_PLAYBOOK },
+   149→    { title: "Product Facts Datasheet Q3 2025", docType: "datasheet", content: PRODUCT_FACTS },
+   150→    { title: "Trademark & Naming Rules", docType: "trademark", content: TRADEMARK_RULES },
+   151→    { title: "Banned & Restricted Terms", docType: "banned_words", content: BANNED_WORDS },
+   152→    { title: "Terminology List", docType: "terminology", content: TERMINOLOGY },
+   153→  ];
+   154→  for (const d of docs) {
+   155→    const chunks = chunkDocument(d.content);
+   156→    await db.guidelineDocument.create({
+   157→      data: {
+   158→        orgId: org.id,
+   159→        title: d.title,
+   160→        docType: d.docType,
+   161→        content: d.content,
+   162→        sourceName: `${d.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.pdf`,
+   163→        chunkCount: chunks.length,
+   164→        chunks: { create: chunks.map((c) => ({ orgId: org.id, chunkIndex: c.chunkIndex, text: c.text, ruleTag: c.ruleTag, keywords: c.keywords })) },
+   165→      },
+   166→    });
+   167→  }
+   168→
+   169→  // ── Visual tokens
+   170→  await db.visualToken.createMany({
+   171→    data: [
+   172→      { orgId: org.id, tokenType: "color", name: "Shield Teal", value: "#0F766E", secondary: "#F8FAFC", usageNotes: "Primary brand color. Use for headers, CTAs, and key moments." },
+   173→      { orgId: org.id, tokenType: "color", name: "Aqua Mint", value: "#14B8A6", secondary: "#0F172A", usageNotes: "Secondary accent. Gradients with Shield Teal only." },
+   174→      { orgId: org.id, tokenType: "color", name: "Amber Accent", value: "#F59E0B", secondary: "#0F172A", usageNotes: "Highlight accents, badges, never body text on white." },
+   175→      { orgId: org.id, tokenType: "color", name: "Ink", value: "#0F172A", secondary: "#F8FAFC", usageNotes: "Headline text color on light backgrounds." },
+   176→      { orgId: org.id, tokenType: "color", name: "Cloud", value: "#F8FAFC", secondary: "#0F172A", usageNotes: "Light section backgrounds." },
+   177→      { orgId: org.id, tokenType: "typography", name: "Headings — Geist SemiBold", value: "Geist Sans / 600 / -0.02em tracking", secondary: null, usageNotes: "H1 40–56px, H2 28–36px. Sentence case per STYLE-02." },
+   178→      { orgId: org.id, tokenType: "typography", name: "Body — Geist Regular", value: "Geist Sans / 400 / 16–18px / 1.6 line height", secondary: null, usageNotes: "Max 70ch measure." },
+   179→      { orgId: org.id, tokenType: "logo", name: "Nimbus Shield Mark", value: SHIELD_LOGO_SVG, secondary: null, usageNotes: "Primary logo. Clear space = 1/2 mark height. Never place on low-contrast backgrounds." },
+   180→    ],
+   181→  });
+   182→
+   183→  // ── Subscription (Growth plan active)
+   184→  const periodEnd = new Date();
+   185→  periodEnd.setDate(periodEnd.getDate() + 18);
+   186→  await db.subscription.create({
+   187→    data: { orgId: org.id, tier: "growth", status: "active", scanLimit: -1, scansUsed: 14, seats: 12, priceCents: 19900, currentPeriodEnd: periodEnd },
+   188→  });
+   189→
+   190→  // ── Submission 1: Creator draft with rich violations (Stage 3 demo)
+   191→  const s1Content = `Introducing the NimbusPay Spring Boost!
+   192→
+   193→Our new merchants see 10x ROI in 7 days — guaranteed. nimbuspay is the world's best payment platform!!! Sign up TODAY and enjoy risk-free onboarding.
+   194→
+   195→We process 180+ currencies and settle funds instantly. Trusted by over 50,000 merchants across 120 countries since 2019.`;
+   196→
+   197→  const s1 = await db.submission.create({
+   198→    data: {
+   199→      orgId: org.id,
+   200→      authorId: ava.id,
+   201→      title: "Spring Boost Campaign — Email Hero",
+   202→      contentType: "text",
+   203→      content: s1Content,
+   204→      status: "draft",
+   205→      complianceScore: 37,
+   206→      scanCount: 1,
+   207→      department: "Content Studio",
+   208→      creatorNote: "Hero copy for the spring re-engagement email. Targeting lapsed merchants.",
+   209→    },
+   210→  });
+   211→  await db.revision.create({ data: { submissionId: s1.id, version: 1, content: s1Content, changeSummary: "Initial draft", authorId: ava.id } });
+   212→  await db.inspection.create({
+   213→    data: {
+   214→      submissionId: s1.id,
+   215→      durationMs: 6420,
+   216→      complianceScore: 37,
+   217→      stageA: JSON.stringify({
+   218→        durationMs: 1.8,
+   219→        bannedTerms: [
+   220→          { term: "guaranteed", index: 62, excerpt: "10x ROI in 7 days — guaranteed" },
+   221→          { term: "world's best", index: 118, excerpt: "nimbuspay is the world's best payment platform" },
+   222→          { term: "risk-free", index: 178, excerpt: "enjoy risk-free onboarding" },
+   223→        ],
+   224→        trademarkIssues: [{ brand: "NimbusPay", expectedGlyph: "®", index: 97, excerpt: "nimbuspay is the world's best payment platform" }],
+   225→        claimCandidates: [
+   226→          "Our new merchants see 10x ROI in 7 days — guaranteed.",
+   227→          "We process 180+ currencies and settle funds instantly.",
+   228→          "Trusted by over 50,000 merchants across 120 countries since 2019.",
+   229→        ],
+   230→        hexCodesFound: [],
+   231→        styleIssues: [{ type: "excessive-punctuation", excerpt: "!!!", detail: "Repeated exclamation marks read as hype; brand voice prefers confident, measured statements." }],
+   232→        checks: [
+   233→          { name: "Banned terms", passed: false, count: 3, ms: 0.21 },
+   234→          { name: "Trademark glyphs", passed: false, count: 1, ms: 0.14 },
+   235→          { name: "Claim candidates", passed: true, count: 3, ms: 0.42 },
+   236→          { name: "Hex discovery", passed: true, count: 0, ms: 0.05 },
+   237→          { name: "Style mechanics", passed: false, count: 1, ms: 0.33 },
+   238→        ],
+   239→      }),
+   240→      stageB: JSON.stringify({
+   241→        durationMs: 6418,
+   242→        tone: {
+   243→          score: 41,
+   244→          voiceSummary: "Copy leans heavily on hype, urgency and unverified superlatives — far from the friendly-expert voice.",
+   245→          driftFlags: [{ phrase: "Sign up TODAY", reason: "Urgency pressure tactic with all-caps shouting.", suggestion: "Sign up today" }],
+   246→        },
+   247→        claimVerdicts: [
+   248→          { claim: "Our new merchants see 10x ROI in 7 days — guaranteed.", verdict: "UNSUPPORTED", citation: "FACT PD-10: The company does NOT publish average merchant ROI figures. No ROI multiplier claims are approved for any channel.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "No approved ROI multiplier exists; an explicit guarantee also breaches VOICE-04.", suggestion: "Our new merchants typically recover 11.4% more failed payments with Smart Retries." },
+   249→          { claim: "We process 180+ currencies and settle funds instantly.", verdict: "UNSUPPORTED", citation: "FACT PD-01: NimbusPay processes payments in 32 currencies across 14 markets. FACT PD-02: Standard settlement time is 2 business days.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "Currency count and settlement speed contradict the approved datasheet.", suggestion: "We process payments in 32 currencies and settle funds in 2 business days." },
+   250→          { claim: "Trusted by over 50,000 merchants across 120 countries since 2019.", verdict: "UNSUPPORTED", citation: "FACT PD-04: Active merchant count: 14,238 verified businesses as of the Q3 2025 report. FACT PD-01: 14 markets.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "Merchant count and market coverage are inflated versus the approved report.", suggestion: "Trusted by 14,000+ merchants across 14 markets since 2019." },
+   251→        ],
+   252→        vision: null,
+   253→      }),
+   254→    },
+   255→  });
+   256→  await db.finding.createMany({
+   257→    data: [
+   258→      { submissionId: s1.id, severity: "critical", category: "claim", flaggedText: "Our new merchants see 10x ROI in 7 days — guaranteed.", ruleCitation: "FACT PD-10: The company does NOT publish average merchant ROI figures. No ROI multiplier claims are approved for any channel.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "No approved ROI multiplier exists; an explicit guarantee also breaches VOICE-04.", suggestion: "Our new merchants typically recover 11.4% more failed payments with Smart Retries.", stage: "ai" },
+   259→      { submissionId: s1.id, severity: "critical", category: "claim", flaggedText: "We process 180+ currencies and settle funds instantly.", ruleCitation: "FACT PD-01: NimbusPay processes payments in 32 currencies across 14 markets. FACT PD-02: Standard settlement time is 2 business days.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "Currency count and settlement speed contradict the approved datasheet.", suggestion: "We process payments in 32 currencies and settle funds in 2 business days.", stage: "ai" },
+   260→      { submissionId: s1.id, severity: "warning", category: "claim", flaggedText: "Trusted by over 50,000 merchants across 120 countries since 2019.", ruleCitation: "FACT PD-04: Active merchant count: 14,238 verified businesses as of the Q3 2025 report.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "Merchant count and market coverage are inflated versus the approved report.", suggestion: "Trusted by 14,000+ merchants across 14 markets since 2019.", stage: "ai" },
+   261→      { submissionId: s1.id, severity: "warning", category: "style", flaggedText: "guaranteed", ruleCitation: "Banned & Restricted Terms — term is prohibited in all external copy", sourceDoc: "Banned & Restricted Terms", rationale: "\"guaranteed\" appears in the restricted vocabulary list and risks deceptive-marketing scrutiny.", stage: "deterministic" },
+   262→      { submissionId: s1.id, severity: "warning", category: "style", flaggedText: "risk-free", ruleCitation: "Banned & Restricted Terms — term is prohibited in all external copy", sourceDoc: "Banned & Restricted Terms", rationale: "\"risk-free\" appears in the restricted vocabulary list and risks deceptive-marketing scrutiny.", stage: "deterministic" },
+   263→      { submissionId: s1.id, severity: "warning", category: "trademark", flaggedText: "nimbuspay", ruleCitation: "RULE TM-01: The master brand \"NimbusPay\" is a registered trademark and must be written camel-case with the ® glyph.", sourceDoc: "Trademark & Naming Rules", rationale: "The brand name appears lowercase and missing its required ® registration mark.", suggestion: "NimbusPay®", stage: "deterministic" },
+   264→      { submissionId: s1.id, severity: "minor", category: "style", flaggedText: "!!!", ruleCitation: "RULE STYLE-01: Single exclamation marks only, never combined.", sourceDoc: "Voice & Tone Playbook", rationale: "Repeated exclamation marks read as hype; brand voice prefers confident, measured statements.", stage: "deterministic" },
+   265→      { submissionId: s1.id, severity: "warning", category: "tone", flaggedText: "Sign up TODAY", ruleCitation: "RULE VOICE-01: NimbusPay speaks as a friendly expert — never hypey, never cold.", sourceDoc: "Voice & Tone Playbook", rationale: "Urgency pressure tactic with all-caps shouting.", suggestion: "Sign up today", stage: "ai" },
+   266→    ],
+   267→  });
+   268→
+   269→  // ── Submission 2: Contractor sandbox copy (in_review)
+   270→  const s3Content = `Partner announcement draft:
+   271→
+   272→With NimbusPay, your merchants can onboard in under 10 minutes and start accepting payments in 46 markets. nimbuspay handles payouts, fraud and reporting in one workspace.
+   273→
+   274→Ready to grow together? Let's build something great.`;
+   275→
+   276→  const s3 = await db.submission.create({
+   277→    data: {
+   278→      orgId: org.id,
+   279→      authorId: priya.id,
+   280→      title: "PixelWorks × NimbusPay — Partner Announcement",
+   281→      contentType: "text",
+   282→      content: s3Content,
+   283→      status: "in_review",
+   284→      complianceScore: 62,
+   285→      scanCount: 2,
+   286→      department: "PixelWorks Agency",
+   287→      creatorNote: "Co-marketing announcement for the partner newsletter, pre-checked in the agency sandbox.",
+   288→    },
+   289→  });
+   290→  await db.revision.create({ data: { submissionId: s3.id, version: 1, content: s3Content, changeSummary: "Agency first pass", authorId: priya.id } });
+   291→  await db.inspection.create({
+   292→    data: {
+   293→      submissionId: s3.id,
+   294→      durationMs: 5210,
+   295→      complianceScore: 62,
+   296→      stageA: JSON.stringify({
+   297→        durationMs: 1.4,
+   298→        bannedTerms: [],
+   299→        trademarkIssues: [{ brand: "NimbusPay", expectedGlyph: "®", index: 143, excerpt: "nimbuspay handles payouts, fraud and reporting" }],
+   300→        claimCandidates: [
+   301→          "With NimbusPay, your merchants can onboard in under 10 minutes and start accepting payments in 46 markets.",
+   302→        ],
+   303→        hexCodesFound: [],
+   304→        styleIssues: [],
+   305→        checks: [
+   306→          { name: "Banned terms", passed: true, count: 0, ms: 0.18 },
+   307→          { name: "Trademark glyphs", passed: false, count: 1, ms: 0.11 },
+   308→          { name: "Claim candidates", passed: true, count: 1, ms: 0.31 },
+   309→          { name: "Hex discovery", passed: true, count: 0, ms: 0.04 },
+   310→          { name: "Style mechanics", passed: true, count: 0, ms: 0.09 },
+   311→        ],
+   312→      }),
+   313→      stageB: JSON.stringify({
+   314→        durationMs: 5208,
+   315→        tone: { score: 86, voiceSummary: "Warm and confident; closely matches the friendly-expert voice.", driftFlags: [] },
+   316→        claimVerdicts: [
+   317→          { claim: "With NimbusPay, your merchants can onboard in under 10 minutes and start accepting payments in 46 markets.", verdict: "UNSUPPORTED", citation: "FACT PD-05: Average merchant onboarding time is 27 minutes. FACT PD-08: NimbusPay partners with 46 licensed regional banks (not markets).", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "Onboarding time is understated and market count confuses partner banks with markets.", suggestion: "With NimbusPay, your merchants typically onboard in under 30 minutes and start accepting payments across 14 markets." },
+   318→        ],
+   319→        vision: null,
+   320→      }),
+   321→    },
+   322→  });
+   323→  await db.finding.createMany({
+   324→    data: [
+   325→      { submissionId: s3.id, severity: "critical", category: "claim", flaggedText: "With NimbusPay, your merchants can onboard in under 10 minutes and start accepting payments in 46 markets.", ruleCitation: "FACT PD-05: Average merchant onboarding time is 27 minutes. FACT PD-01: 14 markets.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "Onboarding time is understated and market count confuses partner banks with markets.", suggestion: "With NimbusPay, your merchants typically onboard in under 30 minutes and start accepting payments across 14 markets.", stage: "ai" },
+   326→      { submissionId: s3.id, severity: "warning", category: "trademark", flaggedText: "nimbuspay", ruleCitation: "RULE TM-01: The master brand must be written camel-case with the ® glyph.", sourceDoc: "Trademark & Naming Rules", rationale: "Brand appears lowercase and missing the ® registration mark.", suggestion: "NimbusPay®", stage: "deterministic" },
+   327→    ],
+   328→  });
+   329→
+   330→  // ── Submission 3: Approved + audit chain (Stage 4 demo with diff)
+   331→  const v1 = `NimbusPay Smart Retries — Launch Note
+   332→
+   333→Failed payments aren't the end of the story. SmartRetries™ recovers failed payments automatically, so your team keeps the revenue it already earned.
+   334→
+   335→Merchants using Smart Retries recover 11.4% more failed payments on average. Setup takes minutes in your workspace.`;
+   336→  const v2 = `NimbusPay® Smart Retries — Launch Note
+   337→
+   338→Failed payments aren't the end of the story. SmartRetries™ recovers failed payments automatically, so your team keeps the revenue it already earned.
+   339→
+   340→Merchants using Smart Retries recover 11.4% more failed payments on average. Setup takes minutes in your workspace.`;
+   341→
+   342→  const s4 = await db.submission.create({
+   343→    data: {
+   344→      orgId: org.id,
+   345→      authorId: ava.id,
+   346→      title: "SmartRetries Launch Note",
+   347→      contentType: "text",
+   348→      content: v2,
+   349→      status: "approved",
+   350→      complianceScore: 100,
+   351→      scanCount: 3,
+   352→      currentVersion: 2,
+   353→      department: "Content Studio",
+   354→      creatorNote: "Product launch note for the merchant newsletter.",
+   355→    },
+   356→  });
+   357→  await db.revision.create({ data: { submissionId: s4.id, version: 1, content: v1, changeSummary: "Initial draft", authorId: ava.id } });
+   358→  await db.revision.create({ data: { submissionId: s4.id, version: 2, content: v2, changeSummary: "Added ® glyph per TM-01 after review", authorId: ava.id } });
+   359→  await db.inspection.create({
+   360→    data: { submissionId: s4.id, durationMs: 4870, complianceScore: 100, stageA: JSON.stringify({ durationMs: 1.2, bannedTerms: [], trademarkIssues: [], claimCandidates: ["Merchants using Smart Retries recover 11.4% more failed payments on average."], hexCodesFound: [], styleIssues: [], checks: [{ name: "Banned terms", passed: true, count: 0, ms: 0.16 }, { name: "Trademark glyphs", passed: true, count: 0, ms: 0.1 }, { name: "Claim candidates", passed: true, count: 1, ms: 0.28 }, { name: "Hex discovery", passed: true, count: 0, ms: 0.03 }, { name: "Style mechanics", passed: true, count: 0, ms: 0.07 }] }), stageB: JSON.stringify({ durationMs: 4868, tone: { score: 93, voiceSummary: "Calm, confident, and customer-championing — on-voice.", driftFlags: [] }, claimVerdicts: [{ claim: "Merchants using Smart Retries recover 11.4% more failed payments on average.", verdict: "SUPPORTED", citation: "FACT PD-09: merchants using NimbusPay Smart Retries recover 11.4% more failed payments on average (internal measurement, Q1–Q3 2025).", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "Metric matches the approved internal measurement exactly.", suggestion: "" }], vision: null }) },
+   361→  });
+   362→  await db.finding.create({
+   363→    data: {
+   364→      submissionId: s4.id, severity: "warning", category: "trademark", flaggedText: "NimbusPay", ruleCitation: "RULE TM-01: First prominent use must carry the ® glyph.", sourceDoc: "Trademark & Naming Rules", rationale: "Title use was missing the ® registration mark.", suggestion: "NimbusPay®", stage: "deterministic", status: "resolved", createdAt: new Date(Date.now() - 1000 * 60 * 60 * 30), resolvedAt: new Date(Date.now() - 1000 * 60 * 60 * 20),
+   365→    },
+   366→  });
+   367→
+   368→  const day = 24 * 60 * 60 * 1000;
+   369→  const chainRows = chain([
+   370→    { action: "SUBMITTED", actorId: ava.id, details: { submissionId: s4.id, title: "SmartRetries Launch Note", version: 1 }, ts: new Date(Date.now() - 3 * day) },
+   371→    { action: "SCAN", actorId: ava.id, details: { submissionId: s4.id, findings: 1, score: 90 }, ts: new Date(Date.now() - 3 * day + 120000) },
+   372→    { action: "SIGN_OFF", actorId: marcus.id, details: { submissionId: s4.id, note: "Claim verified against FACT PD-09; ® glyph fix requested.", hash: createHash("sha256").update(`${s4.id}|${v1}|${marcus.id}`).digest("hex") }, ts: new Date(Date.now() - 2 * day) },
+   373→    { action: "CHANGES_REQUESTED", actorId: marcus.id, details: { submissionId: s4.id, note: "Please add the ® glyph on first prominent brand use (TM-01)." }, ts: new Date(Date.now() - 2 * day + 60000) },
+   374→    { action: "SCAN", actorId: ava.id, details: { submissionId: s4.id, findings: 0, score: 100 }, ts: new Date(Date.now() - 1 * day) },
+   375→    { action: "APPROVAL", actorId: marcus.id, details: { submissionId: s4.id, note: "All flags resolved. Cleared for publication.", certificate: true }, ts: new Date(Date.now() - 1 * day + 300000) },
+   376→  ]);
+   377→  for (const row of chainRows) {
+   378→    await db.auditLog.create({ data: { orgId: org.id, submissionId: s4.id, actorId: row.actorId, action: row.action, details: JSON.stringify(row.details), contentHash: row.contentHash, prevHash: row.prevHash, createdAt: row.ts } });
+   379→  }
+   380→
+   381→  // ── Submission 4: Changes requested (reviewer feedback demo)
+   382→  const s5Content = `Growth team webinar promo:
+   383→
+   384→Join our webinar and learn how NimbusPay customers cut failed payments by 40% in one week. Seats are limited — reserve yours now!`;
+   385→
+   386→  const s5 = await db.submission.create({
+   387→    data: {
+   388→      orgId: org.id,
+   389→      authorId: ava.id,
+   390→      title: "Webinar Promo — Payments Recovery",
+   391→      contentType: "text",
+   392→      content: s5Content,
+   393→      status: "changes_requested",
+   394→      complianceScore: 65,
+   395→      scanCount: 1,
+   396→      department: "Content Studio",
+   397→      creatorNote: "Promo blurb for the September webinar.",
+   398→    },
+   399→  });
+   400→  await db.revision.create({ data: { submissionId: s5.id, version: 1, content: s5Content, changeSummary: "Initial draft", authorId: ava.id } });
+   401→  await db.finding.createMany({
+   402→    data: [
+   403→      { submissionId: s5.id, severity: "critical", category: "claim", flaggedText: "Join our webinar and learn how NimbusPay customers cut failed payments by 40% in one week.", ruleCitation: "FACT PD-09: Smart Retries recover 11.4% more failed payments on average. No 40% one-week figure exists.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "The 40% one-week reduction is not in the approved facts and overstates FACT PD-09.", suggestion: "Join our webinar and learn how merchants recover 11.4% more failed payments with Smart Retries.", stage: "ai" },
+   404→    ],
+   405→  });
+   406→  await db.auditLog.create({
+   407→    data: {
+   408→      orgId: org.id, submissionId: s5.id, actorId: marcus.id, action: "CHANGES_REQUESTED",
+   409→      details: JSON.stringify({ submissionId: s5.id, note: "40% claim is not in the approved facts — please cite FACT PD-09 instead." }),
+   410→      contentHash: createHash("sha256").update(`${s5.id}|changes|${Date.now()}`).digest("hex"), prevHash: chainRows[chainRows.length - 1].contentHash,
+   411→      createdAt: new Date(Date.now() - 0.4 * day),
+   412→    },
+   413→  });
+   414→
+   415→  // ── Banner submission with off-brand palette (image generated separately)
+   416→  const s2 = await db.submission.create({
+   417→    data: {
+   418→      orgId: org.id,
+   419→      authorId: priya.id,
+   420→      title: "Summer Splash — Social Banner",
+   421→      contentType: "banner",
+   422→      content: "Summer Splash Sale — Up to 30% off NimbusPay fees for new merchants!",
+   423→      imageData: "/banners/summer-splash.png",
+   424→      imagePalette: JSON.stringify(["#FCE7F3", "#7C3AED", "#A78BFA", "#111827"]),
+   425→      status: "draft",
+   426→      complianceScore: 55,
+   427→      scanCount: 1,
+   428→      department: "PixelWorks Agency",
+   429→      creatorNote: "Instagram promo banner for the summer campaign.",
+   430→    },
+   431→  });
+   432→  await db.inspection.create({
+   433→    data: {
+   434→      submissionId: s2.id,
+   435→      durationMs: 7340,
+   436→      complianceScore: 55,
+   437→      stageA: JSON.stringify({ durationMs: 1.1, bannedTerms: [], trademarkIssues: [], claimCandidates: ["Summer Splash Sale — Up to 30% off NimbusPay fees for new merchants!"], hexCodesFound: ["#7C3AED"], styleIssues: [], checks: [{ name: "Banned terms", passed: true, count: 0, ms: 0.12 }, { name: "Trademark glyphs", passed: true, count: 0, ms: 0.09 }, { name: "Claim candidates", passed: true, count: 1, ms: 0.26 }, { name: "Hex discovery", passed: true, count: 1, ms: 0.03 }, { name: "Style mechanics", passed: true, count: 0, ms: 0.06 }] }),
+   438→      stageB: JSON.stringify({
+   439→        durationMs: 7338,
+   440→        tone: null,
+   441→        claimVerdicts: [],
+   442→        vision: {
+   443→          dominantColors: ["#FCE7F3", "#7C3AED", "#A78BFA", "#111827"],
+   444→          offBrandColors: ["#7C3AED", "#A78BFA", "#FCE7F3"],
+   445→          contrastIssues: [{ foreground: "#A78BFA", background: "#FCE7F3", ratio: 2.1, requirement: "WCAG 2.1 AA requires ≥ 4.5:1 for normal text" }],
+   446→          logoPresent: false,
+   447→          ocrText: "Summer Splash Sale — Up to 30% off NimbusPay fees for new merchants!",
+   448→          summary: "Banner uses an off-brand purple/violet palette outside the approved tokens, and the Nimbus Shield logo is absent.",
+   449→        },
+   450→      }),
+   451→    },
+   452→  });
+   453→  await db.finding.createMany({
+   454→    data: [
+   455→      { submissionId: s2.id, severity: "critical", category: "visual", flaggedText: "Text #A78BFA on #FCE7F3", ruleCitation: "WCAG 2.1 AA — contrast ratio must be ≥ 4.5:1 (measured 2.1:1)", sourceDoc: "Accessibility & Visual Tokens", rationale: "Foreground #A78BFA on background #FCE7F3 yields only 2.1:1, below the 4.5:1 AA threshold.", suggestion: "Use #0F172A text on #FCE7F3 for guaranteed AA compliance.", suggestedHex: "#0F172A", stage: "vision" },
+   456→      { submissionId: s2.id, severity: "warning", category: "visual", flaggedText: "#7C3AED", ruleCitation: "Visual Token Registry — only approved hex values may appear in creative assets", sourceDoc: "Visual Token Registry", rationale: "#7C3AED is not part of the approved palette. Nearest official token is #0F766E (Shield Teal).", suggestion: "Replace #7C3AED with #0F766E", suggestedHex: "#0F766E", stage: "vision" },
+   457→      { submissionId: s2.id, severity: "warning", category: "visual", flaggedText: "#A78BFA", ruleCitation: "Visual Token Registry — only approved hex values may appear in creative assets", sourceDoc: "Visual Token Registry", rationale: "#A78BFA is not part of the approved palette. Nearest official token is #14B8A6 (Aqua Mint).", suggestion: "Replace #A78BFA with #14B8A6", suggestedHex: "#14B8A6", stage: "vision" },
+   458→    ],
+   459→  });
+   460→
+   461→  // ── A few extra historic audit entries for billing + analytics texture
+   462→  const extra = chain([
+   463→    { action: "SUBSCRIPTION", actorId: elena.id, details: { event: "subscription.started", tier: "growth", seats: 12 }, ts: new Date(Date.now() - 21 * day) },
+   464→    { action: "SCAN", actorId: priya.id, details: { sandbox: true, tier: "growth" }, ts: new Date(Date.now() - 5 * day) },
+   465→    { action: "SCAN", actorId: ava.id, details: { sandbox: false }, ts: new Date(Date.now() - 4 * day) },
+   466→  ]);
+   467→  for (const row of extra) {
+   468→    await db.auditLog.create({ data: { orgId: org.id, submissionId: null, actorId: row.actorId, action: row.action, details: JSON.stringify(row.details), contentHash: row.contentHash, prevHash: row.prevHash, createdAt: row.ts } });
+   469→  }
+   470→
+   471→  console.log("✅ BrandShield seed complete: Nimbus Labs workspace is ready");
+   472→}
+   473→
