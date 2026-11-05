@@ -18,6 +18,7 @@ import {
   ScanSearch,
   Settings,
   ShieldCheck,
+  GraduationCap,
   type LucideIcon,
 } from "lucide-react";
 import { useLogout, useSession } from "@/lib/brandshield/client";
@@ -172,10 +173,14 @@ function IconNavButton({
 
 export function Shell({ children }: { children: ReactNode }) {
   const session = useSession();
-  const { view, setView, sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { view, setView, sidebarCollapsed, toggleSidebar, setTourOpen } = useUIStore();
   const logout = useLogout();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+
+  function startTour() {
+    window.dispatchEvent(new Event("brandshield:start-tour"));
+  }
 
   if (session.isLoading) {
     return (
@@ -356,6 +361,17 @@ export function Shell({ children }: { children: ReactNode }) {
             <span className="hidden max-w-44 truncate text-sm text-slate-500 md:inline">{user.orgName}</span>
             <Separator orientation="vertical" className="data-[orientation=vertical]:h-6! hidden md:block" />
 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={startTour}
+              className="gap-1.5 rounded-lg text-slate-500 hover:bg-teal-50 hover:text-teal-700"
+              aria-label="Take the guided product tour"
+            >
+              <GraduationCap className="size-4" />
+              <span className="hidden sm:inline">Take the tour</span>
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -385,6 +401,11 @@ export function Shell({ children }: { children: ReactNode }) {
                   </Badge>
                 </div>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={startTour} className="gap-2">
+                  <GraduationCap className="size-4 text-teal-600" />
+                  Take the guided tour
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => logout.mutate()}
                   disabled={logout.isPending}
@@ -403,17 +424,19 @@ export function Shell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="flex-1 pb-20 md:pb-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={view}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          <div data-tour="page-root">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={view}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18 }}
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </main>
 
         <footer className="mt-auto shrink-0 border-t border-slate-200 bg-white/60 py-4">

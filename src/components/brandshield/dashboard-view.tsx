@@ -91,7 +91,7 @@ export function DashboardView() {
       </motion.div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div data-tour="stats" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((s, i) => (
           <motion.button key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} onClick={() => setView(s.view)} className="text-left">
             <Card className="transition hover:border-teal-200 hover:shadow-sm">
@@ -195,7 +195,7 @@ export function DashboardView() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="quick-actions">
             <CardContent className="p-5">
               <h2 className="mb-3 text-sm font-semibold text-slate-800">Quick actions</h2>
               <div className="space-y-1.5">

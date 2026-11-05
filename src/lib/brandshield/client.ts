@@ -85,6 +85,18 @@ export function useLogin() {
   });
 }
 
+export function useRegister() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; email: string; password: string; role: string; department?: string }) =>
+      api.post<SessionUser>("/api/auth/register", input),
+    onSuccess: (user) => {
+      qc.setQueryData(["session"], user);
+      qc.invalidateQueries();
+    },
+  });
+}
+
 export function useDemoLogin() {
   const qc = useQueryClient();
   return useMutation({

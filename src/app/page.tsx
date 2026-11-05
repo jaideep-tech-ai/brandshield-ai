@@ -8,6 +8,7 @@ import { useUIStore } from "@/lib/brandshield/store";
 import { Providers } from "@/components/brandshield/providers";
 import { Landing } from "@/components/brandshield/landing";
 import { AuthView } from "@/components/brandshield/auth-view";
+import { DemoTour } from "@/components/brandshield/demo-tour";
 import { Shell } from "@/components/brandshield/shell";
 import { DashboardView } from "@/components/brandshield/dashboard-view";
 import { KnowledgeView } from "@/components/brandshield/knowledge-view";
@@ -59,9 +60,20 @@ function App() {
   }
 
   return (
-    <Shell>
+    <ShellWithTour>
       <ViewRouter />
-    </Shell>
+    </ShellWithTour>
+  );
+}
+
+function ShellWithTour({ children }: { children: React.ReactNode }) {
+  const session = useSession();
+  const user = session.data;
+  return (
+    <>
+      <Shell>{children}</Shell>
+      {user && <DemoTour role={user.role} />}
+    </>
   );
 }
 

@@ -4,20 +4,42 @@ import { SESSION_COOKIE, createSessionToken } from "@/lib/brandshield/server/aut
 import { ensureSeed } from "@/lib/brandshield/server/seed";
 import { jsonError } from "@/lib/brandshield/server/json";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function firebaseError(code: string, message: string, status: number) {
+  return NextResponse.json({ error: message, code }, { status });
+}
+
+/**
+ * Firebase-Auth-compatible email/password sign-in.
+ * Mirrors `signInWithEmailAndPassword` semantics and error codes:
+ *   auth/invalid-email · auth/user-not-found · auth/wrong-password
+ */
 export async function POST(req: NextRequest) {
   try {
     await ensureSeed();
-    const { email, password } = (await req.json()) as { email?: string; password?: string };
+    const { email: rawEmail, password } = (await req.json()) as { email?: string; password?: string };
+    const email = rawEmail?.toLowerCase().trim() ?? "";
+
     if (!email || !password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+      return firebaseError("auth/missing-credentials", "Email and password are required.", 400);
     }
-    const user = await db.user.findUnique({ where: { email: email.toLowerCase().trim() }, include: { organization: true } });
+    if (!EMAIL_RE.test(email)) {
+      return firebaseError("auth/invalid-email", "That email address doesn't look right. Check the format — e.g. you@company.com.", 400);
+    }
+
+    const user = await db.user.findUnique({ where: { email }, include: { organization: true } });
     if (!user) {
-      return NextResponse.json({ error: "No account found for this email. Try a demo persona." }, { status: 401 });
+      return firebaseError(
+        "auth/user-not-found",
+        "No account found for this email. Create one on the “Create account” tab, or use a one-click demo persona.",
+        401
+      );
     }
     if (user.password !== password) {
-      return NextResponse.json({ error: "Incorrect password. Demo accounts use “demo1234”." }, { status: 401 });
+      return firebaseError("auth/wrong-password", "Incorrect password. Demo accounts use “demo1234”.", 401);
     }
+
     const res = NextResponse.json({
       id: user.id,
       email: user.email,
