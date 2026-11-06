@@ -1,0 +1,12 @@
+db/*.db
+db/*.db-journal
+db/*.sqlite
+upload/
+dev.log
+server.log
+*.log
+.zscripts/
+agent-ctx/
+tests/
+.playwright/
+drizzle/
