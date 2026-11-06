@@ -20,9 +20,10 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useDemoLogin, useLogin, useRegister } from "@/lib/brandshield/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { markAuthHint, useDemoLogin, useLogin, useRegister } from "@/lib/brandshield/client";
 import { firebaseEmailSignIn, firebaseEmailSignUp, isFirebaseConfigured } from "@/lib/brandshield/firebase";
-import type { Role } from "@/lib/brandshield/types";
+import type { Role, SessionUser } from "@/lib/brandshield/types";
 import { cn, initials } from "@/lib/brandshield/utils";
 import { LangToggle, useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-auth";
@@ -143,7 +144,16 @@ export function AuthView({ onBack }: { onBack: () => void }) {
   const demo = useDemoLogin();
   const login = useLogin();
   const register = useRegister();
+  const queryClient = useQueryClient();
   const busy = login.isPending || register.isPending || demo.isPending;
+
+  // Swap straight into the dashboard SPA-style — no full page reload, so the
+  // session query is satisfied from the synced user and the shell mounts
+  // immediately (signed-in chunks are already warmed by the shell itself).
+  function finishFirebaseSession(user: SessionUser) {
+    markAuthHint();
+    queryClient.setQueryData(["session"], user);
+  }
   const rawError = (mode === "signin" ? login.error : register.error) ?? null;
   // Server codes arrive Firebase-style ("auth/email-already-in-use") — strip
   // the namespace for dictionary lookup, e.g. auth.err.email-already-in-use.
@@ -170,7 +180,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
     const finish = () => toast.success(t("auth.toast.signedIn"));
     if (firebaseConnected) {
       firebaseEmailSignIn(email.trim(), password)
-        .then(() => window.location.reload())
+        .then(finishFirebaseSession)
         .catch((err: Error) => toast.error(err.message));
       return;
     }
@@ -186,7 +196,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
     }
     if (firebaseConnected) {
       firebaseEmailSignUp({ email: email.trim(), password, name: name.trim() })
-        .then(() => window.location.reload())
+        .then(finishFirebaseSession)
         .catch((err: Error) => toast.error(err.message));
       return;
     }

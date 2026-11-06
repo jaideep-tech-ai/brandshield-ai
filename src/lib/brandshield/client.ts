@@ -57,6 +57,38 @@ export const api = {
   del: <T,>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
+// ─── Session hint (localStorage) ───────────────────────────────────────
+
+// Tracks whether this browser has ever held a signed-in session. Anonymous
+// visitors (no hint) render the landing instantly instead of waiting on the
+// /api/auth/me round trip; returning users get the branded gate while the
+// session check and signed-in chunk warm-up run in parallel.
+const AUTH_HINT_KEY = "bs.auth.hint";
+
+export function markAuthHint(): void {
+  try {
+    localStorage.setItem(AUTH_HINT_KEY, "1");
+  } catch {
+    /* private browsing — the hint is an optimization only */
+  }
+}
+
+export function clearAuthHint(): void {
+  try {
+    localStorage.removeItem(AUTH_HINT_KEY);
+  } catch {
+    /* private browsing */
+  }
+}
+
+export function hasAuthHint(): boolean {
+  try {
+    return localStorage.getItem(AUTH_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export function useSession(options?: Partial<UseQueryOptions<SessionUser | null>>) {
@@ -64,8 +96,11 @@ export function useSession(options?: Partial<UseQueryOptions<SessionUser | null>
     queryKey: ["session"],
     queryFn: async () => {
       try {
-        return await api.get<SessionUser>("/api/auth/me");
+        const user = await api.get<SessionUser>("/api/auth/me");
+        markAuthHint();
+        return user;
       } catch {
+        clearAuthHint();
         return null;
       }
     },
@@ -115,6 +150,7 @@ export function useLogout() {
     onSuccess: () => {
       qc.setQueryData(["session"], null);
       qc.clear();
+      clearAuthHint();
     },
   });
 }

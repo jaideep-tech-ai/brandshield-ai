@@ -1,5 +1,7 @@
 "use client";
 
+import type { SessionUser } from "@/lib/brandshield/types";
+
 /**
  * Firebase Authentication adapter for BrandShield AI.
  *
@@ -70,34 +72,36 @@ function mapFirebaseError(err: unknown): Error {
   return Object.assign(new Error(messages[code] ?? (err as Error)?.message ?? "Authentication failed."), { code });
 }
 
-/** Sign in with real Firebase Auth, then sync the session with the backend. */
-export async function firebaseEmailSignIn(email: string, password: string): Promise<void> {
+/** Sign in with real Firebase Auth, then sync the session with the backend.
+ *  Resolves with the synced session user (drives the SPA dashboard swap). */
+export async function firebaseEmailSignIn(email: string, password: string): Promise<SessionUser> {
   try {
     const { signInWithEmailAndPassword } = await import("firebase/auth");
     const auth = await loadFirebaseAuth();
     const credential = await signInWithEmailAndPassword(auth, email, password);
     const idToken = await credential.user.getIdToken();
-    await syncSession(idToken);
+    return await syncSession(idToken);
   } catch (err) {
     throw mapFirebaseError(err);
   }
 }
 
-/** Create a real Firebase Auth account, then sync the session with the backend. */
-export async function firebaseEmailSignUp(input: { email: string; password: string; name: string }): Promise<void> {
+/** Create a real Firebase Auth account, then sync the session with the backend.
+ *  Resolves with the synced session user (drives the SPA dashboard swap). */
+export async function firebaseEmailSignUp(input: { email: string; password: string; name: string }): Promise<SessionUser> {
   try {
     const { createUserWithEmailAndPassword, updateProfile } = await import("firebase/auth");
     const auth = await loadFirebaseAuth();
     const credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
     if (input.name) await updateProfile(credential.user, { displayName: input.name });
     const idToken = await credential.user.getIdToken();
-    await syncSession(idToken);
+    return await syncSession(idToken);
   } catch (err) {
     throw mapFirebaseError(err);
   }
 }
 
-async function syncSession(idToken: string): Promise<void> {
+async function syncSession(idToken: string): Promise<SessionUser> {
   const res = await fetch("/api/auth/firebase-sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -108,4 +112,5 @@ async function syncSession(idToken: string): Promise<void> {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error ?? "Could not sync your Firebase session with the workspace.");
   }
+  return (await res.json()) as SessionUser;
 }
