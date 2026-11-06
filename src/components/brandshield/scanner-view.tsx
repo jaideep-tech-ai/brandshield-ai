@@ -74,6 +74,7 @@ export function ScannerView() {
   const [note, setNote] = useState("");
   const [imageData, setImageData] = useState<string | null>(null);
   const [palette, setPalette] = useState<string[]>([]);
+  const [dragging, setDragging] = useState(false);
   const [pipelineStep, setPipelineStep] = useState(0); // 0 idle, 1 stage A, 2 stage B, 3 done
   const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -95,8 +96,10 @@ export function ScannerView() {
         setImageData(dataUrl);
         setPalette(p);
         toast.success(t("scanner.toast.loaded", { n: p.length }));
-      } catch {
-        toast.error(t("scanner.toast.readFail"));
+      } catch (err) {
+        toast.error(t("scanner.toast.readFail"), {
+          description: err instanceof Error && err.message ? err.message : undefined,
+        });
       }
     },
     [t]
@@ -244,7 +247,21 @@ export function ScannerView() {
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/50 px-6 py-10 text-center transition hover:border-teal-400 hover:bg-teal-50"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragging(false);
+                      const f = e.dataTransfer.files?.[0];
+                      if (f) void onFile(f);
+                    }}
+                    className={cn(
+                      "flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition",
+                      dragging ? "border-teal-500 bg-teal-100/70" : "border-teal-300 bg-teal-50/50 hover:border-teal-400 hover:bg-teal-50"
+                    )}
                   >
                     <UploadCloud className="h-8 w-8 text-teal-600" />
                     <span className="text-sm font-medium text-teal-800">{t("scanner.drop.title")}</span>
@@ -253,7 +270,7 @@ export function ScannerView() {
                 ) : (
                   <div className="space-y-3">
                     <div className="relative overflow-hidden rounded-xl border border-slate-200">
-                                    <img src={imageData} alt={t("scanner.preview.alt")} className="max-h-64 w-full object-contain" />
+                      <img src={imageData} alt={t("scanner.preview.alt")} className="max-h-64 w-full object-contain" />
                       <Button size="icon" variant="secondary" className="absolute right-2 top-2 h-7 w-7" aria-label={t("scanner.aria.removeImage")} onClick={() => { setImageData(null); setPalette([]); }}>
                         <X className="h-4 w-4" />
                       </Button>
