@@ -119,6 +119,13 @@ export async function POST(req: NextRequest) {
         password: provisioned.user.password,
         organization: provisioned.organization,
       };
+    } else if (user.firebaseUid !== claims.sub) {
+      // Pre-existing workspace account (created before Firebase was
+      // connected, or via local-mode sign-up) signing in through Firebase
+      // for the first time — link the verified Firebase UID so the record
+      // is fully federated, and keep the existing workspace untouched.
+      await db.user.update({ where: { id: user.id }, data: { firebaseUid: claims.sub } });
+      user = { ...user, firebaseUid: claims.sub };
     }
 
     const res = NextResponse.json({

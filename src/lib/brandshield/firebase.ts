@@ -62,6 +62,7 @@ function mapFirebaseError(err: unknown): Error {
     "auth/email-already-in-use": "An account with this email already exists. Try signing in instead.",
     "auth/user-not-found": "No account found for this email. Create one on the “Create account” tab.",
     "auth/wrong-password": "Incorrect password. Please try again.",
+    "auth/invalid-credential": "Email or password is incorrect — or this account was created before Firebase was connected. Try the “Create account” tab once with the same email.",
     "auth/too-many-requests": "Too many attempts. Please wait a moment and try again.",
     "auth/network-request-failed": "Network error — check your connection and try again.",
     "auth/operation-not-allowed": "Email/password sign-in is not enabled for this Firebase project.",

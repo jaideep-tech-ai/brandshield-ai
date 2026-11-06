@@ -100,6 +100,7 @@ const KNOWN_ERR_CODES = new Set([
   "email-already-in-use",
   "user-not-found",
   "wrong-password",
+  "invalid-credential",
   "missing-credentials",
   "too-many-requests",
 ]);
