@@ -22,7 +22,7 @@ import { provisionWorkspace } from "@/lib/brandshield/server/workspace";
  */
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-const CERT_URL = "https://www.googleapis.com/robots/v1/metadata/x509/securetoken@system.gserviceaccount.com";
+const CERT_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
 
 interface FirebaseIdTokenClaims {
   aud: string;
