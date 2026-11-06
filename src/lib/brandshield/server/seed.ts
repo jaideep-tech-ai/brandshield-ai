@@ -116,7 +116,21 @@ function chain(entries: { action: string; actorId: string; details: Record<strin
 
 let seedPromise: Promise<void> | null = null;
 
+/**
+ * Whether the one-click demo workspace (Nimbus Labs personas) may be created.
+ *
+ * Set DEMO_SEED=off in production hosting (Vercel → Environment Variables) to
+ * start with a completely clean database — real users then sign up via the
+ * "Create account" tab and every row is real data. Unset (or any other value)
+ * keeps the sandbox/demo behavior where the first auth call seeds the demo.
+ */
+export function isDemoWorkspaceEnabled(): boolean {
+  const v = (process.env.DEMO_SEED ?? "").trim().toLowerCase();
+  return v !== "off" && v !== "0" && v !== "false";
+}
+
 export function ensureSeed(): Promise<void> {
+  if (!isDemoWorkspaceEnabled()) return Promise.resolve();
   if (!seedPromise) {
     seedPromise = seedInternal().catch((e) => {
       seedPromise = null;

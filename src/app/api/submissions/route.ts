@@ -7,9 +7,15 @@ import { jsonError } from "@/lib/brandshield/server/json";
 export async function GET() {
   try {
     const user = await requireUser();
+    // PERF: the list endpoint deliberately omits `imageData` (base64 banners
+    // can be hundreds of KB each — shipping them for every row made list
+    // payloads multi-MB and slow on serverless). The detail endpoint
+    // GET /api/submissions/[id] still returns it; banner previews render via
+    // GET /api/submissions/[id]/image (cached, binary).
     const subs = await db.submission.findMany({
       where: { orgId: user.orgId },
       orderBy: { updatedAt: "desc" },
+      omit: { imageData: true },
       include: {
         author: { select: { name: true, role: true } },
         findings: { orderBy: { createdAt: "asc" } },

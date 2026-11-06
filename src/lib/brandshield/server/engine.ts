@@ -230,7 +230,31 @@ export function retrieveChunks(query: string, chunks: ChunkRow[], k = 3): ChunkR
 
 // ─── LLM helpers (strict structured output with graceful fallback) ───────────
 
+/**
+ * Resolve the AI client.
+ *
+ * Priority:
+ *  1. Environment credentials (ZAI_BASE_URL + ZAI_API_KEY) — used on hosting
+ *     platforms like Vercel where the sandbox `.z-ai-config` file doesn't
+ *     exist. Any OpenAI-compatible endpoint works (chat/completions shape).
+ *  2. File-based `.z-ai-config` (sandbox / local dev default).
+ *
+ * If neither is available the returned promise rejects; every call site wraps
+ * `getZAI()` in try/catch and degrades to deterministic-only results, so the
+ * product NEVER hard-crashes without AI credentials.
+ */
 async function getZAI() {
+  const envBase = process.env.ZAI_BASE_URL?.trim();
+  const envKey = process.env.ZAI_API_KEY?.trim();
+  if (envBase && envKey) {
+    // The runtime constructor accepts a config object (dist/index.js) — only
+    // the .d.ts declares it private. Construct via a typed shim so hosting
+    // platforms (Vercel) can supply credentials through environment variables
+    // instead of the sandbox `.z-ai-config` file.
+    type ZAIClient = Awaited<ReturnType<typeof ZAI.create>>;
+    const ConfiguredZAI = ZAI as unknown as new (config: { baseUrl: string; apiKey: string }) => ZAIClient;
+    return new ConfiguredZAI({ baseUrl: envBase.replace(/\/+$/, ""), apiKey: envKey });
+  }
   return ZAI.create();
 }
 

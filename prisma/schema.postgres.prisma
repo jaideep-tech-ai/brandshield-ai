@@ -1,9 +1,11 @@
 // ⚠️ GENERATED FILE — do not edit by hand.
 // Generated from prisma/schema.prisma by scripts/sync-pg-schema.mjs (bun run db:sync:pg).
 // Target: Supabase PostgreSQL (also compatible with Neon / RDS / any Postgres 14+).
+// binaryTargets include rhel-openssl-3.0.x for Vercel / AWS Lambda runtimes.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

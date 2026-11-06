@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -119,6 +119,25 @@ export function AuthView({ onBack }: { onBack: () => void }) {
   const [role, setRole] = useState<Role>("creator");
   const [department, setDepartment] = useState("");
   const [organizationName, setOrganizationName] = useState("");
+
+  // Demo personas only exist when the deployment seeds them (DEMO_SEED not
+  // set to "off"). Production deployments start clean — the buttons stay
+  // hidden there and users sign up for real. null = still checking (hidden).
+  const [demoEnabled, setDemoEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/demo-status")
+      .then((r) => (r.ok ? r.json() : { demoEnabled: false }))
+      .then((j: { demoEnabled?: boolean }) => {
+        if (!cancelled) setDemoEnabled(!!j.demoEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setDemoEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const demo = useDemoLogin();
   const login = useLogin();
@@ -310,58 +329,62 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                   exit={{ opacity: 0, x: 12 }}
                   transition={{ duration: 0.18 }}
                 >
-                  {/* Demo personas */}
-                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                    {t("auth.demo.heading")}
-                  </p>
-                  <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    {PERSONAS.map((persona) => (
-                      <button
-                        key={persona.email}
-                        type="button"
-                        disabled={demo.isPending}
-                        onClick={() => handleDemo(persona.email, persona.name)}
-                        className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-teal-300 hover:bg-teal-50/50 hover:shadow-sm disabled:pointer-events-none disabled:opacity-60"
-                      >
-                        <Avatar className="size-10 border border-black/5">
-                          <AvatarFallback
-                            style={{ backgroundColor: persona.avatarColor }}
-                            className="text-sm font-semibold text-white"
+                  {/* Demo personas (hidden on clean production deployments) */}
+                  {demoEnabled && (
+                    <>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                        {t("auth.demo.heading")}
+                      </p>
+                      <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                        {PERSONAS.map((persona) => (
+                          <button
+                            key={persona.email}
+                            type="button"
+                            disabled={demo.isPending}
+                            onClick={() => handleDemo(persona.email, persona.name)}
+                            className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-teal-300 hover:bg-teal-50/50 hover:shadow-sm disabled:pointer-events-none disabled:opacity-60"
                           >
-                            {initials(persona.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate text-sm font-semibold text-slate-900">{persona.name}</span>
-                            <Badge
-                              variant="outline"
-                              className={cn("px-1.5 py-0 text-[10px] font-medium", ROLE_BADGE[persona.role as Role])}
-                            >
-                              {t(`common.role.${persona.role}`)}
-                            </Badge>
-                          </div>
-                          <p className="mt-0.5 truncate text-xs text-slate-500">
-                            {t(`auth.persona.title.${persona.role}`)}
-                          </p>
-                        </div>
-                        {demo.isPending && demo.variables === persona.email ? (
-                          <Loader2 className="size-4 shrink-0 animate-spin text-teal-600" />
-                        ) : (
-                          <ArrowRight className="size-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-600" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
+                            <Avatar className="size-10 border border-black/5">
+                              <AvatarFallback
+                                style={{ backgroundColor: persona.avatarColor }}
+                                className="text-sm font-semibold text-white"
+                              >
+                                {initials(persona.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate text-sm font-semibold text-slate-900">{persona.name}</span>
+                                <Badge
+                                  variant="outline"
+                                  className={cn("px-1.5 py-0 text-[10px] font-medium", ROLE_BADGE[persona.role as Role])}
+                                >
+                                  {t(`common.role.${persona.role}`)}
+                                </Badge>
+                              </div>
+                              <p className="mt-0.5 truncate text-xs text-slate-500">
+                                {t(`auth.persona.title.${persona.role}`)}
+                              </p>
+                            </div>
+                            {demo.isPending && demo.variables === persona.email ? (
+                              <Loader2 className="size-4 shrink-0 animate-spin text-teal-600" />
+                            ) : (
+                              <ArrowRight className="size-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-600" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
 
-                  <div className="relative my-5">
-                    <div className="absolute inset-0 flex items-center">
-                      <Separator className="w-full" />
-                    </div>
-                    <div className="relative flex justify-center">
-                      <span className="bg-white px-3 text-xs text-slate-400">{t("auth.divider.orEmail")}</span>
-                    </div>
-                  </div>
+                      <div className="relative my-5">
+                        <div className="absolute inset-0 flex items-center">
+                          <Separator className="w-full" />
+                        </div>
+                        <div className="relative flex justify-center">
+                          <span className="bg-white px-3 text-xs text-slate-400">{t("auth.divider.orEmail")}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <form onSubmit={handleLogin} className="space-y-4" noValidate>
                     <div className="space-y-1.5">

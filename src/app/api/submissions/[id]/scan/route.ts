@@ -4,7 +4,9 @@ import { getSessionUser, requireRole, requireUser, HttpError } from "@/lib/brand
 import { runPreFlightInspection, appendAuditLog } from "@/lib/brandshield/server/engine";
 import { jsonError } from "@/lib/brandshield/server/json";
 
-export const maxDuration = 120;
+// Vercel serverless cap for the Hobby plan is 60s; the full pipeline
+// (deterministic stage + grounded LLM + vision) typically finishes in ~15s.
+export const maxDuration = 60;
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

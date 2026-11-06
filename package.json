@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
+    "build": "next build",
+    "build:standalone": "NEXT_OUTPUT_STANDALONE=1 next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
+    "postinstall": "prisma generate",
     "lint": "eslint .",
     "db:push": "prisma db push --accept-data-loss",
     "db:generate": "prisma generate",
@@ -14,8 +16,9 @@
     "db:cleanup": "bun scripts/cleanup-db.mjs",
     "db:sync:pg": "bun scripts/sync-pg-schema.mjs",
     "db:pg:generate": "prisma generate --schema prisma/schema.postgres.prisma",
-    "db:pg:push": "prisma db push --schema prisma/schema.postgres.prisma",
-    "db:pg:studio": "prisma studio --schema prisma/schema.postgres.prisma"
+    "db:pg:push": "prisma db push --schema prisma/schema.postgres.prisma --accept-data-loss",
+    "db:pg:studio": "prisma studio --schema prisma/schema.postgres.prisma",
+    "db:pg:migrate": "prisma migrate deploy --schema prisma/schema.postgres.prisma"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

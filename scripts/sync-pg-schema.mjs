@@ -18,16 +18,33 @@ const OUT = "prisma/schema.postgres.prisma";
 
 let schema = readFileSync(SRC, "utf8");
 
-// Swap the datasource provider (SQLite → PostgreSQL). Everything else —
-// models, uniques, indexes, cascade rules — is identical and fully
-// PostgreSQL-compatible.
+// 1) Swap the datasource provider (SQLite → PostgreSQL). Everything else —
+//    models, uniques, indexes, cascade rules — is identical and fully
+//    PostgreSQL-compatible.
 schema = schema.replace(
   /datasource\s+db\s*\{[^}]*\}/,
-  `datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}`
+  [
+    'datasource db {',
+    '  provider  = "postgresql"',
+    '  url       = env("DATABASE_URL")',
+    '  directUrl = env("DIRECT_URL")',
+    '}',
+  ].join("\n")
+);
+
+// 2) Serverless hosting (Vercel/Netlify) builds AND runs on Amazon Linux
+//    2023 — Prisma must download a matching native query engine or the
+//    deployed functions crash at runtime with "Query engine library not
+//    found". "native" keeps local dev exact; rhel-openssl-3.0.x covers
+//    AWS Lambda / Vercel runtimes.
+schema = schema.replace(
+  /generator\s+client\s*\{[^}]*\}/,
+  [
+    'generator client {',
+    '  provider      = "prisma-client-js"',
+    '  binaryTargets = ["native", "rhel-openssl-3.0.x"]',
+    '}',
+  ].join("\n")
 );
 
 // Header note on the generated file.
@@ -35,9 +52,10 @@ schema =
   `// ⚠️ GENERATED FILE — do not edit by hand.
 // Generated from prisma/schema.prisma by scripts/sync-pg-schema.mjs (bun run db:sync:pg).
 // Target: Supabase PostgreSQL (also compatible with Neon / RDS / any Postgres 14+).
+// binaryTargets include rhel-openssl-3.0.x for Vercel / AWS Lambda runtimes.
 
 ` + schema;
 
 writeFileSync(OUT, schema, "utf8");
-console.log(`✔ Wrote ${OUT} (provider: postgresql, directUrl for migrations)`);
+console.log(`✔ Wrote ${OUT} (provider: postgresql, binaryTargets: native + rhel-openssl-3.0.x)`);
 console.log("  Next: set DATABASE_URL + DIRECT_URL in .env, then run: bun run db:pg:push");

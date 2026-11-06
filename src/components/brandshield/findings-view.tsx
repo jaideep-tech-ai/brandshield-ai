@@ -188,7 +188,7 @@ export function FindingsView() {
                   </Badge>
                 </div>
 
-                {sub.contentType === "banner" && sub.imageData ? (
+                {sub.contentType === "banner" ? (
                   <BannerAnnotator sub={sub} findings={openFindings} selectedId={selectedFindingId} onSelect={setSelectedFindingId} />
                 ) : (
                   <div className="rounded-xl border border-slate-100 bg-white p-4 sm:p-5">
@@ -376,14 +376,17 @@ function HighlightedContent({ content, findings, selectedId, onSelect }: { conte
   );
 }
 
-function BannerAnnotator({ sub, findings, selectedId, onSelect }: { sub: { imageData: string | null; imagePalette: string[] }; findings: Finding[]; selectedId: string | null; onSelect: (id: string) => void }) {
+function BannerAnnotator({ sub, findings, selectedId, onSelect }: { sub: { id: string; imageData?: string | null; imagePalette: string[] }; findings: Finding[]; selectedId: string | null; onSelect: (id: string) => void }) {
   const { t } = useLang();
   const colorFindings = findings.filter((f) => /^#[0-9a-fA-F]{3,8}/.test(f.flaggedText));
   const offColors = new Map(colorFindings.map((f) => [f.flaggedText.toUpperCase(), f]));
+  // Prefer the lightweight cached binary endpoint; fall back to the inline
+  // data URL (freshly-created submissions before the list refresh).
+  const src = sub.imageData ?? `/api/submissions/${sub.id}/image`;
   return (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-xl border border-slate-200">
-        <img src={sub.imageData ?? ""} alt={t("findings.banner.alt")} className="max-h-72 w-full object-contain" />
+        <img src={src} alt={t("findings.banner.alt")} className="max-h-72 w-full object-contain" />
       </div>
       <div>
         <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-500"><Palette className="h-3.5 w-3.5 text-teal-700" /> {t("findings.banner.paletteHint")}</p>
