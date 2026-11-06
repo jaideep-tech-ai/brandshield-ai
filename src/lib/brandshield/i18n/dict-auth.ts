@@ -30,7 +30,7 @@ const dict = {
     "signin.title": "Sign in to BrandShield",
     "signin.subtitle": "Email + password, Firebase-style — or jump in with a demo persona.",
     "signup.title": "Create your BrandShield account",
-    "signup.subtitle": "Email + password, Firebase-style. New teammates join the Nimbus Labs workspace with data pre-loaded.",
+    "signup.subtitle": "Email + password, Firebase-style. You get your own private workspace, ready in seconds.",
     "tab.signin": "Sign in",
     "tab.signup": "Create account",
     "aria.modeTabs": "Authentication mode",
@@ -56,6 +56,9 @@ const dict = {
     // Sign-up form
     "signup.name": "Full name",
     "signup.namePlaceholder": "Jordan Lee",
+    "signup.organization": "Company / workspace name",
+    "signup.orgPlaceholder": "Acme Marketing",
+    "signup.orgHint": "A private, isolated workspace is provisioned just for your team — no shared data.",
     "signup.department": "Team / department",
     "optional": "(optional)",
     "signup.deptPlaceholder": "Content Studio",
@@ -72,8 +75,20 @@ const dict = {
     "role.hint.reviewer": "Approve or request changes",
     "role.hint.contractor": "Sandboxed pre-checks",
     "role.hint.admin": "Knowledge, billing, analytics",
-    "signup.footer": "You'll join the Nimbus Labs demo workspace — seeded with a real brand repository.",
+    "signup.footer": "Your own isolated workspace is provisioned atomically — duplicates are impossible, passwords are scrypt-hashed.",
     "error.mismatchLive": "Passwords don't match yet.",
+
+    // Firebase-style error codes → localized messages (server sends codes; UI translates)
+    "err.invalid-email": "That email address doesn't look right. Check the format — e.g. you@company.com.",
+    "err.missing-password": "Please enter a password.",
+    "err.weak-password": "Password should be at least 6 characters.",
+    "err.missing-name": "Please tell us your full name — it appears on reviews and audit logs.",
+    "err.email-already-in-use": "An account with this email already exists. Sign in instead — duplicates are blocked by design.",
+    "err.user-not-found": "No account found for this email. Create one on the “Create account” tab, or use a one-click demo persona.",
+    "err.wrong-password": "Incorrect password. Demo accounts use “demo1234”.",
+    "err.missing-credentials": "Email and password are required.",
+    "err.too-many-requests": "Too many attempts from this network. Please wait a few minutes and try again.",
+    "err.unknown": "Something went wrong. Please try again.",
 
     // Submit buttons & toasts
     "action.signUp": "Create account & start tour",
@@ -111,7 +126,7 @@ const dict = {
     "signin.title": "BrandShield में लॉग इन करें",
     "signin.subtitle": "ईमेल + पासवर्ड, Firebase-स्टाइल — या किसी डेमो पर्सना के साथ सीधे शुरू करें।",
     "signup.title": "अपना BrandShield अकाउंट बनाएँ",
-    "signup.subtitle": "ईमेल + पासवर्ड, Firebase-स्टाइल। नए टीम सदस्य Nimbus Labs वर्कस्पेस में पहले से लोड किए गए डेटा के साथ जुड़ते हैं।",
+    "signup.subtitle": "ईमेल + पासवर्ड, Firebase-स्टाइल। आपको कुछ ही सेकंड में अपना निजी वर्कस्पेस मिलता है।",
     "tab.signin": "लॉग इन",
     "tab.signup": "अकाउंट बनाएँ",
     "aria.modeTabs": "प्रमाणीकरण मोड",
@@ -137,6 +152,9 @@ const dict = {
     // अकाउंट बनाने का फ़ॉर्म
     "signup.name": "पूरा नाम",
     "signup.namePlaceholder": "Jordan Lee",
+    "signup.organization": "कंपनी / वर्कस्पेस का नाम",
+    "signup.orgPlaceholder": "Acme मार्केटिंग",
+    "signup.orgHint": "आपकी टीम के लिए निजी, पूरी तरह अलग वर्कस्पेस बनता है — कोई शेयर्ड डेटा नहीं।",
     "signup.department": "टीम / विभाग",
     "optional": "(वैकल्पिक)",
     "signup.deptPlaceholder": "कंटेंट स्टूडियो",
@@ -153,8 +171,20 @@ const dict = {
     "role.hint.reviewer": "मंज़ूरी दें या बदलाव माँगें",
     "role.hint.contractor": "सैंडबॉक्स में प्री-चेक",
     "role.hint.admin": "नॉलेज, बिलिंग, एनालिटिक्स",
-    "signup.footer": "आप Nimbus Labs डेमो वर्कस्पेस में शामिल होंगे — जिसमें असली ब्रांड रिपॉज़िटरी पहले से तैयार है।",
+    "signup.footer": "आपका अलग वर्कस्पेस एक ही ट्रांज़ैक्शन में बनता है — डुप्लीकेट असंभव, पासवर्ड scrypt-हैश्ड।",
     "error.mismatchLive": "पासवर्ड अभी मेल नहीं खा रहे।",
+
+    // Firebase-स्टाइल एरर कोड → अनूदित संदेश
+    "err.invalid-email": "यह ईमेल पता सही नहीं लग रहा। फ़ॉर्मैट जाँचें — जैसे aap@company.com।",
+    "err.missing-password": "कृपया पासवर्ड दर्ज करें।",
+    "err.weak-password": "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।",
+    "err.missing-name": "कृपया अपना पूरा नाम बताएँ — यह समीक्षाओं और ऑडिट लॉग में दिखता है।",
+    "err.email-already-in-use": "इस ईमेल का अकाउंट पहले से मौजूद है। कृपया लॉग इन करें — डुप्लीकेट जान-बूझकर रोके गए हैं।",
+    "err.user-not-found": "इस ईमेल का कोई अकाउंट नहीं मिला। “अकाउंट बनाएँ” टैब से बनाएँ, या किसी वन-क्लिक डेमो पर्सना का उपयोग करें।",
+    "err.wrong-password": "पासवर्ड गलत है। डेमो अकाउंट का पासवर्ड “demo1234” है।",
+    "err.missing-credentials": "ईमेल और पासवर्ड दोनों ज़रूरी हैं।",
+    "err.too-many-requests": "इस नेटवर्क से बहुत ज़्यादा प्रयास हुए हैं। कृपया कुछ मिनट रुककर फिर कोशिश करें।",
+    "err.unknown": "कुछ गड़बड़ हो गई। कृपया फिर कोशिश करें।",
 
     // सबमिट बटन और टोस्ट
     "action.signUp": "अकाउंट बनाएँ और टूर शुरू करें",

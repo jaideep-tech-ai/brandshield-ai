@@ -88,7 +88,7 @@ export function useLogin() {
 export function useRegister() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name: string; email: string; password: string; role: string; department?: string }) =>
+    mutationFn: (input: { name: string; email: string; password: string; role: string; department?: string; organizationName?: string }) =>
       api.post<SessionUser>("/api/auth/register", input),
     onSuccess: (user) => {
       qc.setQueryData(["session"], user);
@@ -327,4 +327,42 @@ export function useUpdateOrg() {
 
 export function useTeam() {
   return useQuery<TeamMember[]>({ queryKey: ["team"], queryFn: () => api.get("/api/org/team") });
+}
+
+// ─── Database health & integrity (live, real numbers only) ───────────────────
+
+export interface DatabaseHealth {
+  connection: {
+    engine: "SQLite" | "PostgreSQL";
+    supplier: string;
+    pooled: boolean;
+    host: string | null;
+  };
+  counts: {
+    organizations: number;
+    users: number;
+    submissions: number;
+    findings: number;
+    auditLogs: number;
+    guidelineDocs: number;
+  };
+  integrity: {
+    duplicateEmails: number;
+    usersWithoutOrg: number;
+    orgsWithoutSubscription: number;
+    submissionsWithBadAuthor: number;
+    brokenAuditChains: number;
+    consistent: boolean;
+  };
+  chains: { organization: string; entries: number; valid: boolean }[];
+  generatedAt: string;
+  fingerprint: string;
+}
+
+export function useDatabaseHealth(options?: { refetchInterval?: number }) {
+  return useQuery<DatabaseHealth>({
+    queryKey: ["db-health"],
+    queryFn: () => api.get("/api/system/database"),
+    refetchInterval: options?.refetchInterval,
+  });
 }

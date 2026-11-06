@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { SESSION_COOKIE, createSessionToken } from "@/lib/brandshield/server/auth";
 import { ensureSeed } from "@/lib/brandshield/server/seed";
 import { jsonError } from "@/lib/brandshield/server/json";
+import { unusablePassword } from "@/lib/brandshield/server/password";
+import { provisionWorkspace } from "@/lib/brandshield/server/workspace";
 
 /**
  * Real Firebase Authentication sync endpoint.
@@ -101,19 +103,22 @@ export async function POST(req: NextRequest) {
     let user = await db.user.findUnique({ where: { email }, include: { organization: true } });
 
     if (!user) {
-      const org = await db.organization.findUnique({ where: { slug: "nimbus-labs" } });
-      if (!org) return jsonError(new Error("Workspace unavailable"));
-      user = await db.user.create({
-        data: {
-          email,
-          name: claims.name ?? email.split("@")[0],
-          password: `firebase:${claims.sub}`,
-          role: "creator",
-          avatarColor: "#0F766E",
-          orgId: org.id,
-        },
-        include: { organization: true },
+      // Firebase-authenticated newcomers get their OWN workspace (same
+      // contract as email/password sign-up) — never the shared demo org.
+      const provisioned = await provisionWorkspace({
+        email,
+        name: claims.name ?? email.split("@")[0],
+        passwordHash: await unusablePassword(), // federated login only
+        role: "creator",
+        department: null,
+        organizationName: null,
       });
+      await db.user.update({ where: { id: provisioned.user.id }, data: { firebaseUid: claims.sub } });
+      user = {
+        ...provisioned.user,
+        password: provisioned.user.password,
+        organization: provisioned.organization,
+      };
     }
 
     const res = NextResponse.json({

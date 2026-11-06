@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
+  Building2,
   Eye,
   EyeOff,
   FileSearch,
@@ -90,6 +91,19 @@ const TRUST_MARKERS = [
 
 type Mode = "signin" | "signup";
 
+// Server error codes that have localized translations (see dict-auth "err.*").
+const KNOWN_ERR_CODES = new Set([
+  "invalid-email",
+  "missing-password",
+  "weak-password",
+  "missing-name",
+  "email-already-in-use",
+  "user-not-found",
+  "wrong-password",
+  "missing-credentials",
+  "too-many-requests",
+]);
+
 // ─── Auth view ───────────────────────────────────────────────────────────────
 
 export function AuthView({ onBack }: { onBack: () => void }) {
@@ -104,12 +118,23 @@ export function AuthView({ onBack }: { onBack: () => void }) {
   const [confirm, setConfirm] = useState("");
   const [role, setRole] = useState<Role>("creator");
   const [department, setDepartment] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
 
   const demo = useDemoLogin();
   const login = useLogin();
   const register = useRegister();
   const busy = login.isPending || register.isPending || demo.isPending;
-  const formError = (mode === "signin" ? login.error : register.error)?.message ?? null;
+  const rawError = (mode === "signin" ? login.error : register.error) ?? null;
+  // Server codes arrive Firebase-style ("auth/email-already-in-use") — strip
+  // the namespace for dictionary lookup, e.g. auth.err.email-already-in-use.
+  const rawErrCode = (rawError as (Error & { code?: string }) | null)?.code?.split("/").pop();
+  // Localize known Firebase-style codes; rare/unknown codes fall back to the
+  // server message (they only occur with external providers attached).
+  const formError = rawError
+    ? rawErrCode && KNOWN_ERR_CODES.has(rawErrCode)
+      ? t(`auth.err.${rawErrCode}`)
+      : rawError.message
+    : null;
   const firebaseConnected = isFirebaseConfigured();
 
   function handleDemo(personaEmail: string, personaName: string) {
@@ -146,7 +171,14 @@ export function AuthView({ onBack }: { onBack: () => void }) {
       return;
     }
     register.mutate(
-      { name: name.trim(), email: email.trim(), password, role, department: department.trim() || undefined },
+      {
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        role,
+        department: department.trim() || undefined,
+        organizationName: organizationName.trim() || undefined,
+      },
       {
         onSuccess: (user) => {
           toast.success(t("auth.toast.welcome", { name: user.name.split(" ")[0] }));
@@ -426,6 +458,24 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                         className="h-10 rounded-xl"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reg-org">
+                      {t("auth.signup.organization")} <span className="font-normal text-slate-400">{t("auth.optional")}</span>
+                    </Label>
+                    <div className="relative">
+                      <Building2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        id="reg-org"
+                        autoComplete="organization"
+                        placeholder={t("auth.signup.orgPlaceholder")}
+                        value={organizationName}
+                        onChange={(e) => setOrganizationName(e.target.value)}
+                        className="h-10 rounded-xl pl-9"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-400">{t("auth.signup.orgHint")}</p>
                   </div>
 
                   <div className="space-y-1.5">

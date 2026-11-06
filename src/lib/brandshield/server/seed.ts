@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { db } from "@/lib/db";
 import { chunkDocument } from "./engine";
+import { hashPassword } from "./password";
 
 // ─── Seed content: Nimbus Labs brand governance workspace ────────────────────
 
@@ -129,18 +130,19 @@ async function seedInternal(): Promise<void> {
   const existing = await db.organization.findUnique({ where: { slug: "nimbus-labs" } });
   if (existing) return;
 
-  // ── Organization + users
+  // ── Organization + users (demo personas — passwords salted-scrypt hashed) ──
   const org = await db.organization.create({
     data: { name: "Nimbus Labs", slug: "nimbus-labs", zeroDataRetention: true },
   });
 
+  const demoPasswordHash = await hashPassword("demo1234");
   const [ava, marcus, priya, elena] = await Promise.all(
     [
       { email: "ava@nimbus.demo", name: "Ava Chen", role: "creator", department: "Content Studio", avatarColor: "#0F766E" },
       { email: "marcus@nimbus.demo", name: "Marcus Reed", role: "reviewer", department: "Brand & Legal", avatarColor: "#B45309" },
       { email: "priya@pixelworks.demo", name: "Priya Sharma", role: "contractor", department: "PixelWorks Agency", avatarColor: "#7C2D12" },
       { email: "elena@nimbus.demo", name: "Elena Rodriguez", role: "admin", department: "Marketing Leadership", avatarColor: "#4D7C0F" },
-    ].map((u) => db.user.create({ data: { ...u, orgId: org.id, password: "demo1234" } }))
+    ].map((u) => db.user.create({ data: { ...u, orgId: org.id, password: demoPasswordHash } }))
   );
 
   // ── Guideline documents + chunks

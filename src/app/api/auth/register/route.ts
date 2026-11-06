@@ -3,30 +3,54 @@ import { db } from "@/lib/db";
 import { SESSION_COOKIE, createSessionToken } from "@/lib/brandshield/server/auth";
 import { ensureSeed } from "@/lib/brandshield/server/seed";
 import { jsonError } from "@/lib/brandshield/server/json";
+import { hashPassword } from "@/lib/brandshield/server/password";
+import { checkRateLimit, clientIp } from "@/lib/brandshield/server/rate-limit";
+import { provisionWorkspace } from "@/lib/brandshield/server/workspace";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_ROLES = new Set(["creator", "reviewer", "contractor", "admin"]);
-const AVATAR_COLORS = ["#0F766E", "#B45309", "#7C2D12", "#4D7C0F", "#6D28D9", "#BE185D"];
 
-function firebaseError(code: string, message: string, status: number) {
-  return NextResponse.json({ error: message, code }, { status });
+// Scaling guard: a burst of automated signups gets 429s, not 1000 rows.
+const REGISTER_LIMIT = { limit: 8, windowMs: 60 * 60 * 1000 }; // 8 signups / hour / IP
+
+function firebaseError(code: string, message: string, status: number, extra?: Record<string, unknown>) {
+  return NextResponse.json({ error: message, code, ...extra }, { status });
 }
 
 /**
  * Firebase-Auth-compatible email/password account creation.
  * Mirrors `createUserWithEmailAndPassword` semantics and error codes:
- *   auth/invalid-email · auth/missing-password · auth/weak-password
- *   auth/email-already-in-use
+ *   auth/invalid-email · auth/missing-password · auth/weak-password ·
+ *   auth/email-already-in-use · auth/too-many-requests
+ *
+ * Consistency contract (see server/workspace.ts):
+ *   • Every account provisions its OWN workspace in one atomic transaction.
+ *   • Email is globally unique and stored lower-cased — duplicates are
+ *     impossible at the schema level and rejected with 409 at the API level.
+ *   • Passwords are stored as salted scrypt hashes, never plaintext.
  */
 export async function POST(req: NextRequest) {
   try {
     await ensureSeed();
+
+    // ── Rate limit (before any DB write) ──
+    const rl = checkRateLimit(`register:${clientIp(req)}`, REGISTER_LIMIT.limit, REGISTER_LIMIT.windowMs);
+    if (!rl.ok) {
+      return firebaseError(
+        "auth/too-many-requests",
+        `Too many accounts created from this network. Please try again in about ${Math.ceil(rl.retryAfterSec / 60)} minute(s).`,
+        429,
+        { retryAfterSec: rl.retryAfterSec }
+      );
+    }
+
     const body = (await req.json()) as {
       email?: string;
       password?: string;
       name?: string;
       role?: string;
       department?: string;
+      organizationName?: string;
     };
 
     const email = body.email?.toLowerCase().trim() ?? "";
@@ -34,6 +58,7 @@ export async function POST(req: NextRequest) {
     const name = body.name?.trim() ?? "";
     const role = VALID_ROLES.has(body.role ?? "") ? (body.role as string) : "creator";
     const department = body.department?.trim() || null;
+    const organizationName = body.organizationName?.trim().slice(0, 60) || null;
 
     if (!email || !EMAIL_RE.test(email)) {
       return firebaseError("auth/invalid-email", "That email address doesn't look right. Check the format — e.g. you@company.com.", 400);
@@ -48,29 +73,25 @@ export async function POST(req: NextRequest) {
       return firebaseError("auth/missing-name", "Please tell us your full name — it appears on reviews and audit logs.", 400);
     }
 
+    // ── Duplicate protection: unique index is the backstop, this is the UX ──
     const existing = await db.user.findUnique({ where: { email } });
     if (existing) {
-      return firebaseError("auth/email-already-in-use", "An account with this email already exists. Try signing in instead.", 409);
+      return firebaseError(
+        "auth/email-already-in-use",
+        `An account with ${email} already exists. Sign in instead — or reset your password.`,
+        409
+      );
     }
 
-    // New teammates join the demo organization (Nimbus Labs) so the
-    // workspace is pre-populated with the seeded brand repository.
-    const org = await db.organization.findUnique({ where: { slug: "nimbus-labs" } });
-    if (!org) {
-      return firebaseError("server/org-unavailable", "Workspace is initializing. Try again in a moment.", 503);
-    }
-
-    const user = await db.user.create({
-      data: {
-        email,
-        name,
-        password,
-        role,
-        department,
-        avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
-        orgId: org.id,
-      },
-      include: { organization: true },
+    // ── Atomic provisioning: org + subscription + user (+ genesis audit) ──
+    const passwordHash = await hashPassword(password);
+    const { user, organization } = await provisionWorkspace({
+      email,
+      name,
+      passwordHash,
+      role,
+      department,
+      organizationName,
     });
 
     const res = NextResponse.json({
@@ -81,9 +102,9 @@ export async function POST(req: NextRequest) {
       department: user.department,
       avatarColor: user.avatarColor,
       orgId: user.orgId,
-      orgName: user.organization.name,
-      orgSlug: user.organization.slug,
-      zeroDataRetention: user.organization.zeroDataRetention,
+      orgName: organization.name,
+      orgSlug: organization.slug,
+      zeroDataRetention: organization.zeroDataRetention,
     });
     res.cookies.set(SESSION_COOKIE, createSessionToken(user.id), {
       httpOnly: true,
@@ -93,6 +114,12 @@ export async function POST(req: NextRequest) {
     });
     return res;
   } catch (e) {
+    // Race guard: two concurrent signups with the same email — the DB unique
+    // index wins; surface the friendly 409 instead of a 500.
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.includes("Unique constraint") || msg.includes("P2002")) {
+      return firebaseError("auth/email-already-in-use", "An account with this email already exists. Try signing in instead.", 409);
+    }
     return jsonError(e);
   }
 }

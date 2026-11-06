@@ -3,22 +3,27 @@
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
+  AlertTriangle,
   Briefcase,
   Building2,
   Check,
+  CheckCircle2,
+  Database,
   KeyRound,
   Languages,
   Lock,
   Mail,
   Minus,
+  RefreshCw,
   ShieldCheck,
   Users,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { useSession, useUpdateOrg, useTeam } from "@/lib/brandshield/client";
+import { useDatabaseHealth, useSession, useUpdateOrg, useTeam } from "@/lib/brandshield/client";
 import { LANGS, useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-settings";
 import type { Role } from "@/lib/brandshield/types";
@@ -120,6 +125,7 @@ export function SettingsView() {
   const isAdmin = session?.role === "admin";
   const updateOrg = useUpdateOrg();
   const team = useTeam();
+  const dbHealth = useDatabaseHealth({ refetchInterval: 60_000 });
 
   // Optimistic ZDR toggle: write the session cache immediately, reconcile on settle
   const toggleZdr = (v: boolean) => {
@@ -259,8 +265,125 @@ export function SettingsView() {
         </SectionCard>
       </motion.div>
 
-      {/* 2 — Team & Access Control */}
+      {/* 2 — Database Health (live integrity proof) */}
       <motion.div {...fadeUp(2)}>
+        <SectionCard icon={Database} title={t("settings.db.title")} description={t("settings.db.desc")}>
+          {dbHealth.isLoading || !dbHealth.data ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 rounded-xl" />
+              <Skeleton className="h-20 rounded-xl" />
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {/* Engine + overall verdict */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "gap-1.5 border px-2.5 py-1",
+                      dbHealth.data.connection.engine === "PostgreSQL"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-slate-200 bg-slate-50 text-slate-600"
+                    )}
+                  >
+                    <Database className="h-3 w-3" />
+                    {dbHealth.data.connection.engine === "PostgreSQL"
+                      ? t("settings.db.enginePg", { supplier: dbHealth.data.connection.supplier })
+                      : t("settings.db.engineSQLite")}
+                  </Badge>
+                  {dbHealth.data.integrity.consistent ? (
+                    <Badge className="gap-1.5 border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> {t("settings.db.consistent")}
+                    </Badge>
+                  ) : (
+                    <Badge className="gap-1.5 border border-red-200 bg-red-50 px-2.5 py-1 text-red-700">
+                      <AlertTriangle className="h-3.5 w-3.5" /> {t("settings.db.inconsistent")}
+                    </Badge>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => dbHealth.refetch()}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition hover:border-teal-300 hover:text-teal-700"
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", dbHealth.isFetching && "animate-spin")} />
+                  {t("settings.db.refresh")}
+                </button>
+              </div>
+
+              {/* Live counts — straight from the database */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {([
+                  ["orgs", dbHealth.data.counts.organizations],
+                  ["users", dbHealth.data.counts.users],
+                  ["submissions", dbHealth.data.counts.submissions],
+                  ["findings", dbHealth.data.counts.findings],
+                  ["auditLogs", dbHealth.data.counts.auditLogs],
+                  ["docs", dbHealth.data.counts.guidelineDocs],
+                ] as const).map(([key, value]) => (
+                  <div key={key} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-center">
+                    <p className="text-lg font-semibold tabular-nums text-slate-900">{value}</p>
+                    <p className="mt-0.5 text-[11px] font-medium text-slate-500">{t(`settings.db.count.${key}`)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Integrity checks */}
+              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {([
+                  ["dup", dbHealth.data.integrity.duplicateEmails === 0, String(dbHealth.data.integrity.duplicateEmails)],
+                  ["orphanUser", dbHealth.data.integrity.usersWithoutOrg === 0, String(dbHealth.data.integrity.usersWithoutOrg)],
+                  ["orphanSub", dbHealth.data.integrity.submissionsWithBadAuthor === 0, String(dbHealth.data.integrity.submissionsWithBadAuthor)],
+                  ["sub", dbHealth.data.integrity.orgsWithoutSubscription === 0, String(dbHealth.data.integrity.orgsWithoutSubscription)],
+                ] as const).map(([key, ok, n]) => (
+                  <li key={key} className="flex items-center gap-2.5 rounded-xl border border-slate-100 px-3 py-2">
+                    {ok ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                    ) : (
+                      <XCircle className="h-4 w-4 shrink-0 text-red-600" />
+                    )}
+                    <span className="text-sm text-slate-700">{t(`settings.db.check.${key}`)}</span>
+                    <span className={cn("ml-auto text-xs font-semibold tabular-nums", ok ? "text-emerald-600" : "text-red-600")}>
+                      {n}
+                    </span>
+                  </li>
+                ))}
+                {/* Audit hash-chain verification per org */}
+                <li className="flex items-center gap-2.5 rounded-xl border border-slate-100 px-3 py-2 sm:col-span-2">
+                  {dbHealth.data.integrity.brokenAuditChains === 0 ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  ) : (
+                    <XCircle className="h-4 w-4 shrink-0 text-red-600" />
+                  )}
+                  <span className="text-sm text-slate-700">{t("settings.db.check.chain")}</span>
+                  <span className="ml-auto flex flex-wrap gap-1.5">
+                    {dbHealth.data.chains.map((c) => (
+                      <Badge
+                        key={c.organization}
+                        variant="outline"
+                        className={cn(
+                          "px-1.5 py-0 text-[10px] font-medium",
+                          c.valid ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
+                        )}
+                      >
+                        {c.organization}: {c.valid ? t("settings.db.chainValid", { n: c.entries }) : t("settings.db.chainBroken")}
+                      </Badge>
+                    ))}
+                  </span>
+                </li>
+              </ul>
+
+              <p className="font-mono text-[11px] text-slate-400">
+                {t("settings.db.fingerprint")}: {dbHealth.data.fingerprint} · {new Date(dbHealth.data.generatedAt).toLocaleTimeString(lang === "hi" ? "hi-IN" : "en-IN")}
+              </p>
+            </div>
+          )}
+        </SectionCard>
+      </motion.div>
+
+      {/* 3 — Team & Access Control */}
+      <motion.div {...fadeUp(3)}>
         <SectionCard
           icon={Users}
           title={t("settings.team.title")}
@@ -339,8 +462,8 @@ export function SettingsView() {
         </SectionCard>
       </motion.div>
 
-      {/* 3 — Role Permission Matrix */}
-      <motion.div {...fadeUp(3)}>
+      {/* 4 — Role Permission Matrix */}
+      <motion.div {...fadeUp(4)}>
         <SectionCard
           icon={ShieldCheck}
           title={t("settings.perm.title")}
@@ -379,8 +502,8 @@ export function SettingsView() {
         </SectionCard>
       </motion.div>
 
-      {/* 4 — Preferences (display-only language row; the switcher lives in the header) */}
-      <motion.div {...fadeUp(4)}>
+      {/* 5 — Preferences (display-only language row; the switcher lives in the header) */}
+      <motion.div {...fadeUp(5)}>
         <SectionCard icon={Languages} title={t("settings.prefs.title")} description={t("settings.prefs.desc")}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-xl">
@@ -394,8 +517,8 @@ export function SettingsView() {
         </SectionCard>
       </motion.div>
 
-      {/* 5 — Session */}
-      <motion.div {...fadeUp(5)}>
+      {/* 6 — Session */}
+      <motion.div {...fadeUp(6)}>
         <SectionCard icon={KeyRound} title={t("settings.session.title")} description={t("settings.session.desc")}>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600">
