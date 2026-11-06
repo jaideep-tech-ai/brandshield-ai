@@ -38,17 +38,20 @@ import {
 } from "@/lib/brandshield/client";
 import { cn, lineDiff, timeAgo, formatDate, shortHash } from "@/lib/brandshield/utils";
 import { STATUS_META, SEVERITY_META, type Submission, type SubmissionStatus } from "@/lib/brandshield/types";
+import { useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-approvals";
 
-const COLUMNS: { status: SubmissionStatus; title: string; accent: string }[] = [
-  { status: "draft", title: "Draft", accent: "bg-slate-400" },
-  { status: "in_review", title: "In Review", accent: "bg-amber-400" },
-  { status: "changes_requested", title: "Changes Requested", accent: "bg-orange-500" },
-  { status: "approved", title: "Approved", accent: "bg-emerald-500" },
+const COLUMNS: { status: SubmissionStatus; accent: string }[] = [
+  { status: "draft", accent: "bg-slate-400" },
+  { status: "in_review", accent: "bg-amber-400" },
+  { status: "changes_requested", accent: "bg-orange-500" },
+  { status: "approved", accent: "bg-emerald-500" },
 ];
 
 export function ApprovalsView() {
   const session = useSession();
   const submissions = useSubmissions();
+  const { t } = useLang();
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const grouped = useMemo(() => {
@@ -69,13 +72,13 @@ export function ApprovalsView() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600/10 text-teal-700">
               <ClipboardCheck className="h-5 w-5" />
             </span>
-            Approval Board
+            {t("approvals.title")}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">Draft → In Review → Changes Requested → Approved, with a tamper-evident sign-off trail.</p>
+          <p className="mt-1 text-sm text-slate-500">{t("approvals.subtitle")}</p>
         </div>
         {isReviewer && (
           <Badge variant="outline" className="gap-1 border-teal-200 bg-teal-50 text-teal-700">
-            <BadgeCheck className="h-3.5 w-3.5" /> Reviewer authority · {inReviewCount} awaiting review
+            <BadgeCheck className="h-3.5 w-3.5" /> {t("approvals.reviewerBadge", { count: inReviewCount })}
           </Badge>
         )}
       </div>
@@ -89,7 +92,7 @@ export function ApprovalsView() {
               <div className="mb-3 flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
                   <span className={cn("h-2.5 w-2.5 rounded-full", col.accent)} />
-                  <h3 className="text-sm font-semibold text-slate-700">{col.title}</h3>
+                  <h3 className="text-sm font-semibold text-slate-700">{t(`common.status.${col.status}`)}</h3>
                 </div>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">{grouped.get(col.status)?.length ?? 0}</span>
               </div>
@@ -116,18 +119,18 @@ export function ApprovalsView() {
                       <p className="mt-1 truncate text-[11px] text-slate-400">{s.authorName} · {s.department ?? "—"}</p>
                       <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-400">
                         <span className="flex items-center gap-1"><History className="h-3 w-3" /> v{s.currentVersion}</span>
-                        {s.contentType === "banner" && <span className="rounded bg-slate-100 px-1.5 py-0.5">banner</span>}
+                        {s.contentType === "banner" && <span className="rounded bg-slate-100 px-1.5 py-0.5">{t("approvals.typeBanner")}</span>}
                         {(() => {
                           const open = s.findings?.filter((f) => f.status === "open") ?? [];
-                          if (open.length === 0) return <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" /> clear</span>;
-                          return <span className="flex items-center gap-1 text-amber-600"><CircleDashed className="h-3 w-3" /> {open.length} open</span>;
+                          if (open.length === 0) return <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" /> {t("approvals.findingsClear")}</span>;
+                          return <span className="flex items-center gap-1 text-amber-600"><CircleDashed className="h-3 w-3" /> {t("approvals.findingsOpen", { n: open.length })}</span>;
                         })()}
                       </div>
                     </motion.button>
                   ))}
                 </AnimatePresence>
                 {(grouped.get(col.status) ?? []).length === 0 && (
-                  <div className="rounded-xl border border-dashed border-slate-200 py-8 text-center text-xs text-slate-300">Empty</div>
+                  <div className="rounded-xl border border-dashed border-slate-200 py-8 text-center text-xs text-slate-300">{t("approvals.emptyColumn")}</div>
                 )}
               </div>
             </div>
@@ -148,8 +151,18 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
   const { data: audit } = useAuditTrail(submissionId);
   const transition = useTransitionSubmission();
   const resolveFinding = useResolveFinding();
+  const { t, lang } = useLang();
   const [note, setNote] = useState("");
   const [actionOpen, setActionOpen] = useState<"request_changes" | "approve" | null>(null);
+
+  const actionLabel = (a: string) => {
+    const k = `approvals.action.${a}`;
+    return t(k) === k ? a.replaceAll("_", " ") : t(k);
+  };
+  const detailLabel = (k: string) => {
+    const key = `approvals.detail.${k}`;
+    return t(key) === key ? k : t(key);
+  };
 
   const isReviewer = session.data?.role === "reviewer" || session.data?.role === "admin";
   const isAuthor = sub?.authorId === session.data?.id;
@@ -159,21 +172,21 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
     try {
       const res = await transition.mutateAsync({ id: sub.id, action, note: note.trim() || undefined });
       if (action === "approve") {
-        toast.success("Final approval granted", {
-          description: `SHA-256 sign-off: ${String((res as { signOffHash?: string }).signOffHash ?? "").slice(0, 24)}… · compliance certificate ready`,
+        toast.success(t("approvals.toastApproved"), {
+          description: t("approvals.toastApprovedDesc", { hash: String((res as { signOffHash?: string }).signOffHash ?? "").slice(0, 24) }),
           duration: 7000,
         });
       } else if (action === "request_changes") {
-        toast.info("Changes requested — the author has been notified on the board");
+        toast.info(t("approvals.toastChanges"));
       } else if (action === "submit_for_review") {
-        toast.success("Submitted for review");
+        toast.success(t("approvals.toastSubmitted"));
       } else {
-        toast.info("Draft reopened");
+        toast.info(t("approvals.toastReopened"));
       }
       setActionOpen(null);
       setNote("");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Action failed");
+      toast.error(e instanceof Error ? e.message : t("approvals.toastError"));
     }
   };
 
@@ -193,7 +206,7 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
     a.download = `brandshield-certificate-${sub.id.slice(-8)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Compliance certificate exported (JSON)");
+    toast.success(t("approvals.toastExported"));
   };
 
   const chainOk = audit ? verifyChain(audit, false) : false;
@@ -201,16 +214,16 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
   return (
     <Dialog open={!!submissionId} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92vh] overflow-hidden sm:max-w-3xl lg:max-w-5xl">
-        <DialogTitle className="sr-only">Submission review detail</DialogTitle>
+        <DialogTitle className="sr-only">{t("approvals.detailSrTitle")}</DialogTitle>
         {sub ? (
           <div className="flex max-h-[calc(92vh-4rem)] flex-col gap-4">
             <DialogHeader className="shrink-0 pr-8">
               <DialogTitle className="flex flex-wrap items-center gap-2 text-base">
                 {sub.title}
-                <Badge variant="outline" className={cn("border", STATUS_META[sub.status as keyof typeof STATUS_META]?.className)}>{STATUS_META[sub.status as keyof typeof STATUS_META]?.label}</Badge>
+                <Badge variant="outline" className={cn("border", STATUS_META[sub.status as keyof typeof STATUS_META]?.className)}>{t(`common.status.${sub.status}`)}</Badge>
                 {sub.complianceScore !== null && (
                   <Badge variant="outline" className={cn("border text-[10px]", sub.complianceScore >= 85 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700")}>
-                    Score {sub.complianceScore}/100
+                    {t("approvals.scoreBadge", { score: sub.complianceScore })}
                   </Badge>
                 )}
               </DialogTitle>
@@ -218,9 +231,9 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
 
             <Tabs defaultValue="diff" className="min-h-0 flex-1">
               <TabsList className="flex w-full sm:w-fit">
-                <TabsTrigger value="diff" className="flex-1 gap-1.5 sm:flex-none"><FileDiff className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Version</span> Diff</TabsTrigger>
-                <TabsTrigger value="findings" className="flex-1 gap-1.5 sm:flex-none"><ShieldCheck className="h-3.5 w-3.5" /> Findings ({sub.findings.filter((f) => f.status === "open").length})</TabsTrigger>
-                <TabsTrigger value="audit" className="flex-1 gap-1.5 sm:flex-none"><History className="h-3.5 w-3.5" /> Audit Trail</TabsTrigger>
+                <TabsTrigger value="diff" className="flex-1 gap-1.5 sm:flex-none"><FileDiff className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("approvals.tabDiffVersion")}</span>{" "}{t("approvals.tabDiff")}</TabsTrigger>
+                <TabsTrigger value="findings" className="flex-1 gap-1.5 sm:flex-none"><ShieldCheck className="h-3.5 w-3.5" /> {t("approvals.tabFindings", { n: sub.findings.filter((f) => f.status === "open").length })}</TabsTrigger>
+                <TabsTrigger value="audit" className="flex-1 gap-1.5 sm:flex-none"><History className="h-3.5 w-3.5" /> {t("approvals.tabAudit")}</TabsTrigger>
               </TabsList>
 
               {/* Diff tab */}
@@ -231,18 +244,18 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
               {/* Findings tab */}
               <TabsContent value="findings" className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
                 <div className="space-y-2">
-                  {sub.findings.length === 0 && <p className="py-8 text-center text-sm text-slate-400">No findings recorded.</p>}
+                  {sub.findings.length === 0 && <p className="py-8 text-center text-sm text-slate-400">{t("approvals.noFindings")}</p>}
                   {sub.findings.map((f) => (
                     <div key={f.id} className="rounded-xl border border-slate-100 bg-white p-3">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant="outline" className={cn("border text-[10px]", SEVERITY_META[f.severity].border, SEVERITY_META[f.severity].bg, SEVERITY_META[f.severity].text)}>{f.severity}</Badge>
+                        <Badge variant="outline" className={cn("border text-[10px]", SEVERITY_META[f.severity].border, SEVERITY_META[f.severity].bg, SEVERITY_META[f.severity].text)}>{t(`common.severity.${f.severity}`)}</Badge>
                         <span className="text-xs font-medium text-slate-600">&ldquo;{f.flaggedText.slice(0, 70)}{f.flaggedText.length > 70 ? "…" : ""}&rdquo;</span>
-                        <span className="ml-auto text-[10px] capitalize text-slate-400">{f.status}</span>
+                        <span className="ml-auto text-[10px] capitalize text-slate-400">{t(`common.finding.${f.status}`)}</span>
                       </div>
                       <p className="mt-1 text-[11px] text-slate-400">{f.sourceDoc} — {f.ruleCitation.slice(0, 90)}</p>
                       {isReviewer && f.status === "open" && (
                         <Button size="sm" variant="ghost" className="mt-1 h-7 gap-1 text-xs text-teal-700" onClick={() => resolveFinding.mutate({ id: f.id })}>
-                          <CheckCircle2 className="h-3 w-3" /> Mark resolved
+                          <CheckCircle2 className="h-3 w-3" /> {t("approvals.markResolved")}
                         </Button>
                       )}
                     </div>
@@ -255,10 +268,10 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
                 <div className="flex h-full flex-col gap-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <Badge variant="outline" className={cn("gap-1.5 border text-[11px]", chainOk ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-600")}>
-                      <Lock className="h-3 w-3" /> {chainOk ? "Chain integrity verified" : "Chain broken"}
+                      <Lock className="h-3 w-3" /> {chainOk ? t("approvals.chainOk") : t("approvals.chainBroken")}
                     </Badge>
                     <Button size="sm" variant="outline" className="gap-1.5" onClick={exportAudit} disabled={!audit?.length}>
-                      <Download className="h-3.5 w-3.5" /> Export certificate (JSON)
+                      <Download className="h-3.5 w-3.5" /> {t("approvals.exportCert")}
                     </Button>
                   </div>
                   <ScrollArea className="min-h-0 flex-1 pr-2">
@@ -268,14 +281,14 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
                         <div key={entry.id} className="relative py-2.5">
                           <span className={cn("absolute -left-[13px] top-3.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white", i === 0 ? "bg-slate-300" : entry.action === "APPROVAL" || entry.action === "SIGN_OFF" ? "bg-emerald-500" : "bg-teal-500")} />
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="text-xs font-semibold text-slate-700">{entry.action.replaceAll("_", " ")}</span>
-                            <span className="text-[11px] text-slate-400">{entry.actorName} · {formatDate(entry.createdAt)}</span>
+                            <span className="text-xs font-semibold text-slate-700">{actionLabel(entry.action)}</span>
+                            <span className="text-[11px] text-slate-400">{entry.actorName} · {formatDate(entry.createdAt, lang)}</span>
                           </div>
                           <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
                             {Object.entries(entry.details)
                               .filter(([k]) => !["hash", "verifiedContentHash"].includes(k))
                               .slice(0, 3)
-                              .map(([k, v]) => `${k}: ${String(v).slice(0, 90)}`)
+                              .map(([k, v]) => `${detailLabel(k)}: ${String(v).slice(0, 90)}`)
                               .join(" · ")}
                           </p>
                           <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-slate-400">
@@ -295,25 +308,25 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {isAuthor && sub.status === "draft" && sub.scanCount > 0 && (
                   <Button className="min-h-10 gap-1.5 bg-teal-700 hover:bg-teal-800" onClick={() => act("submit_for_review")} disabled={transition.isPending}>
-                    {transition.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-4 w-4" />} Submit for review
+                    {transition.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-4 w-4" />} {transition.isPending ? t("approvals.working") : t("approvals.submitReview")}
                   </Button>
                 )}
                 {isReviewer && sub.status === "in_review" && (
                   <>
                     <Button variant="outline" className="min-h-10 gap-1.5" onClick={() => setActionOpen("request_changes")}>
-                      <MessageSquarePlus className="h-4 w-4" /> Request changes
+                      <MessageSquarePlus className="h-4 w-4" /> {t("approvals.requestChanges")}
                     </Button>
                     <Button className="min-h-10 gap-1.5 bg-emerald-600 hover:bg-emerald-700" onClick={() => setActionOpen("approve")}>
-                      <BadgeCheck className="h-4 w-4" /> Grant final approval
+                      <BadgeCheck className="h-4 w-4" /> {t("approvals.grantApproval")}
                     </Button>
                   </>
                 )}
                 {isReviewer && sub.status === "changes_requested" && (
-                  <Button variant="ghost" className="min-h-10" onClick={() => act("reopen")}>Reopen as draft</Button>
+                  <Button variant="ghost" className="min-h-10" onClick={() => act("reopen")}>{t("approvals.reopenDraft")}</Button>
                 )}
                 {isReviewer && sub.status === "approved" && (
                   <Badge variant="outline" className="gap-1 border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-700">
-                    <ShieldCheck className="h-4 w-4" /> Cryptographic sign-off recorded
+                    <ShieldCheck className="h-4 w-4" /> {t("approvals.signedOff")}
                   </Badge>
                 )}
               </div>
@@ -327,23 +340,23 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
         <Dialog open={!!actionOpen} onOpenChange={(o) => !o && setActionOpen(null)}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-base">{actionOpen === "approve" ? "Grant final approval" : "Request changes"}</DialogTitle>
+              <DialogTitle className="text-base">{actionOpen === "approve" ? t("approvals.grantApproval") : t("approvals.requestChanges")}</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-slate-500">
               {actionOpen === "approve"
-                ? "Approving computes a SHA-256 hash over the content, your reviewer identity and timestamp, then appends an immutable, hash-chained sign-off entry."
-                : "Explain what the author should fix. This note is attached to the audit trail."}
+                ? t("approvals.approveHelp")
+                : t("approvals.changesHelp")}
             </p>
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={actionOpen === "approve" ? "e.g. All flags resolved — cleared for publication." : "e.g. 40% claim is not in the approved facts — cite FACT PD-09 instead."} className="min-h-[80px]" />
+            <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={actionOpen === "approve" ? t("approvals.approvePlaceholder") : t("approvals.changesPlaceholder")} className="min-h-[80px]" />
             <DialogFooter>
-              <Button variant="ghost" onClick={() => setActionOpen(null)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setActionOpen(null)}>{t("common.action.cancel")}</Button>
               <Button
                 className={actionOpen === "approve" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"}
                 disabled={transition.isPending || (actionOpen === "request_changes" && note.trim().length < 8)}
                 onClick={() => act(actionOpen === "approve" ? "approve" : "request_changes")}
               >
                 {transition.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : actionOpen === "approve" ? <BadgeCheck className="h-4 w-4" /> : null}
-                {actionOpen === "approve" ? "Approve & sign off" : "Send"}
+                {actionOpen === "approve" ? t("approvals.approveSign") : t("approvals.send")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -356,6 +369,7 @@ function DetailDialog({ submissionId, onClose }: { submissionId: string | null; 
 // ─── Diff viewer (side-by-side LCS line diff) ────────────────────────────────
 
 function DiffViewer({ sub }: { sub: NonNullable<ReturnType<typeof useSubmission>["data"]> }) {
+  const { t, lang } = useLang();
   const [fromV, setFromV] = useState(0);
   const revisions = sub.revisions;
   const a = revisions?.[fromV]?.content ?? "";
@@ -364,32 +378,32 @@ function DiffViewer({ sub }: { sub: NonNullable<ReturnType<typeof useSubmission>
   const same = a === b;
 
   if (!revisions || revisions.length === 0) {
-    return <p className="py-8 text-center text-sm text-slate-400">No revisions recorded.</p>;
+    return <p className="py-8 text-center text-sm text-slate-400">{t("approvals.noRevisions")}</p>;
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <span className="font-medium text-slate-600">Compare</span>
+        <span className="font-medium text-slate-600">{t("approvals.compare")}</span>
         <select value={fromV} onChange={(e) => setFromV(Number(e.target.value))} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs">
           {revisions.slice(0, Math.max(1, revisions.length - 1)).map((r) => (
             <option key={r.id} value={r.id === revisions[revisions.length - 1].id ? Math.max(0, revisions.length - 2) : revisions.findIndex((x) => x.id === r.id)}>
-              v{r.version} · {r.changeSummary ?? "edited"} · {timeAgo(r.createdAt)}
+              v{r.version} · {r.changeSummary ?? t("approvals.edited")} · {timeAgo(r.createdAt, lang)}
             </option>
           ))}
         </select>
         <span>→</span>
-        <span className="font-medium text-slate-600">v{revisions[revisions.length - 1].version} (current)</span>
-        {same && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-[10px] text-emerald-600">identical</Badge>}
+        <span className="font-medium text-slate-600">v{revisions[revisions.length - 1].version} ({t("approvals.current")})</span>
+        {same && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-[10px] text-emerald-600">{t("approvals.identical")}</Badge>}
       </div>
       <Separator />
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden sm:grid-cols-2">
         <div className="min-h-0 overflow-y-auto rounded-xl border border-slate-100">
-          <p className="sticky top-0 bg-red-50/90 px-3 py-1.5 text-[11px] font-semibold text-red-700 backdrop-blur">Previous version</p>
+          <p className="sticky top-0 bg-red-50/90 px-3 py-1.5 text-[11px] font-semibold text-red-700 backdrop-blur">{t("approvals.prevVersion")}</p>
           <DiffPane rows={rows} side="left" />
         </div>
         <div className="min-h-0 overflow-y-auto rounded-xl border border-slate-100">
-          <p className="sticky top-0 bg-emerald-50/90 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 backdrop-blur">Verified current version</p>
+          <p className="sticky top-0 bg-emerald-50/90 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 backdrop-blur">{t("approvals.currVersion")}</p>
           <DiffPane rows={rows} side="right" />
         </div>
       </div>

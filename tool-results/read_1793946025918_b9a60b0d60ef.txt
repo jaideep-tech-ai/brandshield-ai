@@ -1,0 +1,840 @@
+     1→"use client";
+     2→
+     3→import { useRef, useState, type ChangeEvent } from "react";
+     4→import { motion } from "framer-motion";
+     5→import {
+     6→  BookOpen,
+     7→  Database,
+     8→  FileText,
+     9→  FileUp,
+    10→  History,
+    11→  Image as ImageIcon,
+    12→  Layers,
+    13→  Loader2,
+    14→  Maximize2,
+    15→  Palette,
+    16→  Plus,
+    17→  Trash2,
+    18→  Type,
+    19→  Eye,
+    20→} from "lucide-react";
+    21→import { toast } from "sonner";
+    22→
+    23→import {
+    24→  useSession,
+    25→  useGuidelines,
+    26→  useCreateGuideline,
+    27→  useDeleteGuideline,
+    28→  useVisualTokens,
+    29→  useCreateVisualToken,
+    30→  useDeleteVisualToken,
+    31→} from "@/lib/brandshield/client";
+    32→import type { GuidelineDoc, VisualToken } from "@/lib/brandshield/types";
+    33→import { cn, timeAgo, readableOn } from "@/lib/brandshield/utils";
+    34→
+    35→import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+    36→import {
+    37→  AlertDialog,
+    38→  AlertDialogAction,
+    39→  AlertDialogCancel,
+    40→  AlertDialogContent,
+    41→  AlertDialogDescription,
+    42→  AlertDialogFooter,
+    43→  AlertDialogHeader,
+    44→  AlertDialogTitle,
+    45→} from "@/components/ui/alert-dialog";
+    46→import { Badge } from "@/components/ui/badge";
+    47→import { Button } from "@/components/ui/button";
+    48→import { Card, CardContent } from "@/components/ui/card";
+    49→import {
+    50→  Dialog,
+    51→  DialogContent,
+    52→  DialogDescription,
+    53→  DialogFooter,
+    54→  DialogHeader,
+    55→  DialogTitle,
+    56→} from "@/components/ui/dialog";
+    57→import { Input } from "@/components/ui/input";
+    58→import { Label } from "@/components/ui/label";
+    59→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    60→import { Skeleton } from "@/components/ui/skeleton";
+    61→import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+    62→import { Textarea } from "@/components/ui/textarea";
+    63→
+    64→// ─── Meta maps ───────────────────────────────────────────────────────────────
+    65→
+    66→const DOC_TYPE_META: Record<string, { label: string; cls: string }> = {
+    67→  guideline: { label: "Guideline", cls: "bg-slate-100 text-slate-700 border-slate-200" },
+    68→  datasheet: { label: "Product Datasheet", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    69→  terminology: { label: "Terminology", cls: "bg-cyan-50 text-cyan-700 border-cyan-200" },
+    70→  banned_words: { label: "Banned Words", cls: "bg-red-50 text-red-700 border-red-200" },
+    71→  trademark: { label: "Trademark", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+    72→  tone: { label: "Tone of Voice", cls: "bg-teal-50 text-teal-700 border-teal-200" },
+    73→};
+    74→
+    75→const TOKEN_TYPE_META: Record<string, { label: string; icon: typeof Palette }> = {
+    76→  color: { label: "Color", icon: Palette },
+    77→  typography: { label: "Typography", icon: Type },
+    78→  logo: { label: "Logo / Mark", icon: ImageIcon },
+    79→};
+    80→
+    81→const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+    82→
+    83→function fadeUp(i: number) {
+    84→  return {
+    85→    initial: { opacity: 0, y: 14 },
+    86→    animate: { opacity: 1, y: 0 },
+    87→    transition: { duration: 0.35, delay: Math.min(i, 8) * 0.05 },
+    88→  };
+    89→}
+    90→
+    91→function StatChip({ icon: Icon, label, value, iconCls }: { icon: typeof Layers; label: string; value: string | number; iconCls: string }) {
+    92→  return (
+    93→    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
+    94→      <Icon className={cn("h-3.5 w-3.5", iconCls)} />
+    95→      <span className="text-xs font-semibold text-slate-900">{value}</span>
+    96→      <span className="text-xs text-slate-500">{label}</span>
+    97→    </div>
+    98→  );
+    99→}
+   100→
+   101→// ─── View ────────────────────────────────────────────────────────────────────
+   102→
+   103→export function KnowledgeView() {
+   104→  const { data: session } = useSession();
+   105→  const isAdmin = session?.role === "admin";
+   106→
+   107→  const guidelines = useGuidelines();
+   108→  const visualTokens = useVisualTokens();
+   109→  const createGuideline = useCreateGuideline();
+   110→  const deleteGuideline = useDeleteGuideline();
+   111→  const createToken = useCreateVisualToken();
+   112→  const deleteToken = useDeleteVisualToken();
+   113→
+   114→  const docs = guidelines.data ?? [];
+   115→  const tokens = visualTokens.data ?? [];
+   116→  const totalChunks = docs.reduce((sum, d) => sum + (d.chunkCount ?? 0), 0);
+   117→
+   118→  // Add-document dialog state
+   119→  const [addDocOpen, setAddDocOpen] = useState(false);
+   120→  const [docTitle, setDocTitle] = useState("");
+   121→  const [docType, setDocType] = useState("guideline");
+   122→  const [docContent, setDocContent] = useState("");
+   123→  const fileInputRef = useRef<HTMLInputElement>(null);
+   124→
+   125→  // Full-document dialog + delete confirms
+   126→  const [fullDoc, setFullDoc] = useState<GuidelineDoc | null>(null);
+   127→  const [docToDelete, setDocToDelete] = useState<GuidelineDoc | null>(null);
+   128→  const [tokenToDelete, setTokenToDelete] = useState<VisualToken | null>(null);
+   129→
+   130→  // Add-token dialog state
+   131→  const [addTokenOpen, setAddTokenOpen] = useState(false);
+   132→  const [tokenType, setTokenType] = useState("color");
+   133→  const [tokenName, setTokenName] = useState("");
+   134→  const [tokenValue, setTokenValue] = useState("");
+   135→  const [tokenSecondary, setTokenSecondary] = useState("");
+   136→  const [tokenNotes, setTokenNotes] = useState("");
+   137→
+   138→  const colorTokens = tokens.filter((t) => t.tokenType === "color");
+   139→  const typographyTokens = tokens.filter((t) => t.tokenType === "typography");
+   140→  const logoTokens = tokens.filter((t) => t.tokenType === "logo");
+   141→
+   142→  // ── File import ──
+   143→  const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
+   144→    const file = e.target.files?.[0];
+   145→    if (!file) return;
+   146→    const reader = new FileReader();
+   147→    reader.onload = () => {
+   148→      const text = String(reader.result ?? "");
+   149→      setDocContent(text);
+   150→      setDocTitle(file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim());
+   151→      toast.info(`Imported "${file.name}" — review title & content, then ingest.`);
+   152→    };
+   153→    reader.onerror = () => toast.error("Could not read that file.");
+   154→    reader.readAsText(file);
+   155→    e.target.value = "";
+   156→  };
+   157→
+   158→  // ── Submit handlers ──
+   159→  const submitDoc = async () => {
+   160→    if (!docTitle.trim() || !docContent.trim()) {
+   161→      toast.error("Title and content are required.");
+   162→      return;
+   163→    }
+   164→    try {
+   165→      await createGuideline.mutateAsync({ title: docTitle.trim(), docType, content: docContent.trim() });
+   166→      toast.success("Document ingested & chunked");
+   167→      setAddDocOpen(false);
+   168→      setDocTitle("");
+   169→      setDocContent("");
+   170→      setDocType("guideline");
+   171→    } catch (err) {
+   172→      toast.error(err instanceof Error ? err.message : "Failed to ingest document.");
+   173→    }
+   174→  };
+   175→
+   176→  const submitToken = async () => {
+   177→    if (!tokenName.trim() || !tokenValue.trim()) {
+   178→      toast.error("Token name and value are required.");
+   179→      return;
+   180→    }
+   181→    if (tokenType === "color" && !HEX_RE.test(tokenValue.trim())) {
+   182→      toast.error("Color value must be a hex code like #0F766E.");
+   183→      return;
+   184→    }
+   185→    try {
+   186→      await createToken.mutateAsync({
+   187→        tokenType,
+   188→        name: tokenName.trim(),
+   189→        value: tokenValue.trim(),
+   190→        secondary: tokenSecondary.trim() || undefined,
+   191→        usageNotes: tokenNotes.trim() || undefined,
+   192→      });
+   193→      toast.success("Visual token added");
+   194→      setAddTokenOpen(false);
+   195→      setTokenName("");
+   196→      setTokenValue("");
+   197→      setTokenSecondary("");
+   198→      setTokenNotes("");
+   199→    } catch (err) {
+   200→      toast.error(err instanceof Error ? err.message : "Failed to add token.");
+   201→    }
+   202→  };
+   203→
+   204→  const resetTokenDialog = (type: string) => {
+   205→    setTokenType(type);
+   206→    setTokenName("");
+   207→    setTokenValue("");
+   208→    setTokenSecondary("");
+   209→    setTokenNotes("");
+   210→  };
+   211→
+   212→  return (
+   213→    <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6">
+   214→      {/* Header */}
+   215→      <motion.div {...fadeUp(0)} className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+   216→        <div>
+   217→          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Ground-Truth Knowledge Base</h1>
+   218→          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+   219→            Approved guidelines, product facts, terminology and visual tokens — chunked and indexed for
+   220→            retrieval-grounded verification.
+   221→          </p>
+   222→        </div>
+   223→        <div className="flex flex-wrap items-center gap-2">
+   224→          <StatChip icon={FileText} label="documents" value={guidelines.isLoading ? "…" : docs.length} iconCls="text-teal-700" />
+   225→          <StatChip icon={Layers} label="chunks" value={guidelines.isLoading ? "…" : totalChunks} iconCls="text-emerald-600" />
+   226→          <StatChip icon={Palette} label="tokens" value={visualTokens.isLoading ? "…" : tokens.length} iconCls="text-amber-600" />
+   227→        </div>
+   228→      </motion.div>
+   229→
+   230→      {/* Read-only notice */}
+   231→      {!isAdmin && (
+   232→        <motion.div {...fadeUp(1)}>
+   233→          <Alert className="border-amber-200 bg-amber-50 text-amber-800">
+   234→            <Eye className="text-amber-600" />
+   235→            <AlertTitle>Read-only</AlertTitle>
+   236→            <AlertDescription>Brand Admins manage the ground-truth repository.</AlertDescription>
+   237→          </Alert>
+   238→        </motion.div>
+   239→      )}
+   240→
+   241→      {/* Tabs */}
+   242→      <Tabs defaultValue="documents" className="gap-6">
+   243→        <TabsList className="h-auto w-fit rounded-xl bg-slate-100 p-1">
+   244→          <TabsTrigger
+   245→            value="documents"
+   246→            className="rounded-lg px-4 py-1.5 text-sm data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm"
+   247→          >
+   248→            <FileText className="h-4 w-4" /> Documents
+   249→          </TabsTrigger>
+   250→          <TabsTrigger
+   251→            value="tokens"
+   252→            className="rounded-lg px-4 py-1.5 text-sm data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm"
+   253→          >
+   254→            <Palette className="h-4 w-4" /> Visual Tokens
+   255→          </TabsTrigger>
+   256→        </TabsList>
+   257→
+   258→        {/* ── Documents tab ── */}
+   259→        <TabsContent value="documents" className="space-y-4">
+   260→          <div className="flex items-center justify-between gap-3">
+   261→            <p className="text-xs text-slate-500">
+   262→              {guidelines.isLoading ? "Loading repository…" : `${docs.length} approved document${docs.length === 1 ? "" : "s"} indexed for retrieval`}
+   263→            </p>
+   264→            {isAdmin && (
+   265→              <Button size="sm" className="bg-teal-700 text-white hover:bg-teal-800" onClick={() => setAddDocOpen(true)}>
+   266→                <Plus className="h-4 w-4" /> Add Document
+   267→              </Button>
+   268→            )}
+   269→          </div>
+   270→
+   271→          {guidelines.isLoading ? (
+   272→            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+   273→              {Array.from({ length: 6 }).map((_, i) => (
+   274→                <Card key={i} className="rounded-2xl border-slate-200 shadow-sm">
+   275→                  <CardContent className="space-y-3 p-6">
+   276→                    <div className="flex gap-2">
+   277→                      <Skeleton className="h-5 w-24 rounded-full" />
+   278→                      <Skeleton className="h-5 w-12 rounded-full" />
+   279→                    </div>
+   280→                    <Skeleton className="h-4 w-3/4" />
+   281→                    <Skeleton className="h-3 w-1/2" />
+   282→                    <Skeleton className="h-28 w-full rounded-lg" />
+   283→                  </CardContent>
+   284→                </Card>
+   285→              ))}
+   286→            </div>
+   287→          ) : docs.length === 0 ? (
+   288→            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 px-6 py-14 text-center">
+   289→              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50">
+   290→                <Database className="h-6 w-6 text-teal-700" />
+   291→              </div>
+   292→              <p className="text-sm font-semibold text-slate-900">No documents yet</p>
+   293→              <p className="max-w-sm text-xs text-slate-500">
+   294→                {isAdmin
+   295→                  ? "Add your first document — approved copy guidelines, product datasheets or banned-word lists."
+   296→                  : "Add your first document once a Brand Admin seeds the repository."}
+   297→              </p>
+   298→              {isAdmin && (
+   299→                <Button size="sm" className="mt-1 bg-teal-700 text-white hover:bg-teal-800" onClick={() => setAddDocOpen(true)}>
+   300→                  <Plus className="h-4 w-4" /> Add your first document
+   301→                </Button>
+   302→              )}
+   303→            </div>
+   304→          ) : (
+   305→            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+   306→              {docs.map((doc, i) => {
+   307→                const meta = DOC_TYPE_META[doc.docType] ?? { label: doc.docType, cls: "bg-slate-100 text-slate-700 border-slate-200" };
+   308→                return (
+   309→                  <motion.div key={doc.id} {...fadeUp(i)}>
+   310→                    <Card className="flex h-full flex-col rounded-2xl border-slate-200 shadow-sm transition-shadow hover:shadow-md">
+   311→                      <CardContent className="flex h-full flex-col gap-3 p-6">
+   312→                        <div className="flex items-center gap-2">
+   313→                          <Badge variant="outline" className={cn("border", meta.cls)}>
+   314→                            {meta.label}
+   315→                          </Badge>
+   316→                          <Badge variant="outline" className="border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-500">
+   317→                            v{doc.version}
+   318→                          </Badge>
+   319→                          {isAdmin && (
+   320→                            <Button
+   321→                              variant="ghost"
+   322→                              size="icon"
+   323→                              aria-label={`Delete ${doc.title}`}
+   324→                              className="ml-auto h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-600"
+   325→                              onClick={() => setDocToDelete(doc)}
+   326→                            >
+   327→                              <Trash2 className="h-4 w-4" />
+   328→                            </Button>
+   329→                          )}
+   330→                        </div>
+   331→
+   332→                        <h3 className="text-sm font-semibold leading-snug text-slate-900">{doc.title}</h3>
+   333→
+   334→                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+   335→                          <span className="inline-flex items-center gap-1">
+   336→                            <Layers className="h-3.5 w-3.5 text-teal-600" />
+   337→                            {doc.chunkCount} chunks
+   338→                          </span>
+   339→                          <span className="inline-flex items-center gap-1">
+   340→                            <History className="h-3.5 w-3.5" />
+   341→                            Updated {timeAgo(doc.updatedAt ?? doc.createdAt)}
+   342→                          </span>
+   343→                          {doc.sourceName && (
+   344→                            <span className="inline-flex max-w-full items-center gap-1 truncate">
+   345→                              <BookOpen className="h-3.5 w-3.5 shrink-0" />
+   346→                              <span className="truncate">{doc.sourceName}</span>
+   347→                            </span>
+   348→                          )}
+   349→                        </div>
+   350→
+   351→                        <div className="whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 p-3 font-mono text-xs text-slate-600">
+   352→                          {doc.content.slice(0, 280)}
+   353→                          {doc.content.length > 280 ? "…" : ""}
+   354→                        </div>
+   355→
+   356→                        <Button
+   357→                          variant="ghost"
+   358→                          size="sm"
+   359→                          className="-ml-2 mt-auto self-start text-teal-700 hover:bg-teal-50 hover:text-teal-800"
+   360→                          onClick={() => setFullDoc(doc)}
+   361→                        >
+   362→                          <Maximize2 className="h-3.5 w-3.5" /> Show full document
+   363→                        </Button>
+   364→                      </CardContent>
+   365→                    </Card>
+   366→                  </motion.div>
+   367→                );
+   368→              })}
+   369→            </div>
+   370→          )}
+   371→        </TabsContent>
+   372→
+   373→        {/* ── Visual Tokens tab ── */}
+   374→        <TabsContent value="tokens" className="space-y-8">
+   375→          <div className="flex items-center justify-between gap-3">
+   376→            <p className="text-xs text-slate-500">
+   377→              {visualTokens.isLoading ? "Loading tokens…" : `${tokens.length} visual token${tokens.length === 1 ? "" : "s"} enforced by the vision & style validators`}
+   378→            </p>
+   379→            {isAdmin && (
+   380→              <Button
+   381→                size="sm"
+   382→                variant="outline"
+   383→                className="border-teal-200 bg-white text-teal-700 hover:bg-teal-50 hover:text-teal-800"
+   384→                onClick={() => {
+   385→                  resetTokenDialog("color");
+   386→                  setAddTokenOpen(true);
+   387→                }}
+   388→              >
+   389→                <Plus className="h-4 w-4" /> Add Token
+   390→              </Button>
+   391→            )}
+   392→          </div>
+   393→
+   394→          {visualTokens.isLoading ? (
+   395→            <div className="space-y-6">
+   396→              <Skeleton className="h-5 w-40" />
+   397→              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+   398→                {Array.from({ length: 3 }).map((_, i) => (
+   399→                  <Skeleton key={i} className="h-44 rounded-2xl" />
+   400→                ))}
+   401→              </div>
+   402→            </div>
+   403→          ) : (
+   404→            <>
+   405→              {/* Approved Palette */}
+   406→              <section className="space-y-3">
+   407→                <div className="flex items-center gap-2">
+   408→                  <Palette className="h-4 w-4 text-teal-700" />
+   409→                  <h2 className="text-sm font-semibold text-slate-900">Approved Palette</h2>
+   410→                  <span className="text-xs text-slate-400">({colorTokens.length})</span>
+   411→                </div>
+   412→                {colorTokens.length === 0 ? (
+   413→                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
+   414→                    No color tokens yet — the vision stage skips WCAG checks until a palette exists.
+   415→                  </p>
+   416→                ) : (
+   417→                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+   418→                    {colorTokens.map((token, i) => (
+   419→                      <motion.div key={token.id} {...fadeUp(i)}>
+   420→                        <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm transition-shadow hover:shadow-md">
+   421→                          <CardContent className="space-y-3 p-6">
+   422→                            <div
+   423→                              className="flex h-24 w-full items-end justify-between rounded-xl border border-black/5 p-3"
+   424→                              style={{ backgroundColor: token.value }}
+   425→                            >
+   426→                              <span className="font-mono text-xs font-semibold" style={{ color: readableOn(token.value) }}>
+   427→                                {token.value.toUpperCase()}
+   428→                              </span>
+   429→                              {isAdmin && (
+   430→                                <button
+   431→                                  aria-label={`Delete ${token.name}`}
+   432→                                  className="rounded-md p-1 transition-colors hover:bg-black/10"
+   433→                                  style={{ color: readableOn(token.value) }}
+   434→                                  onClick={() => setTokenToDelete(token)}
+   435→                                >
+   436→                                  <Trash2 className="h-3.5 w-3.5" />
+   437→                                </button>
+   438→                              )}
+   439→                            </div>
+   440→                            <div className="flex items-center justify-between gap-2">
+   441→                              <p className="truncate text-sm font-medium text-slate-900">{token.name}</p>
+   442→                              {token.secondary && (
+   443→                                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
+   444→                                  <span className="h-2.5 w-2.5 rounded-full border border-black/10" style={{ backgroundColor: token.secondary }} />
+   445→                                  <span className="font-mono text-[10px] text-slate-500">{token.secondary.toUpperCase()}</span>
+   446→                                </span>
+   447→                              )}
+   448→                            </div>
+   449→                            {token.usageNotes && <p className="line-clamp-2 text-xs text-slate-500">{token.usageNotes}</p>}
+   450→                          </CardContent>
+   451→                        </Card>
+   452→                      </motion.div>
+   453→                    ))}
+   454→                  </div>
+   455→                )}
+   456→              </section>
+   457→
+   458→              {/* Typography */}
+   459→              <section className="space-y-3">
+   460→                <div className="flex items-center gap-2">
+   461→                  <Type className="h-4 w-4 text-teal-700" />
+   462→                  <h2 className="text-sm font-semibold text-slate-900">Typography</h2>
+   463→                  <span className="text-xs text-slate-400">({typographyTokens.length})</span>
+   464→                </div>
+   465→                {typographyTokens.length === 0 ? (
+   466→                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
+   467→                    No typography tokens yet.
+   468→                  </p>
+   469→                ) : (
+   470→                  <div className="space-y-3">
+   471→                    {typographyTokens.map((token, i) => (
+   472→                      <motion.div key={token.id} {...fadeUp(i)}>
+   473→                        <Card className="rounded-2xl border-slate-200 shadow-sm">
+   474→                          <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 p-6">
+   475→                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50">
+   476→                              <Type className="h-5 w-5 text-teal-700" />
+   477→                            </div>
+   478→                            <div className="min-w-0 flex-1">
+   479→                              <p className="truncate text-sm font-medium text-slate-900">{token.name}</p>
+   480→                              {token.usageNotes && <p className="truncate text-xs text-slate-500">{token.usageNotes}</p>}
+   481→                            </div>
+   482→                            <code className="rounded-md border border-slate-100 bg-slate-50 px-2.5 py-1 font-mono text-xs text-slate-600">
+   483→                              {token.value}
+   484→                            </code>
+   485→                            {isAdmin && (
+   486→                              <Button
+   487→                                variant="ghost"
+   488→                                size="icon"
+   489→                                aria-label={`Delete ${token.name}`}
+   490→                                className="h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-600"
+   491→                                onClick={() => setTokenToDelete(token)}
+   492→                              >
+   493→                                <Trash2 className="h-4 w-4" />
+   494→                              </Button>
+   495→                            )}
+   496→                          </CardContent>
+   497→                        </Card>
+   498→                      </motion.div>
+   499→                    ))}
+   500→                  </div>
+   501→                )}
+   502→              </section>
+   503→
+   504→              {/* Logo & Marks */}
+   505→              <section className="space-y-3">
+   506→                <div className="flex items-center gap-2">
+   507→                  <ImageIcon className="h-4 w-4 text-teal-700" />
+   508→                  <h2 className="text-sm font-semibold text-slate-900">Logo &amp; Marks</h2>
+   509→                  <span className="text-xs text-slate-400">({logoTokens.length})</span>
+   510→                </div>
+   511→                {logoTokens.length === 0 ? (
+   512→                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
+   513→                    No logo tokens yet.
+   514→                  </p>
+   515→                ) : (
+   516→                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+   517→                    {logoTokens.map((token, i) => (
+   518→                      <motion.div key={token.id} {...fadeUp(i)}>
+   519→                        <Card className="rounded-2xl border-slate-200 shadow-sm">
+   520→                          <CardContent className="flex items-center gap-4 p-6">
+   521→                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-slate-50 p-2">
+   522→                              <img src={token.value} alt={token.name} className="h-16 w-16 object-contain" />
+   523→                            </div>
+   524→                            <div className="min-w-0 flex-1">
+   525→                              <p className="truncate text-sm font-medium text-slate-900">{token.name}</p>
+   526→                              {token.usageNotes && <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{token.usageNotes}</p>}
+   527→                            </div>
+   528→                            {isAdmin && (
+   529→                              <Button
+   530→                                variant="ghost"
+   531→                                size="icon"
+   532→                                aria-label={`Delete ${token.name}`}
+   533→                                className="h-8 w-8 shrink-0 text-slate-400 hover:bg-red-50 hover:text-red-600"
+   534→                                onClick={() => setTokenToDelete(token)}
+   535→                              >
+   536→                                <Trash2 className="h-4 w-4" />
+   537→                              </Button>
+   538→                            )}
+   539→                          </CardContent>
+   540→                        </Card>
+   541→                      </motion.div>
+   542→                    ))}
+   543→                  </div>
+   544→                )}
+   545→              </section>
+   546→            </>
+   547→          )}
+   548→        </TabsContent>
+   549→      </Tabs>
+   550→
+   551→      {/* ── Add Document dialog ── */}
+   552→      <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
+   553→        <DialogContent className="max-h-[92vh] overflow-y-auto rounded-2xl sm:max-w-xl">
+   554→          <DialogHeader>
+   555→            <DialogTitle className="text-slate-900">Ingest document</DialogTitle>
+   556→            <DialogDescription>
+   557→              Paste approved text or import a file. Content is chunked and embedded on save.
+   558→            </DialogDescription>
+   559→          </DialogHeader>
+   560→
+   561→          <div className="space-y-4">
+   562→            <div className="space-y-1.5">
+   563→              <Label htmlFor="kb-title" className="text-slate-700">Title</Label>
+   564→              <Input
+   565→                id="kb-title"
+   566→                value={docTitle}
+   567→                onChange={(e) => setDocTitle(e.target.value)}
+   568→                placeholder="e.g. Claims & Substantiation Policy"
+   569→                className="border-slate-200"
+   570→              />
+   571→            </div>
+   572→
+   573→            <div className="space-y-1.5">
+   574→              <Label className="text-slate-700">Document type</Label>
+   575→              <Select value={docType} onValueChange={setDocType}>
+   576→                <SelectTrigger className="w-full border-slate-200">
+   577→                  <SelectValue placeholder="Select type" />
+   578→                </SelectTrigger>
+   579→                <SelectContent>
+   580→                  {Object.entries(DOC_TYPE_META).map(([value, meta]) => (
+   581→                    <SelectItem key={value} value={value}>
+   582→                      {meta.label}
+   583→                    </SelectItem>
+   584→                  ))}
+   585→                </SelectContent>
+   586→              </Select>
+   587→            </div>
+   588→
+   589→            <div className="space-y-1.5">
+   590→              <Label htmlFor="kb-content" className="text-slate-700">Content</Label>
+   591→              <Textarea
+   592→                id="kb-content"
+   593→                value={docContent}
+   594→                onChange={(e) => setDocContent(e.target.value)}
+   595→                placeholder="Paste approved guideline text…"
+   596→                className="min-h-[220px] border-slate-200 font-mono text-xs"
+   597→              />
+   598→            </div>
+   599→
+   600→            <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-6 text-center transition-colors hover:border-teal-500 hover:bg-teal-50/40">
+   601→              <FileUp className="h-5 w-5 text-slate-400" />
+   602→              <span className="text-xs font-medium text-slate-600">Import a .txt, .md or .csv file</span>
+   603→              <span className="text-[11px] text-slate-400">Title is derived from the filename; text fills the content field.</span>
+   604→              <input
+   605→                ref={fileInputRef}
+   606→                type="file"
+   607→                accept=".txt,.md,.markdown,.csv"
+   608→                className="hidden"
+   609→                onChange={handleFileImport}
+   610→              />
+   611→            </label>
+   612→          </div>
+   613→
+   614→          <DialogFooter>
+   615→            <Button variant="outline" className="border-slate-200" onClick={() => setAddDocOpen(false)}>
+   616→              Cancel
+   617→            </Button>
+   618→            <Button
+   619→              className="bg-teal-700 text-white hover:bg-teal-800"
+   620→              disabled={createGuideline.isPending}
+   621→              onClick={submitDoc}
+   622→            >
+   623→              {createGuideline.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+   624→              Ingest &amp; chunk
+   625→            </Button>
+   626→          </DialogFooter>
+   627→        </DialogContent>
+   628→      </Dialog>
+   629→
+   630→      {/* ── Full document dialog ── */}
+   631→      <Dialog open={!!fullDoc} onOpenChange={(o) => !o && setFullDoc(null)}>
+   632→        <DialogContent className="max-h-[92vh] overflow-hidden rounded-2xl sm:max-w-2xl">
+   633→          {fullDoc && (
+   634→            <>
+   635→              <DialogHeader>
+   636→                <div className="flex flex-wrap items-center gap-2">
+   637→                  <Badge variant="outline" className={cn("border", (DOC_TYPE_META[fullDoc.docType] ?? { cls: "bg-slate-100 text-slate-700 border-slate-200" }).cls)}>
+   638→                    {(DOC_TYPE_META[fullDoc.docType] ?? { label: fullDoc.docType }).label}
+   639→                  </Badge>
+   640→                  <Badge variant="outline" className="border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-500">
+   641→                    v{fullDoc.version}
+   642→                  </Badge>
+   643→                  <Badge variant="outline" className="border-slate-200 bg-slate-50 text-[10px] text-slate-500">
+   644→                    {fullDoc.chunkCount} chunks
+   645→                  </Badge>
+   646→                </div>
+   647→                <DialogTitle className="pt-1 text-slate-900">{fullDoc.title}</DialogTitle>
+   648→                <DialogDescription>Full approved content — the retrieval source of truth.</DialogDescription>
+   649→              </DialogHeader>
+   650→              <div className="max-h-[55vh] overflow-y-auto rounded-lg border border-slate-100 bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-600">
+   651→                <div className="whitespace-pre-wrap">{fullDoc.content}</div>
+   652→              </div>
+   653→            </>
+   654→          )}
+   655→        </DialogContent>
+   656→      </Dialog>
+   657→
+   658→      {/* ── Add Token dialog ── */}
+   659→      <Dialog open={addTokenOpen} onOpenChange={setAddTokenOpen}>
+   660→        <DialogContent className="max-h-[92vh] overflow-y-auto rounded-2xl sm:max-w-md">
+   661→          <DialogHeader>
+   662→            <DialogTitle className="text-slate-900">Add visual token</DialogTitle>
+   663→            <DialogDescription>Tokens are enforced by the deterministic &amp; vision validators.</DialogDescription>
+   664→          </DialogHeader>
+   665→
+   666→          <div className="space-y-4">
+   667→            <div className="space-y-1.5">
+   668→              <Label className="text-slate-700">Token type</Label>
+   669→              <Select value={tokenType} onValueChange={setTokenType}>
+   670→                <SelectTrigger className="w-full border-slate-200">
+   671→                  <SelectValue placeholder="Select type" />
+   672→                </SelectTrigger>
+   673→                <SelectContent>
+   674→                  {Object.entries(TOKEN_TYPE_META).map(([value, meta]) => (
+   675→                    <SelectItem key={value} value={value}>
+   676→                      {meta.label}
+   677→                    </SelectItem>
+   678→                  ))}
+   679→                </SelectContent>
+   680→              </Select>
+   681→            </div>
+   682→
+   683→            <div className="space-y-1.5">
+   684→              <Label htmlFor="tok-name" className="text-slate-700">Name</Label>
+   685→              <Input
+   686→                id="tok-name"
+   687→                value={tokenName}
+   688→                onChange={(e) => setTokenName(e.target.value)}
+   689→                placeholder={tokenType === "color" ? "e.g. Deep Teal — primary" : tokenType === "typography" ? "e.g. Headline face" : "e.g. Primary wordmark"}
+   690→                className="border-slate-200"
+   691→              />
+   692→            </div>
+   693→
+   694→            <div className="space-y-1.5">
+   695→              <Label htmlFor="tok-value" className="text-slate-700">
+   696→                {tokenType === "color" ? "Hex value" : tokenType === "typography" ? "Font stack" : "Image URL"}
+   697→              </Label>
+   698→              {tokenType === "color" ? (
+   699→                <div className="flex items-center gap-2">
+   700→                  <Input
+   701→                    id="tok-value"
+   702→                    value={tokenValue}
+   703→                    onChange={(e) => setTokenValue(e.target.value)}
+   704→                    placeholder="#0F766E"
+   705→                    className="border-slate-200 font-mono"
+   706→                  />
+   707→                  {HEX_RE.test(tokenValue.trim()) && (
+   708→                    <span
+   709→                      className="h-9 w-9 shrink-0 rounded-md border border-slate-200"
+   710→                      style={{ backgroundColor: tokenValue.trim() }}
+   711→                      aria-hidden
+   712→                    />
+   713→                  )}
+   714→                </div>
+   715→              ) : (
+   716→                <Input
+   717→                  id="tok-value"
+   718→                  value={tokenValue}
+   719→                  onChange={(e) => setTokenValue(e.target.value)}
+   720→                  placeholder={tokenType === "typography" ? "Inter, 'Helvetica Neue', sans-serif" : "https://cdn.example.com/logo.svg"}
+   721→                  className="border-slate-200 font-mono text-xs"
+   722→                />
+   723→              )}
+   724→            </div>
+   725→
+   726→            {tokenType === "color" && (
+   727→              <div className="space-y-1.5">
+   728→                <Label htmlFor="tok-secondary" className="text-slate-700">
+   729→                  Secondary pairing <span className="font-normal text-slate-400">(optional)</span>
+   730→                </Label>
+   731→                <Input
+   732→                  id="tok-secondary"
+   733→                  value={tokenSecondary}
+   734→                  onChange={(e) => setTokenSecondary(e.target.value)}
+   735→                  placeholder="#F0FDFA"
+   736→                  className="border-slate-200 font-mono"
+   737→                />
+   738→              </div>
+   739→            )}
+   740→
+   741→            <div className="space-y-1.5">
+   742→              <Label htmlFor="tok-notes" className="text-slate-700">
+   743→                Usage notes <span className="font-normal text-slate-400">(optional)</span>
+   744→              </Label>
+   745→              <Textarea
+   746→                id="tok-notes"
+   747→                value={tokenNotes}
+   748→                onChange={(e) => setTokenNotes(e.target.value)}
+   749→                placeholder="Where and how this token may be used…"
+   750→                className="min-h-[72px] border-slate-200"
+   751→              />
+   752→            </div>
+   753→          </div>
+   754→
+   755→          <DialogFooter>
+   756→            <Button variant="outline" className="border-slate-200" onClick={() => setAddTokenOpen(false)}>
+   757→              Cancel
+   758→            </Button>
+   759→            <Button
+   760→              className="bg-teal-700 text-white hover:bg-teal-800"
+   761→              disabled={createToken.isPending}
+   762→              onClick={submitToken}
+   763→            >
+   764→              {createToken.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+   765→              Add token
+   766→            </Button>
+   767→          </DialogFooter>
+   768→        </DialogContent>
+   769→      </Dialog>
+   770→
+   771→      {/* ── Delete document confirm ── */}
+   772→      <AlertDialog open={!!docToDelete} onOpenChange={(o) => !o && setDocToDelete(null)}>
+   773→        <AlertDialogContent className="rounded-2xl">
+   774→          <AlertDialogHeader>
+   775→            <AlertDialogTitle className="text-slate-900">Delete document?</AlertDialogTitle>
+   776→            <AlertDialogDescription>
+   777→              &ldquo;{docToDelete?.title}&rdquo; will be removed from the repository and its vector chunks
+   778→              purged. Scans will no longer cite this source.
+   779→            </AlertDialogDescription>
+   780→          </AlertDialogHeader>
+   781→          <AlertDialogFooter>
+   782→            <AlertDialogCancel className="border-slate-200">Cancel</AlertDialogCancel>
+   783→            <AlertDialogAction
+   784→              className="bg-red-600 text-white hover:bg-red-700"
+   785→              disabled={deleteGuideline.isPending}
+   786→              onClick={async () => {
+   787→                if (!docToDelete) return;
+   788→                try {
+   789→                  await deleteGuideline.mutateAsync(docToDelete.id);
+   790→                  toast.success("Document deleted");
+   791→                } catch (err) {
+   792→                  toast.error(err instanceof Error ? err.message : "Delete failed.");
+   793→                }
+   794→                setDocToDelete(null);
+   795→              }}
+   796→            >
+   797→              {deleteGuideline.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+   798→              Delete
+   799→            </AlertDialogAction>
+   800→          </AlertDialogFooter>
+   801→        </AlertDialogContent>
+   802→      </AlertDialog>
+   803→
+   804→      {/* ── Delete token confirm ── */}
+   805→      <AlertDialog open={!!tokenToDelete} onOpenChange={(o) => !o && setTokenToDelete(null)}>
+   806→        <AlertDialogContent className="rounded-2xl">
+   807→          <AlertDialogHeader>
+   808→            <AlertDialogTitle className="text-slate-900">Delete token?</AlertDialogTitle>
+   809→            <AlertDialogDescription>
+   810→              &ldquo;{tokenToDelete?.name}&rdquo; will no longer be enforced by the brand validators.
+   811→            </AlertDialogDescription>
+   812→          </AlertDialogHeader>
+   813→          <AlertDialogFooter>
+   814→            <AlertDialogCancel className="border-slate-200">Cancel</AlertDialogCancel>
+   815→            <AlertDialogAction
+   816→              className="bg-red-600 text-white hover:bg-red-700"
+   817→              disabled={deleteToken.isPending}
+   818→              onClick={async () => {
+   819→                if (!tokenToDelete) return;
+   820→                try {
+   821→                  await deleteToken.mutateAsync(tokenToDelete.id);
+   822→                  toast.success("Token deleted");
+   823→                } catch (err) {
+   824→                  toast.error(err instanceof Error ? err.message : "Delete failed.");
+   825→                }
+   826→                setTokenToDelete(null);
+   827→              }}
+   828→            >
+   829→              {deleteToken.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+   830→              Delete
+   831→            </AlertDialogAction>
+   832→          </AlertDialogFooter>
+   833→        </AlertDialogContent>
+   834→      </AlertDialog>
+   835→    </div>
+   836→  );
+   837→}
+   838→
+   839→export default KnowledgeView;
+   840→

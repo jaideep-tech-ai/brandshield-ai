@@ -31,6 +31,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-findings";
 import {
   useSession,
   useSubmissions,
@@ -42,7 +44,7 @@ import {
   useTransitionSubmission,
 } from "@/lib/brandshield/client";
 import { useUIStore } from "@/lib/brandshield/store";
-import { cn, timeAgo } from "@/lib/brandshield/utils";
+import { cn } from "@/lib/brandshield/utils";
 import { SEVERITY_META, STATUS_META, CATEGORY_META, type Finding, type Severity } from "@/lib/brandshield/types";
 
 const CATEGORY_ICON: Record<string, React.ReactNode> = {
@@ -54,6 +56,7 @@ const CATEGORY_ICON: Record<string, React.ReactNode> = {
 };
 
 export function FindingsView() {
+  const { t } = useLang();
   const session = useSession();
   const submissions = useSubmissions();
   const selectedId = useUIStore((s) => s.selectedSubmissionId) ?? submissions.data?.[0]?.id ?? null;
@@ -90,9 +93,9 @@ export function FindingsView() {
     if (!f.suggestion) return;
     try {
       const res = await resolve.mutateAsync({ id: f.id, suggestion: f.suggestion });
-      toast.success("Rewrite applied", { description: res.contentUpdated ? "Copy updated and a new revision was recorded." : "Finding marked as resolved." });
+      toast.success(t("findings.toast.applied"), { description: res.contentUpdated ? t("findings.toast.appliedDesc.contentUpdated") : t("findings.toast.appliedDesc.resolved") });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not apply rewrite");
+      toast.error(e instanceof Error ? e.message : t("findings.toast.applyFail"));
     }
   };
 
@@ -100,22 +103,22 @@ export function FindingsView() {
     try {
       const res = await rewrite.mutateAsync(f.id);
       if (!res.suggestion) {
-        toast.info("No rewrite produced — try overriding with a justification instead");
+        toast.info(t("findings.toast.noRewrite"));
         return;
       }
       await resolve.mutateAsync({ id: f.id, suggestion: res.suggestion });
-      toast.success("AI rewrite applied to the copy");
+      toast.success(t("findings.toast.aiApplied"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Rewrite failed");
+      toast.error(e instanceof Error ? e.message : t("findings.toast.rewriteFail"));
     }
   };
 
   const onOverride = async (f: Finding, note: string) => {
     try {
       await override.mutateAsync({ id: f.id, note });
-      toast.success("Finding overridden with justification — recorded in the audit trail");
+      toast.success(t("findings.toast.overridden"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Override failed");
+      toast.error(e instanceof Error ? e.message : t("findings.toast.overrideFail"));
     }
   };
 
@@ -123,9 +126,9 @@ export function FindingsView() {
     if (!sub) return;
     try {
       await transition.mutateAsync({ id: sub.id, action: "submit_for_review" });
-      toast.success("Submitted to the review board");
+      toast.success(t("findings.toast.submitted"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not submit");
+      toast.error(e instanceof Error ? e.message : t("findings.toast.submitFail"));
     }
   };
 
@@ -133,9 +136,9 @@ export function FindingsView() {
     if (!sub) return;
     try {
       await scan.mutateAsync(sub.id);
-      toast.success("Re-scan complete");
+      toast.success(t("findings.toast.rescanDone"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Scan failed");
+      toast.error(e instanceof Error ? e.message : t("findings.toast.failed"));
     }
   };
 
@@ -159,13 +162,13 @@ export function FindingsView() {
           </button>
         ))}
         {(submissions.data ?? []).length === 0 && (
-          <p className="text-sm text-slate-400">No submissions yet — run a pre-flight scan first.</p>
+          <p className="text-sm text-slate-400">{t("findings.submissions.empty")}</p>
         )}
       </div>
 
       {isLoading || !sub ? (
         <div className="flex h-64 items-center justify-center text-slate-400">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading workspace…
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("findings.loading")}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -177,11 +180,11 @@ export function FindingsView() {
                   <div>
                     <h2 className="text-base font-semibold text-slate-900">{sub.title}</h2>
                     <p className="mt-0.5 text-xs text-slate-400">
-                      {sub.authorName} · {sub.department ?? "Unassigned"} · v{sub.currentVersion}
+                      {sub.authorName} · {sub.department ?? t("findings.unassigned")} · v{sub.currentVersion}
                     </p>
                   </div>
                   <Badge variant="outline" className={cn("border", STATUS_META[sub.status as keyof typeof STATUS_META]?.className)}>
-                    {STATUS_META[sub.status as keyof typeof STATUS_META]?.label}
+                    {t(`common.status.${sub.status}`)}
                   </Badge>
                 </div>
 
@@ -197,24 +200,24 @@ export function FindingsView() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button variant="outline" size="sm" className="min-h-9 gap-1.5" onClick={() => void onRescan()} disabled={scan.isPending}>
-                        {scan.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Re-scan
+                        {scan.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} {t("findings.action.rescan")}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Runs the two-stage pipeline again on the current revision</TooltipContent>
+                    <TooltipContent>{t("findings.rescan.tooltip")}</TooltipContent>
                   </Tooltip>
                   {canSubmitForReview && (
                     <Button size="sm" className="min-h-9 gap-1.5 bg-teal-700 hover:bg-teal-800" onClick={() => void onSubmitForReview()} disabled={transition.isPending || openCritical > 0}>
                       {transition.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <SendHorizonal className="h-3.5 w-3.5" />}
-                      Submit for review
+                      {t("findings.action.submitReview")}
                     </Button>
                   )}
                   {canSubmitForReview && openCritical > 0 && (
                     <span className="flex items-center gap-1 text-xs text-red-600">
-                      <AlertCircle className="h-3.5 w-3.5" /> {openCritical} critical finding{openCritical > 1 ? "s" : ""} must be resolved or justified
+                      <AlertCircle className="h-3.5 w-3.5" /> {t("findings.blockedCritical", { n: openCritical, s: openCritical > 1 ? "s" : "" })}
                     </span>
                   )}
                   {isAuthor && sub.status === "draft" && sub.scanCount === 0 && (
-                    <span className="text-xs text-slate-400">Run a scan before submitting for review</span>
+                    <span className="text-xs text-slate-400">{t("findings.scanFirst")}</span>
                   )}
                 </div>
               </CardContent>
@@ -224,12 +227,12 @@ export function FindingsView() {
             {sub.inspections && sub.inspections.length > 0 && (
               <Card>
                 <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4 text-xs text-slate-500">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-600"><Layers className="h-3.5 w-3.5 text-teal-700" /> Last inspection</span>
-                  <span>{(sub.inspections[0].durationMs / 1000).toFixed(1)}s pipeline</span>
+                  <span className="flex items-center gap-1.5 font-medium text-slate-600"><Layers className="h-3.5 w-3.5 text-teal-700" /> {t("findings.meta.lastInspection")}</span>
+                  <span>{t("findings.meta.pipeline", { sec: (sub.inspections[0].durationMs / 1000).toFixed(1) })}</span>
                   <span>·</span>
-                  <span>Stage 1 deterministic: {String((sub.inspections[0].stageA as { durationMs?: number }).durationMs ?? "—")}ms</span>
+                  <span>{t("findings.meta.stage1", { ms: String((sub.inspections[0].stageA as { durationMs?: number }).durationMs ?? "—") })}</span>
                   <span>·</span>
-                  <span>Strict JSON citations: enforced</span>
+                  <span>{t("findings.meta.strictJson")}</span>
                 </CardContent>
               </Card>
             )}
@@ -239,8 +242,8 @@ export function FindingsView() {
           <div className="min-w-0 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <FileSearch className="h-4 w-4 text-teal-700" /> Findings
-                <span className="text-xs font-normal text-slate-400">({openFindings.length} open)</span>
+                <FileSearch className="h-4 w-4 text-teal-700" /> {t("findings.findings.title")}
+                <span className="text-xs font-normal text-slate-400">{t("findings.findings.openCount", { n: openFindings.length })}</span>
               </h3>
               <div className="flex gap-1.5">
                 {(["all", "critical", "warning", "minor"] as const).map((s) => (
@@ -248,11 +251,11 @@ export function FindingsView() {
                     key={s}
                     onClick={() => setSevFilter(s)}
                     className={cn(
-                      "rounded-full px-2.5 py-1 text-[11px] font-medium capitalize transition",
+                      "rounded-full px-2.5 py-1 text-[11px] font-medium transition",
                       sevFilter === s ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                     )}
                   >
-                    {s === "all" ? "All" : s}
+                    {s === "all" ? t("findings.filter.all") : t(`common.severity.${s}`)}
                     {s !== "all" && counts[s] > 0 && <span className="ml-1 opacity-70">{counts[s]}</span>}
                   </button>
                 ))}
@@ -267,8 +270,8 @@ export function FindingsView() {
                       <Card className="border-emerald-100 bg-emerald-50/60">
                         <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
                           <CheckCircle2 className="h-8 w-8 text-emerald-500" />
-                          <p className="text-sm font-medium text-emerald-800">No open findings in this view</p>
-                          <p className="text-xs text-emerald-700/70">The copy aligns with the ground-truth repository.</p>
+                          <p className="text-sm font-medium text-emerald-800">{t("findings.empty.title")}</p>
+                          <p className="text-xs text-emerald-700/70">{t("findings.empty.sub")}</p>
                         </CardContent>
                       </Card>
                     </motion.div>
@@ -374,15 +377,16 @@ function HighlightedContent({ content, findings, selectedId, onSelect }: { conte
 }
 
 function BannerAnnotator({ sub, findings, selectedId, onSelect }: { sub: { imageData: string | null; imagePalette: string[] }; findings: Finding[]; selectedId: string | null; onSelect: (id: string) => void }) {
+  const { t } = useLang();
   const colorFindings = findings.filter((f) => /^#[0-9a-fA-F]{3,8}/.test(f.flaggedText));
   const offColors = new Map(colorFindings.map((f) => [f.flaggedText.toUpperCase(), f]));
   return (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-xl border border-slate-200">
-        <img src={sub.imageData ?? ""} alt="Submitted banner" className="max-h-72 w-full object-contain" />
+        <img src={sub.imageData ?? ""} alt={t("findings.banner.alt")} className="max-h-72 w-full object-contain" />
       </div>
       <div>
-        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-500"><Palette className="h-3.5 w-3.5 text-teal-700" /> Extracted palette — click a swatch to inspect violations</p>
+        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-500"><Palette className="h-3.5 w-3.5 text-teal-700" /> {t("findings.banner.paletteHint")}</p>
         <div className="flex flex-wrap gap-2">
           {sub.imagePalette.map((hex) => {
             const f = offColors.get(hex.toUpperCase());
@@ -430,6 +434,7 @@ function FindingCard({
   onGenerate: () => void;
   onOverride: (note: string) => void;
 }) {
+  const { t } = useLang();
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [note, setNote] = useState("");
   const meta = SEVERITY_META[f.severity];
@@ -448,17 +453,17 @@ function FindingCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <Badge variant="outline" className={cn("gap-1 border text-[10px] font-semibold uppercase tracking-wide", meta.border, meta.bg, meta.text)}>
-              {meta.label.split(" — ")[0]}
+              {t(`common.severity.${f.severity}`).split(" — ")[0]}
             </Badge>
             <Badge variant="outline" className="gap-1 border-slate-200 bg-white text-[10px] text-slate-500">
-              {CATEGORY_ICON[f.category]} {CATEGORY_META[f.category as keyof typeof CATEGORY_META]?.label}
+              {CATEGORY_ICON[f.category]} {t(`common.category.${f.category}`)}
             </Badge>
-            {f.stage === "deterministic" && <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-400">regex · &lt;100ms</Badge>}
-            {f.stage === "vision" && <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-400"><Eye className="mr-0.5 inline h-3 w-3" />vision</Badge>}
+            {f.stage === "deterministic" && <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-400">{t("common.stage.deterministic")}</Badge>}
+            {f.stage === "vision" && <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-400"><Eye className="mr-0.5 inline h-3 w-3" />{t("common.stage.vision")}</Badge>}
           </div>
           {f.status !== "open" && (
             <Badge variant="outline" className={cn("shrink-0 text-[10px]", f.status === "resolved" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-orange-200 bg-orange-50 text-orange-600")}>
-              {f.status}
+              {t(`common.finding.${f.status}`)}
             </Badge>
           )}
         </div>
@@ -484,13 +489,13 @@ function FindingCard({
               <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-3">
                 <p className="flex items-start gap-1.5 text-xs leading-relaxed text-emerald-900">
                   <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                  <span><span className="font-semibold">Tone-preserving fix:</span> {f.suggestion}</span>
+                  <span><span className="font-semibold">{t("findings.fix.label")}</span> {f.suggestion}</span>
                 </p>
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-emerald-200 bg-emerald-50/40 p-3">
                 <p className="flex items-center gap-1.5 text-xs text-emerald-800">
-                  <Wand2 className="h-3.5 w-3.5" /> Generate a one-click rewrite that preserves your creative nuance.
+                  <Wand2 className="h-3.5 w-3.5" /> {t("findings.rewrite.hint")}
                 </p>
               </div>
             )}
@@ -498,15 +503,15 @@ function FindingCard({
               <div className="flex flex-wrap gap-2">
                 {f.suggestion ? (
                   <Button size="sm" className="min-h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700" disabled={busy} onClick={(e) => { e.stopPropagation(); onApply(); }}>
-                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Apply fix
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} {t("findings.action.applyFix")}
                   </Button>
                 ) : (
                   <Button size="sm" className="min-h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700" disabled={busy} onClick={(e) => { e.stopPropagation(); onGenerate(); }}>
-                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />} One-click rewrite
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />} {t("findings.action.oneClickRewrite")}
                   </Button>
                 )}
                 <Button size="sm" variant="outline" className="min-h-9 gap-1.5" disabled={busy} onClick={(e) => { e.stopPropagation(); setOverrideOpen(true); }}>
-                  <Flag className="h-3.5 w-3.5" /> Override with justification
+                  <Flag className="h-3.5 w-3.5" /> {t("findings.action.override")}
                 </Button>
               </div>
             )}
@@ -514,7 +519,7 @@ function FindingCard({
         )}
         {f.status === "overridden" && f.overrideNote && (
           <p className="flex items-start gap-1.5 rounded-lg bg-orange-50 p-2.5 text-xs text-orange-700">
-            <MessageSquareQuote className="mt-0.5 h-3.5 w-3.5 shrink-0" /> <span><span className="font-semibold">Justification:</span> {f.overrideNote}</span>
+            <MessageSquareQuote className="mt-0.5 h-3.5 w-3.5 shrink-0" /> <span><span className="font-semibold">{t("findings.justification.label")}</span> {f.overrideNote}</span>
           </p>
         )}
       </CardContent>
@@ -522,14 +527,14 @@ function FindingCard({
       <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
         <DialogContent onClick={(e) => e.stopPropagation()} className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base"><Flag className="h-4 w-4 text-amber-600" /> Override finding</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-base"><Flag className="h-4 w-4 text-amber-600" /> {t("findings.override.title")}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-slate-500">
-            Overriding skips the suggested fix. Your justification is written to the tamper-evident audit log and shown to reviewers.
+            {t("findings.override.desc")}
           </p>
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. This phrase is part of a registered co-marketing claim agreed with Legal on Mar 3 (contract #CS-221)." className="min-h-[90px]" />
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("findings.override.ph")} className="min-h-[90px]" />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setOverrideOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setOverrideOpen(false)}>{t("common.action.cancel")}</Button>
             <Button
               className="bg-amber-600 hover:bg-amber-700"
               disabled={note.trim().length < 8 || busy}
@@ -539,7 +544,7 @@ function FindingCard({
                 setNote("");
               }}
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Record override
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {t("findings.override.record")}
             </Button>
           </DialogFooter>
         </DialogContent>

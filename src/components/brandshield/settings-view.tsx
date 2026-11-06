@@ -7,7 +7,7 @@ import {
   Building2,
   Check,
   KeyRound,
-  Loader2,
+  Languages,
   Lock,
   Mail,
   Minus,
@@ -19,6 +19,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { useSession, useUpdateOrg, useTeam } from "@/lib/brandshield/client";
+import { LANGS, useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-settings";
 import type { Role } from "@/lib/brandshield/types";
 import { cn, initials } from "@/lib/brandshield/utils";
 
@@ -34,23 +36,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 // ─── Meta ────────────────────────────────────────────────────────────────────
 
-const ROLE_META: Record<Role, { label: string; cls: string }> = {
-  creator: { label: "Creator", cls: "bg-teal-50 text-teal-700 border-teal-200" },
-  reviewer: { label: "Reviewer", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  contractor: { label: "Contractor", cls: "bg-orange-50 text-orange-700 border-orange-200" },
-  admin: { label: "Brand Admin", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+const ROLE_CLS: Record<Role, string> = {
+  creator: "bg-teal-50 text-teal-700 border-teal-200",
+  reviewer: "bg-amber-50 text-amber-700 border-amber-200",
+  contractor: "bg-orange-50 text-orange-700 border-orange-200",
+  admin: "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 
 const ROLE_ORDER: Role[] = ["creator", "contractor", "reviewer", "admin"];
 
-const PERMISSION_ROWS: { label: string; allowed: Record<Role, boolean> }[] = [
-  { label: "Run pre-flight scans", allowed: { creator: true, contractor: true, reviewer: false, admin: true } },
-  { label: "Submit for review", allowed: { creator: true, contractor: true, reviewer: false, admin: true } },
-  { label: "Approve / request changes", allowed: { creator: false, contractor: false, reviewer: true, admin: true } },
-  { label: "Manage knowledge base", allowed: { creator: false, contractor: false, reviewer: false, admin: true } },
-  { label: "Billing & subscription", allowed: { creator: false, contractor: false, reviewer: false, admin: true } },
-  { label: "Analytics & rule friction", allowed: { creator: false, contractor: false, reviewer: true, admin: true } },
-  { label: "Override findings", allowed: { creator: true, contractor: false, reviewer: true, admin: true } },
+const PERMISSION_ROWS: { key: string; allowed: Record<Role, boolean> }[] = [
+  { key: "scans", allowed: { creator: true, contractor: true, reviewer: false, admin: true } },
+  { key: "submit", allowed: { creator: true, contractor: true, reviewer: false, admin: true } },
+  { key: "approve", allowed: { creator: false, contractor: false, reviewer: true, admin: true } },
+  { key: "kb", allowed: { creator: false, contractor: false, reviewer: false, admin: true } },
+  { key: "billing", allowed: { creator: false, contractor: false, reviewer: false, admin: true } },
+  { key: "analytics", allowed: { creator: false, contractor: false, reviewer: true, admin: true } },
+  { key: "override", allowed: { creator: true, contractor: false, reviewer: true, admin: true } },
 ];
 
 function fadeUp(i: number) {
@@ -62,10 +64,10 @@ function fadeUp(i: number) {
 }
 
 function RoleBadge({ role }: { role: Role }) {
-  const meta = ROLE_META[role] ?? { label: role, cls: "bg-slate-100 text-slate-700 border-slate-200" };
+  const { t } = useLang();
   return (
-    <Badge variant="outline" className={cn("border", meta.cls)}>
-      {meta.label}
+    <Badge variant="outline" className={cn("border", ROLE_CLS[role])}>
+      {t(`common.role.${role}`)}
     </Badge>
   );
 }
@@ -112,6 +114,7 @@ function SectionCard({
 // ─── View ────────────────────────────────────────────────────────────────────
 
 export function SettingsView() {
+  const { t, lang } = useLang();
   const queryClient = useQueryClient();
   const { data: session, isLoading: sessionLoading } = useSession();
   const isAdmin = session?.role === "admin";
@@ -127,13 +130,12 @@ export function SettingsView() {
     updateOrg.mutate(
       { zeroDataRetention: v },
       {
-        onSuccess: () =>
-          toast.success(v ? "Zero-data-retention enabled" : "Zero-data-retention disabled"),
+        onSuccess: () => toast.success(v ? t("settings.toast.zdrOn") : t("settings.toast.zdrOff")),
         onError: (err) => {
           if (session) {
             queryClient.setQueryData(["session"], { ...session, zeroDataRetention: prev });
           }
-          toast.error(err instanceof Error ? err.message : "Could not update organization settings.");
+          toast.error(err instanceof Error ? err.message : t("settings.toast.orgError"));
         },
       }
     );
@@ -156,8 +158,8 @@ export function SettingsView() {
     return (
       <div className="mx-auto max-w-[1100px] space-y-6 px-4 py-6 sm:px-6">
         <motion.div {...fadeUp(0)}>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Settings</h1>
-          <p className="mt-1 text-sm text-slate-600">Organization profile and governance controls.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">{t("settings.title")}</h1>
+          <p className="mt-1 text-sm text-slate-600">{t("settings.subtitleNonAdmin")}</p>
         </motion.div>
 
         <motion.div {...fadeUp(1)}>
@@ -166,11 +168,8 @@ export function SettingsView() {
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
                 <Lock className="h-6 w-6 text-amber-600" />
               </div>
-              <p className="text-base font-semibold text-slate-900">Settings are reserved for Brand Admins.</p>
-              <p className="max-w-md text-sm text-slate-600">
-                Organization profile, access control and governance settings are managed by your workspace
-                administrators.
-              </p>
+              <p className="text-base font-semibold text-slate-900">{t("settings.gate.title")}</p>
+              <p className="max-w-md text-sm text-slate-600">{t("settings.gate.desc")}</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -200,26 +199,31 @@ export function SettingsView() {
 
   // ── Admin view ──
   const members = team.data ?? [];
+  const currentLangNative = LANGS.find((l) => l.value === lang)?.native ?? lang;
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-6 px-4 py-6 sm:px-6">
       <motion.div {...fadeUp(0)}>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Settings</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Organization profile, access control and governance settings.
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">{t("settings.title")}</h1>
+        <p className="mt-1 text-sm text-slate-600">{t("settings.subtitle")}</p>
       </motion.div>
 
       {/* 1 — Organization */}
       <motion.div {...fadeUp(1)}>
-        <SectionCard icon={Building2} title="Organization" description="Workspace identity and data-governance controls.">
+        <SectionCard icon={Building2} title={t("settings.org.title")} description={t("settings.org.desc")}>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="org-name" className="text-slate-700">Organization name</Label>
-              <Input id="org-name" readOnly value={session.orgName} className="border-slate-200 bg-slate-50 text-slate-600" />
+              <Label htmlFor="org-name" className="text-slate-700">{t("settings.org.name")}</Label>
+              <Input
+                id="org-name"
+                readOnly
+                value={session.orgName}
+                placeholder={t("settings.org.namePlaceholder")}
+                className="border-slate-200 bg-slate-50 text-slate-600"
+              />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-700">Workspace slug</Label>
+              <Label className="text-slate-700">{t("settings.org.slug")}</Label>
               <div>
                 <Badge variant="outline" className="border-teal-200 bg-teal-50/60 font-mono text-teal-700">
                   @{session.orgSlug}
@@ -233,16 +237,15 @@ export function SettingsView() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-xl">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium text-slate-900">Zero-Data-Retention</p>
+                <p className="text-sm font-medium text-slate-900">{t("settings.org.zdr")}</p>
                 {session.zeroDataRetention && (
                   <Badge className="border border-emerald-200 bg-emerald-50 text-emerald-700">
-                    <ShieldCheck className="h-3 w-3" /> ZDR Active
+                    <ShieldCheck className="h-3 w-3" /> {t("settings.org.zdrActive")}
                   </Badge>
                 )}
               </div>
               <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                When enabled, proprietary campaign drafts and documents are never used for external model
-                training (enterprise LLM calls run with data-retention disabled).
+                {session.zeroDataRetention ? t("settings.org.zdr.descOn") : t("settings.org.zdr.descOff")}
               </p>
             </div>
             <Switch
@@ -250,7 +253,7 @@ export function SettingsView() {
               onCheckedChange={toggleZdr}
               disabled={updateOrg.isPending}
               className="data-[state=checked]:bg-emerald-600"
-              aria-label="Toggle zero-data-retention"
+              aria-label={t("settings.org.zdrAria")}
             />
           </div>
         </SectionCard>
@@ -260,8 +263,12 @@ export function SettingsView() {
       <motion.div {...fadeUp(2)}>
         <SectionCard
           icon={Users}
-          title="Team & Access Control"
-          description={`${members.length} member${members.length === 1 ? "" : "s"} in ${session.orgName}.`}
+          title={t("settings.team.title")}
+          description={
+            members.length === 1
+              ? t("settings.team.descOne", { n: members.length, org: session.orgName })
+              : t("settings.team.descMany", { n: members.length, org: session.orgName })
+          }
         >
           {team.isLoading ? (
             <div className="space-y-2">
@@ -271,7 +278,7 @@ export function SettingsView() {
             </div>
           ) : members.length === 0 ? (
             <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
-              No team members found.
+              {t("settings.team.noMembers")}
             </p>
           ) : (
             <>
@@ -280,9 +287,9 @@ export function SettingsView() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-slate-100 bg-slate-50/60 hover:bg-slate-50/60">
-                      <TableHead className="text-slate-500">Member</TableHead>
-                      <TableHead className="text-slate-500">Role</TableHead>
-                      <TableHead className="text-slate-500">Department</TableHead>
+                      <TableHead className="text-slate-500">{t("settings.team.colName")}</TableHead>
+                      <TableHead className="text-slate-500">{t("settings.team.colRole")}</TableHead>
+                      <TableHead className="text-slate-500">{t("settings.team.colDepartment")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -336,31 +343,31 @@ export function SettingsView() {
       <motion.div {...fadeUp(3)}>
         <SectionCard
           icon={ShieldCheck}
-          title="Role Permission Matrix"
-          description="Capabilities granted to each role across the governance workflow."
+          title={t("settings.perm.title")}
+          description={t("settings.perm.desc")}
         >
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-100 bg-slate-50/60 hover:bg-slate-50/60">
-                  <TableHead className="min-w-44 text-slate-500">Capability</TableHead>
+                  <TableHead className="min-w-44 text-slate-500">{t("settings.perm.colCapability")}</TableHead>
                   {ROLE_ORDER.map((role) => (
                     <TableHead key={role} className="min-w-20 text-center text-slate-500">
-                      {ROLE_META[role].label}
+                      {t(`common.role.${role}`)}
                     </TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {PERMISSION_ROWS.map((row) => (
-                  <TableRow key={row.label} className="border-slate-100">
-                    <TableCell className="text-sm text-slate-700">{row.label}</TableCell>
+                  <TableRow key={row.key} className="border-slate-100">
+                    <TableCell className="text-sm text-slate-700">{t(`settings.perm.row.${row.key}`)}</TableCell>
                     {ROLE_ORDER.map((role) => (
                       <TableCell key={role} className="text-center">
                         {row.allowed[role] ? (
-                          <Check className="mx-auto h-4 w-4 text-teal-600" aria-label="Allowed" />
+                          <Check className="mx-auto h-4 w-4 text-teal-600" aria-label={t("settings.perm.allowed")} />
                         ) : (
-                          <Minus className="mx-auto h-4 w-4 text-slate-300" aria-label="Not allowed" />
+                          <Minus className="mx-auto h-4 w-4 text-slate-300" aria-label={t("settings.perm.notAllowed")} />
                         )}
                       </TableCell>
                     ))}
@@ -372,9 +379,24 @@ export function SettingsView() {
         </SectionCard>
       </motion.div>
 
-      {/* 4 — Session */}
+      {/* 4 — Preferences (display-only language row; the switcher lives in the header) */}
       <motion.div {...fadeUp(4)}>
-        <SectionCard icon={KeyRound} title="Session" description="Your current signed-in identity.">
+        <SectionCard icon={Languages} title={t("settings.prefs.title")} description={t("settings.prefs.desc")}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-xl">
+              <p className="text-sm font-medium text-slate-900">{t("settings.prefs.lang")}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{t("settings.prefs.langHint")}</p>
+            </div>
+            <Badge variant="outline" className="w-fit border-teal-200 bg-teal-50/60 text-teal-700">
+              {currentLangNative}
+            </Badge>
+          </div>
+        </SectionCard>
+      </motion.div>
+
+      {/* 5 — Session */}
+      <motion.div {...fadeUp(5)}>
+        <SectionCard icon={KeyRound} title={t("settings.session.title")} description={t("settings.session.desc")}>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600">
               <Mail className="h-3 w-3 text-slate-400" /> {session.email}
@@ -386,7 +408,7 @@ export function SettingsView() {
               </Badge>
             ) : (
               <Badge variant="outline" className="border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-500">
-                No department
+                {t("settings.session.noDept")}
               </Badge>
             )}
           </div>

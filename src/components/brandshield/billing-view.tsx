@@ -26,6 +26,8 @@ import {
   useCompleteCheckout,
   useBillingPortal,
 } from "@/lib/brandshield/client";
+import { useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-billing";
 import { TIER_META } from "@/lib/brandshield/types";
 import type { Tier } from "@/lib/brandshield/types";
 import { cn, formatDate } from "@/lib/brandshield/utils";
@@ -43,10 +45,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const TIER_ORDER: Tier[] = ["starter", "growth", "enterprise"];
 
-function tierShort(tier: Tier): string {
-  return TIER_META[tier].name.split(" — ")[0];
-}
-
 function fadeUp(i: number) {
   return {
     initial: { opacity: 0, y: 14 },
@@ -58,6 +56,8 @@ function fadeUp(i: number) {
 // ─── View ────────────────────────────────────────────────────────────────────
 
 export function BillingView() {
+  const { t, lang } = useLang();
+
   const { data: session } = useSession();
   const isAdmin = session?.role === "admin";
 
@@ -67,6 +67,8 @@ export function BillingView() {
   const billingPortal = useBillingPortal();
 
   const sub = subscription.data;
+
+  const tierShort = (tier: Tier) => t(`billing.tier.${tier}.short`);
 
   // Simulated Stripe Checkout state
   const [checkout, setCheckout] = useState<{ tier: Tier; sessionId: string } | null>(null);
@@ -86,7 +88,7 @@ export function BillingView() {
         setPayStage("form");
         setCheckout({ tier: r.tier ?? tier, sessionId: r.sessionId });
       },
-      onError: (err) => toast.error(err instanceof Error ? err.message : "Could not start checkout."),
+      onError: (err) => toast.error(err instanceof Error ? err.message : t("billing.toastCheckoutError")),
     });
   };
 
@@ -98,20 +100,20 @@ export function BillingView() {
         setPayStage("confirmed");
         confirmTimer.current = window.setTimeout(() => {
           closeCheckout();
-          toast.success("Subscription updated");
+          toast.success(t("billing.toastSubUpdated"));
         }, 1200);
       },
       onError: (err) => {
         setPayStage("form");
-        toast.error(err instanceof Error ? err.message : "Payment could not be confirmed.");
+        toast.error(err instanceof Error ? err.message : t("billing.toastPayError"));
       },
     });
   };
 
   const openPortal = () => {
     billingPortal.mutate(undefined, {
-      onSuccess: () => toast.info("Stripe Customer Portal opens here in production (sandbox mode)"),
-      onError: (err) => toast.error(err instanceof Error ? err.message : "Could not open the billing portal."),
+      onSuccess: () => toast.info(t("billing.toastPortalInfo")),
+      onError: (err) => toast.error(err instanceof Error ? err.message : t("billing.toastPortalError")),
     });
   };
 
@@ -124,18 +126,16 @@ export function BillingView() {
       <motion.div {...fadeUp(0)} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Billing &amp; Subscription</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">{t("billing.title")}</h1>
             <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
-              <FlaskConical className="h-3 w-3" /> Sandbox Mode — Stripe test environment
+              <FlaskConical className="h-3 w-3" /> {t("billing.sandboxBadge")}
             </Badge>
           </div>
-          <p className="mt-1 text-sm text-slate-600">
-            Plan, quota and seat management for your organization workspace.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">{t("billing.subtitle")}</p>
         </div>
         {!isAdmin && (
           <Badge variant="outline" className="w-fit border-amber-200 bg-amber-50 text-amber-700">
-            <Eye className="h-3 w-3" /> Read-only
+            <Eye className="h-3 w-3" /> {t("billing.readOnlyBadge")}
           </Badge>
         )}
       </motion.div>
@@ -159,9 +159,9 @@ export function BillingView() {
             <CardContent className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[1.2fr_1fr]">
               {/* Plan identity */}
               <div className="flex flex-col items-start gap-2">
-                <span className="text-xs font-medium uppercase tracking-wider text-slate-400">Current plan</span>
+                <span className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("billing.currentPlan")}</span>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">{TIER_META[sub.tier].name}</h2>
+                  <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">{t(`common.tier.${sub.tier}`)}</h2>
                   <Badge
                     variant="outline"
                     className={cn(
@@ -171,23 +171,25 @@ export function BillingView() {
                         : "border-amber-200 bg-amber-50 text-amber-700"
                     )}
                   >
-                    <CircleCheck className="h-3 w-3" /> {sub.status === "active" ? "Active" : sub.status}
+                    <CircleCheck className="h-3 w-3" /> {sub.status === "active" ? t("billing.status.active") : sub.status}
                   </Badge>
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold tracking-tight text-slate-900">
                     ${(sub.priceCents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}
                   </span>
-                  <span className="text-sm text-slate-500">/ month</span>
+                  <span className="text-sm text-slate-500">{t("billing.perMonth")}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-slate-500">
                   <span className="inline-flex items-center gap-1.5">
                     <CalendarClock className="h-3.5 w-3.5 text-slate-400" />
-                    {sub.currentPeriodEnd ? <>Renews {formatDate(sub.currentPeriodEnd)}</> : "No renewal date"}
+                    {sub.currentPeriodEnd
+                      ? t("billing.renews", { date: formatDate(sub.currentPeriodEnd, lang) })
+                      : t("billing.noRenewalDate")}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5 text-slate-400" />
-                    {sub.seats} seat{sub.seats === 1 ? "" : "s"}
+                    {sub.seats === 1 ? t("billing.seat.one", { n: sub.seats }) : t("billing.seat.many", { n: sub.seats })}
                   </span>
                 </div>
                 <Button
@@ -198,14 +200,14 @@ export function BillingView() {
                   onClick={openPortal}
                 >
                   {billingPortal.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-                  Manage billing portal
+                  {t("billing.managePortal")}
                 </Button>
               </div>
 
               {/* Usage panel */}
               <div className="flex flex-col justify-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-5">
                 <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-slate-400">
-                  <ShieldCheck className="h-3.5 w-3.5 text-teal-700" /> Scan quota
+                  <ShieldCheck className="h-3.5 w-3.5 text-teal-700" /> {t("billing.scanQuota")}
                 </div>
                 {sub.scanLimit === -1 ? (
                   <div className="flex items-center gap-3">
@@ -213,15 +215,15 @@ export function BillingView() {
                       <InfinityIcon className="h-5 w-5 text-teal-700" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">Unlimited pre-flight scans</p>
-                      <p className="text-xs text-slate-500">{sub.scansUsed} scans this cycle</p>
+                      <p className="text-sm font-semibold text-slate-900">{t("billing.unlimitedScans")}</p>
+                      <p className="text-xs text-slate-500">{t("billing.scansThisCycle", { n: sub.scansUsed })}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     <div className="flex items-baseline justify-between">
                       <p className="text-sm font-semibold text-slate-900">
-                        {sub.scansUsed} of {sub.scanLimit} scans used
+                        {t("billing.scansUsed", { used: sub.scansUsed, limit: sub.scanLimit })}
                       </p>
                       <span className={cn("text-xs font-medium", usagePct >= 90 ? "text-red-600" : "text-slate-500")}>
                         {usagePct}%
@@ -231,7 +233,7 @@ export function BillingView() {
                       value={usagePct}
                       className={cn("h-2 bg-slate-200/70", usagePct >= 90 ? "[&>div]:bg-red-500" : "[&>div]:bg-teal-600")}
                     />
-                    <p className="text-xs text-slate-500">Quota resets at the start of each billing cycle.</p>
+                    <p className="text-xs text-slate-500">{t("billing.quotaResets")}</p>
                   </div>
                 )}
               </div>
@@ -244,8 +246,8 @@ export function BillingView() {
       {!isAdmin && (
         <Alert className="border-amber-200 bg-amber-50 text-amber-800">
           <Eye className="text-amber-600" />
-          <AlertTitle>Read-only</AlertTitle>
-          <AlertDescription>Brand Admins manage plan changes and payment methods.</AlertDescription>
+          <AlertTitle>{t("billing.readOnlyTitle")}</AlertTitle>
+          <AlertDescription>{t("billing.readOnlyDesc")}</AlertDescription>
         </Alert>
       )}
 
@@ -270,27 +272,27 @@ export function BillingView() {
               >
                 {isCurrent ? (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 border border-teal-300 bg-white text-teal-700">
-                    Current plan
+                    {t("billing.currentPlan")}
                   </Badge>
                 ) : isPopular ? (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 border-transparent bg-teal-700 text-white">
-                    Most popular
+                    {t("billing.popular")}
                   </Badge>
                 ) : null}
 
                 <h3 className="text-sm font-semibold text-slate-900">{tierShort(tier)}</h3>
-                <p className="mt-0.5 text-xs text-slate-500">{meta.name.split(" — ").slice(1).join(" — ")}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{t(`billing.tier.${tier}.tagline`)}</p>
                 <div className="mt-3 flex items-baseline gap-1">
                   <span className="text-3xl font-bold tracking-tight text-slate-900">${meta.price}</span>
-                  <span className="text-sm text-slate-500">/ month</span>
+                  <span className="text-sm text-slate-500">{t("billing.perMonth")}</span>
                 </div>
-                <p className="mt-2 min-h-[40px] text-xs leading-relaxed text-slate-600">{meta.blurb}</p>
+                <p className="mt-2 min-h-[40px] text-xs leading-relaxed text-slate-600">{t(`billing.tier.${tier}.blurb`)}</p>
 
                 <ul className="mt-4 space-y-2.5">
-                  {meta.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-xs text-slate-600">
+                  {meta.features.map((_, fIdx) => (
+                    <li key={fIdx} className="flex items-start gap-2 text-xs text-slate-600">
                       <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal-600" />
-                      {feature}
+                      {t(`billing.tier.${tier}.f${fIdx + 1}`)}
                     </li>
                   ))}
                 </ul>
@@ -298,7 +300,7 @@ export function BillingView() {
                 <div className="mt-6 pt-2">
                   {isCurrent ? (
                     <Button variant="outline" className="w-full border-teal-200 bg-teal-50/50 text-teal-700" disabled>
-                      <CircleCheck className="h-4 w-4" /> Current plan
+                      <CircleCheck className="h-4 w-4" /> {t("billing.currentPlan")}
                     </Button>
                   ) : (
                     <Button
@@ -315,9 +317,9 @@ export function BillingView() {
                       {startCheckout.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : isHigher ? (
-                        `Upgrade to ${tierShort(tier)}`
+                        t("billing.upgradeTo", { tier: tierShort(tier) })
                       ) : (
-                        `Downgrade to ${tierShort(tier)}`
+                        t("billing.downgradeTo", { tier: tierShort(tier) })
                       )}
                     </Button>
                   )}
@@ -332,12 +334,8 @@ export function BillingView() {
       <motion.div {...fadeUp(5)}>
         <Alert className="border-slate-200 bg-slate-50/70">
           <Webhook className="text-teal-700" />
-          <AlertTitle>How billing works</AlertTitle>
-          <AlertDescription>
-            Checkout creates a Stripe Checkout Session; the secure webhook (Stripe-Signature verified) syncs the
-            subscription record to Firestore/DB. Seat and quota enforcement are derived from that synced
-            subscription on every request.
-          </AlertDescription>
+          <AlertTitle>{t("billing.howTitle")}</AlertTitle>
+          <AlertDescription>{t("billing.howDesc")}</AlertDescription>
         </Alert>
       </motion.div>
 
@@ -352,11 +350,11 @@ export function BillingView() {
               </div>
               <div>
                 <DialogTitle className="text-sm font-semibold text-slate-900">Nimbus Labs</DialogTitle>
-                <p className="text-[11px] text-slate-500">Merchant of record · Stripe Checkout</p>
+                <p className="text-[11px] text-slate-500">{t("billing.merchantOfRecord")}</p>
               </div>
             </div>
             <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
-              Test mode
+              {t("billing.testMode")}
             </Badge>
           </div>
 
@@ -365,16 +363,16 @@ export function BillingView() {
               <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 320, damping: 18 }}>
                 <CircleCheck className="h-12 w-12 text-emerald-600" />
               </motion.div>
-              <p className="text-sm font-semibold text-slate-900">Payment confirmed — webhook synced</p>
-              <p className="text-xs text-slate-500">Syncing subscription to your workspace…</p>
+              <p className="text-sm font-semibold text-slate-900">{t("billing.payConfirmed")}</p>
+              <p className="text-xs text-slate-500">{t("billing.syncingWorkspace")}</p>
             </div>
           ) : (
             <>
               {/* Product line */}
               <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900">{checkout ? TIER_META[checkout.tier].name : ""}</p>
-                  <p className="text-xs text-slate-500">BrandShield AI · monthly subscription</p>
+                  <p className="truncate text-sm font-medium text-slate-900">{checkout ? t(`common.tier.${checkout.tier}`) : ""}</p>
+                  <p className="text-xs text-slate-500">{t("billing.productLine")}</p>
                 </div>
                 <p className="shrink-0 pl-3 text-lg font-semibold text-slate-900">${checkoutPrice}.00</p>
               </div>
@@ -382,7 +380,7 @@ export function BillingView() {
               {/* Payment form (read-only sandbox) */}
               <div className="space-y-4 px-6 py-5">
                 <div className="space-y-1.5">
-                  <Label htmlFor="co-email" className="text-slate-700">Email</Label>
+                  <Label htmlFor="co-email" className="text-slate-700">{t("billing.email")}</Label>
                   <Input
                     id="co-email"
                     type="email"
@@ -392,7 +390,7 @@ export function BillingView() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="co-card" className="text-slate-700">Card information</Label>
+                  <Label htmlFor="co-card" className="text-slate-700">{t("billing.cardInfo")}</Label>
                   <Input
                     id="co-card"
                     readOnly
@@ -400,13 +398,13 @@ export function BillingView() {
                     className="border-slate-200 bg-slate-50 font-mono text-slate-600"
                   />
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    <Input readOnly value="12 / 34" aria-label="Expiry" className="border-slate-200 bg-slate-50 font-mono text-slate-600" />
-                    <Input readOnly value="424" aria-label="CVC" className="border-slate-200 bg-slate-50 font-mono text-slate-600" />
+                    <Input readOnly value="12 / 34" aria-label={t("billing.expiry")} className="border-slate-200 bg-slate-50 font-mono text-slate-600" />
+                    <Input readOnly value="424" aria-label={t("billing.cvc")} className="border-slate-200 bg-slate-50 font-mono text-slate-600" />
                   </div>
                 </div>
                 <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-500">
                   <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                  Sandbox mode — no real charge. STRIPE_SECRET_KEY enables live Checkout.
+                  {t("billing.sandboxNote")}
                 </p>
                 <Button
                   className="w-full bg-teal-700 text-white hover:bg-teal-800"
@@ -415,17 +413,17 @@ export function BillingView() {
                 >
                   {payStage === "processing" || completeCheckout.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Processing…
+                      <Loader2 className="h-4 w-4 animate-spin" /> {t("billing.processing")}
                     </>
                   ) : (
                     <>
-                      <CreditCard className="h-4 w-4" /> Pay ${checkoutPrice}.00
+                      <CreditCard className="h-4 w-4" /> {t("billing.payNow", { amount: `$${checkoutPrice}.00` })}
                     </>
                   )}
                 </Button>
                 <Separator className="bg-slate-100" />
                 <p className="text-center text-[11px] text-slate-400">
-                  Powered by Stripe · PCI-DSS Level 1 · Payments are simulated in this environment
+                  {t("billing.stripeFooter")}
                 </p>
               </div>
             </>

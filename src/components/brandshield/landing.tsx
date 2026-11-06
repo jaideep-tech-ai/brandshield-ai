@@ -25,6 +25,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { LangToggle, useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-landing";
 import { TIER_META } from "@/lib/brandshield/types";
 import { cn } from "@/lib/brandshield/utils";
 
@@ -82,10 +84,10 @@ function scrollToId(id: string) {
 }
 
 const NAV_LINKS = [
-  { label: "Problem", id: "problem" },
-  { label: "Workflow", id: "workflow" },
-  { label: "Personas", id: "personas" },
-  { label: "Pricing", id: "pricing" },
+  { labelKey: "landing.nav.problem", id: "problem" },
+  { labelKey: "landing.nav.workflow", id: "workflow" },
+  { labelKey: "landing.nav.personas", id: "personas" },
+  { labelKey: "landing.nav.pricing", id: "pricing" },
 ] as const;
 
 // ─── Data ────────────────────────────────────────────────────────────────────
@@ -93,81 +95,111 @@ const NAV_LINKS = [
 const PROBLEMS = [
   {
     icon: FileWarning,
-    title: "Factual Hallucinations & Unverified Claims",
-    desc: "Confidently published statistics and product claims that no verified corporate document actually supports.",
+    titleKey: "landing.problem.p1.title",
+    descKey: "landing.problem.p1.desc",
   },
   {
     icon: MessageSquareOff,
-    title: "Brand Voice Fragmentation",
-    desc: "Every team writes in a different tone, eroding the consistent voice your audience was trained to trust.",
+    titleKey: "landing.problem.p2.title",
+    descKey: "landing.problem.p2.desc",
   },
   {
     icon: Palette,
-    title: "Visual & Accessibility Non-Compliance",
-    desc: "Off-palette colors, stretched logos, and WCAG contrast failures that slip through until after launch.",
+    titleKey: "landing.problem.p3.title",
+    descKey: "landing.problem.p3.desc",
   },
   {
     icon: Hourglass,
-    title: "Manual Review Bottlenecks",
-    desc: "Reviewers drown in doc threads and email chains, delaying launch dates by days for every asset.",
+    titleKey: "landing.problem.p4.title",
+    descKey: "landing.problem.p4.desc",
   },
 ] as const;
 
 const WORKFLOW = [
   {
-    title: "Repository Ingestion & Brand Tokenization",
-    desc: "Connect guideline PDFs, style wikis, and approved visual tokens. BrandShield tokenizes them into a governed, versioned knowledge base.",
+    titleKey: "landing.workflow.s1.title",
+    descKey: "landing.workflow.s1.desc",
   },
   {
-    title: "Multi-Modal Pre-Flight Analysis",
-    desc: "Deterministic validators, RAG claim verification, and vision checks run on every text and banner draft before it moves an inch.",
+    titleKey: "landing.workflow.s2.title",
+    descKey: "landing.workflow.s2.desc",
   },
   {
-    title: "Explainable Findings & Guided Remediation",
-    desc: "Every flag cites the exact rule and source document, with one-click, tone-preserving rewrite suggestions.",
+    titleKey: "landing.workflow.s3.title",
+    descKey: "landing.workflow.s3.desc",
   },
   {
-    title: "Collaborative Sign-Off & Cryptographic Audit Trail",
-    desc: "Reviewers approve or request changes on a shared board; each decision is hashed into a tamper-evident SHA-256 chain.",
+    titleKey: "landing.workflow.s4.title",
+    descKey: "landing.workflow.s4.desc",
   },
   {
-    title: "Brand Drift & Rule Ambiguity Analytics",
-    desc: "Spot recurring drift patterns and rules that generate friction, then refine your governance where it matters most.",
+    titleKey: "landing.workflow.s5.title",
+    descKey: "landing.workflow.s5.desc",
   },
 ] as const;
 
 const PERSONAS = [
   {
     icon: PenLine,
-    title: "Content Creators & Copywriters",
-    pain: "Waiting days for manual brand reviews kills creative momentum.",
-    value: "Instant pre-flight scans with cited, actionable fixes — ship same-day.",
+    titleKey: "landing.personas.p1.title",
+    painKey: "landing.personas.p1.pain",
+    valueKey: "landing.personas.p1.value",
   },
   {
     icon: FileSearch,
-    title: "Brand Managers & Legal Reviewers",
-    pain: "Risky claims and tone drift hide inside endless doc threads.",
-    value: "One approval board with explainable findings and a full audit trail.",
+    titleKey: "landing.personas.p2.title",
+    painKey: "landing.personas.p2.pain",
+    valueKey: "landing.personas.p2.value",
   },
   {
     icon: Building2,
-    title: "External Agencies & Contractors",
-    pain: "Contractors lack context on every client's brand rules.",
-    value: "Sandboxed workspaces enforce client guidelines without exposing internals.",
+    titleKey: "landing.personas.p3.title",
+    painKey: "landing.personas.p3.pain",
+    valueKey: "landing.personas.p3.value",
   },
   {
     icon: TrendingUp,
-    title: "CMO & Marketing Leadership",
-    pain: "No quantified visibility into where brand equity leaks.",
-    value: "Drift analytics measure risk and prove governance ROI to the board.",
+    titleKey: "landing.personas.p4.title",
+    painKey: "landing.personas.p4.pain",
+    valueKey: "landing.personas.p4.value",
   },
 ] as const;
 
 const TIER_ORDER = ["starter", "growth", "enterprise"] as const;
 
+// Feature list keys per tier (TIER_META is only used for price / scanLimit).
+const TIER_FEATURE_KEYS: Record<(typeof TIER_ORDER)[number], readonly string[]> = {
+  starter: [
+    "landing.pricing.tier.starter.f1",
+    "landing.pricing.tier.starter.f2",
+    "landing.pricing.tier.starter.f3",
+    "landing.pricing.tier.starter.f4",
+    "landing.pricing.tier.starter.f5",
+  ],
+  growth: [
+    "landing.pricing.tier.growth.f1",
+    "landing.pricing.tier.growth.f2",
+    "landing.pricing.tier.growth.f3",
+    "landing.pricing.tier.growth.f4",
+    "landing.pricing.tier.growth.f5",
+    "landing.pricing.tier.growth.f6",
+  ],
+  enterprise: [
+    "landing.pricing.tier.enterprise.f1",
+    "landing.pricing.tier.enterprise.f2",
+    "landing.pricing.tier.enterprise.f3",
+    "landing.pricing.tier.enterprise.f4",
+    "landing.pricing.tier.enterprise.f5",
+    "landing.pricing.tier.enterprise.f6",
+    "landing.pricing.tier.enterprise.f7",
+  ],
+};
+
 // ─── Landing ─────────────────────────────────────────────────────────────────
 
 export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
+  const { t } = useLang();
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       {/* ── Top nav ── */}
@@ -176,32 +208,35 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             className="flex items-center gap-2.5"
-            aria-label="BrandShield AI home"
+            aria-label={t("landing.nav.ariaHome")}
           >
             <LogoMark />
-            <span className="text-base font-semibold tracking-tight">
+            <span className="whitespace-nowrap text-sm font-semibold tracking-tight sm:text-base">
               BrandShield <span className="text-teal-700">AI</span>
             </span>
           </button>
 
-          <nav className="hidden items-center gap-8 md:flex" aria-label="Sections">
+          <nav className="hidden items-center gap-8 md:flex" aria-label={t("landing.nav.ariaSections")}>
             {NAV_LINKS.map((link) => (
               <button
                 key={link.id}
                 onClick={() => scrollToId(link.id)}
                 className="text-sm font-medium text-slate-600 transition-colors hover:text-teal-700"
               >
-                {link.label}
+                {t(link.labelKey)}
               </button>
             ))}
           </nav>
 
-          <Button
-            onClick={onGetStarted}
-            className="rounded-lg bg-teal-700 text-white shadow-sm hover:bg-teal-800"
-          >
-            Get Started
-          </Button>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <LangToggle />
+            <Button
+              onClick={onGetStarted}
+              className="rounded-lg bg-teal-700 px-3 text-sm text-white shadow-sm hover:bg-teal-800 sm:px-4 sm:text-base"
+            >
+              {t("landing.nav.cta")}
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -219,23 +254,21 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
                 className="gap-1.5 rounded-full border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700"
               >
                 <Sparkles className="size-3.5" />
-                Pre-Publishing Brand Assurance
+                {t("landing.hero.badge")}
               </Badge>
             </motion.div>
             <motion.h1
               variants={fadeUp}
               className="mt-5 text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl"
             >
-              Catch brand drift{" "}
+              {t("landing.hero.titleA")}{" "}
               <span className="bg-gradient-to-r from-teal-700 to-emerald-500 bg-clip-text text-transparent">
-                before it ships
+                {t("landing.hero.titleB")}
               </span>
-              .
+              {t("landing.hero.titleEnd")}
             </motion.h1>
             <motion.p variants={fadeUp} className="mt-5 text-base leading-relaxed text-slate-600 sm:text-lg">
-              An explainable copilot that prevents factual hallucinations, tone drift, visual
-              non-compliance, and compliance violations before content publication — grounded in
-              your verified corporate documents.
+              {t("landing.hero.sub")}
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-3">
               <Button
@@ -243,7 +276,7 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
                 size="lg"
                 className="h-12 rounded-xl bg-teal-700 px-6 text-white shadow-sm hover:bg-teal-800"
               >
-                Start free in sandbox
+                {t("landing.hero.ctaPrimary")}
                 <ArrowRight className="size-4" />
               </Button>
               <Button
@@ -252,7 +285,7 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
                 onClick={() => scrollToId("workflow")}
                 className="h-12 rounded-xl border-slate-300 px-6 text-slate-700 hover:border-teal-300 hover:text-teal-700"
               >
-                See the 5-stage workflow
+                {t("landing.hero.ctaSecondary")}
               </Button>
             </motion.div>
           </motion.div>
@@ -272,45 +305,45 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <LogoMark className="size-6 rounded-md" />
-                  <span className="text-sm font-semibold text-slate-900">Pre-Flight Scan</span>
+                  <span className="text-sm font-semibold text-slate-900">{t("landing.mock.title")}</span>
                 </div>
                 <Badge variant="outline" className="border-slate-200 text-xs text-slate-500">
-                  Draft v3
+                  {t("landing.mock.draft")}
                 </Badge>
               </div>
 
               <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm leading-relaxed text-slate-600">
                 <p>
-                  &ldquo;Experience up to{" "}
+                  {t("landing.mock.quoteA")}{" "}
                   <span className="rounded bg-red-50 px-1 font-medium text-red-700 underline decoration-red-500 decoration-wavy underline-offset-4">
-                    340% guaranteed conversion uplift
+                    {t("landing.mock.quoteFlag")}
                   </span>{" "}
-                  with zero ramp-up time.&rdquo;
+                  {t("landing.mock.quoteB")}
                 </p>
                 <p className="mt-2 flex items-start gap-1.5 text-xs text-red-600">
                   <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-                  Unverified claim — no supporting source in Brand Voice Guide §4.2
+                  {t("landing.mock.unverified")}
                 </p>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
                   <span className="size-1.5 rounded-full bg-red-600" />
-                  Critical Claim Mismatch
+                  {t("landing.mock.chipCritical")}
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
                   <span className="size-1.5 rounded-full bg-amber-500" />
-                  Warning Tone Drift
+                  {t("landing.mock.chipWarning")}
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700">
                   <span className="size-1.5 rounded-full bg-teal-600" />
-                  Minor Style
+                  {t("landing.mock.chipMinor")}
                 </span>
               </div>
 
               <div className="mt-5">
                 <div className="flex items-center justify-between text-xs font-medium text-slate-600">
-                  <span>Compliance Score</span>
+                  <span>{t("landing.mock.complianceScore")}</span>
                   <span className="text-slate-900">62/100</span>
                 </div>
                 <Progress value={62} className="mt-2 h-2 bg-slate-100 [&>div]:bg-amber-500" />
@@ -325,7 +358,7 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
             >
               <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs font-medium text-teal-700 shadow-md shadow-teal-900/5">
                 <BadgeCheck className="size-3.5" />
-                3 citations verified
+                {t("landing.mock.citationsVerified")}
               </span>
             </motion.div>
             <motion.div
@@ -335,7 +368,7 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
             >
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-md shadow-teal-900/5">
                 <Fingerprint className="size-3.5 text-teal-600" />
-                SHA-256 audit logged
+                {t("landing.mock.auditLogged")}
               </span>
             </motion.div>
           </motion.div>
@@ -346,14 +379,13 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
       <section id="problem" className="scroll-mt-24 border-t border-slate-100 bg-slate-50/50 py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-widest text-teal-700">The problem</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-              Governance fails at the last mile
-            </h2>
-            <p className="mt-3 text-slate-600">
-              Brand books are thorough — enforcement is not. Drift is discovered after publication,
-              when the damage is already public.
+            <p className="text-sm font-semibold uppercase tracking-widest text-teal-700">
+              {t("landing.problem.kicker")}
             </p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+              {t("landing.problem.title")}
+            </h2>
+            <p className="mt-3 text-slate-600">{t("landing.problem.sub")}</p>
           </Reveal>
 
           <motion.div
@@ -364,16 +396,16 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
             className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
           >
             {PROBLEMS.map((problem) => (
-              <motion.div key={problem.title} variants={fadeUp} whileHover={{ y: -4 }}>
+              <motion.div key={problem.titleKey} variants={fadeUp} whileHover={{ y: -4 }}>
                 <Card className="h-full rounded-2xl border-slate-200 py-0 shadow-sm transition-shadow hover:shadow-md">
                   <CardContent className="p-5">
                     <span className="flex size-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
                       <problem.icon className="size-5" />
                     </span>
                     <h3 className="mt-4 text-sm font-semibold leading-snug text-slate-900">
-                      {problem.title}
+                      {t(problem.titleKey)}
                     </h3>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{problem.desc}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{t(problem.descKey)}</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -384,15 +416,11 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
             <div className="grid gap-8 rounded-2xl border border-teal-100 bg-teal-50/60 px-6 py-8 sm:grid-cols-2 sm:px-10">
               <div className="text-center sm:text-left">
                 <p className="text-4xl font-bold tracking-tight text-teal-700 sm:text-5xl">68%</p>
-                <p className="mt-2 text-sm text-slate-600">
-                  of enterprise teams publish off-brand or unverified claims
-                </p>
+                <p className="mt-2 text-sm text-slate-600">{t("landing.problem.stat1")}</p>
               </div>
               <div className="text-center sm:text-left">
                 <p className="text-4xl font-bold tracking-tight text-teal-700 sm:text-5xl">4.2</p>
-                <p className="mt-2 text-sm text-slate-600">
-                  business days average review delay
-                </p>
+                <p className="mt-2 text-sm text-slate-600">{t("landing.problem.stat2")}</p>
               </div>
             </div>
           </Reveal>
@@ -403,13 +431,13 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
       <section id="workflow" className="scroll-mt-24 py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-teal-700">The workflow</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-              Five stages between draft and public
-            </h2>
-            <p className="mt-3 text-slate-600">
-              Every step is explainable, auditable, and grounded in documents you already trust.
+            <p className="text-sm font-semibold uppercase tracking-widest text-teal-700">
+              {t("landing.workflow.kicker")}
             </p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+              {t("landing.workflow.title")}
+            </h2>
+            <p className="mt-3 text-slate-600">{t("landing.workflow.sub")}</p>
           </Reveal>
 
           <motion.div
@@ -420,7 +448,7 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
             className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
           >
             {WORKFLOW.map((step, i) => (
-              <motion.div key={step.title} variants={fadeUp} className="relative">
+              <motion.div key={step.titleKey} variants={fadeUp} className="relative">
                 {i < WORKFLOW.length - 1 && (
                   <ArrowRight
                     aria-hidden
@@ -431,8 +459,8 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
                   <span className="flex size-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">
                     {i + 1}
                   </span>
-                  <h3 className="mt-4 text-sm font-semibold leading-snug text-slate-900">{step.title}</h3>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-600 sm:text-sm">{step.desc}</p>
+                  <h3 className="mt-4 text-sm font-semibold leading-snug text-slate-900">{t(step.titleKey)}</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-600 sm:text-sm">{t(step.descKey)}</p>
                 </div>
               </motion.div>
             ))}
@@ -444,9 +472,11 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
       <section id="personas" className="scroll-mt-24 border-t border-slate-100 bg-slate-50/50 py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-widest text-teal-700">Personas</p>
+            <p className="text-sm font-semibold uppercase tracking-widest text-teal-700">
+              {t("landing.personas.kicker")}
+            </p>
             <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-              Built for everyone who touches the brand
+              {t("landing.personas.title")}
             </h2>
           </Reveal>
 
@@ -458,23 +488,23 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
             className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
           >
             {PERSONAS.map((persona) => (
-              <motion.div key={persona.title} variants={fadeUp} whileHover={{ y: -4 }}>
+              <motion.div key={persona.titleKey} variants={fadeUp} whileHover={{ y: -4 }}>
                 <Card className="h-full rounded-2xl border-slate-200 py-0 shadow-sm transition-shadow hover:shadow-md">
                   <CardContent className="p-5">
                     <span className="flex size-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
                       <persona.icon className="size-5" />
                     </span>
                     <h3 className="mt-4 text-sm font-semibold leading-snug text-slate-900">
-                      {persona.title}
+                      {t(persona.titleKey)}
                     </h3>
                     <ul className="mt-3 space-y-2.5">
                       <li className="flex gap-2 text-sm leading-relaxed text-slate-600">
                         <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" />
-                        <span>{persona.pain}</span>
+                        <span>{t(persona.painKey)}</span>
                       </li>
                       <li className="flex gap-2 text-sm leading-relaxed text-slate-600">
                         <CircleCheck className="mt-0.5 size-4 shrink-0 text-teal-600" />
-                        <span>{persona.value}</span>
+                        <span>{t(persona.valueKey)}</span>
                       </li>
                     </ul>
                   </CardContent>
@@ -489,11 +519,13 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
       <section id="pricing" className="scroll-mt-24 py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-teal-700">Pricing</p>
+            <p className="text-sm font-semibold uppercase tracking-widest text-teal-700">
+              {t("landing.pricing.kicker")}
+            </p>
             <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-              Governance that scales with you
+              {t("landing.pricing.title")}
             </h2>
-            <p className="mt-3 text-slate-600">Start free in sandbox. Upgrade when the team does.</p>
+            <p className="mt-3 text-slate-600">{t("landing.pricing.sub")}</p>
           </Reveal>
 
           <motion.div
@@ -516,23 +548,25 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
                   >
                     {highlighted && (
                       <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-teal-700 px-3 py-1 text-xs text-white shadow-sm">
-                        Most popular
+                        {t("landing.pricing.popular")}
                       </Badge>
                     )}
                     <CardContent className="flex h-full flex-col p-6">
-                      <h3 className="text-sm font-semibold text-slate-900">{meta.name}</h3>
+                      <h3 className="text-sm font-semibold text-slate-900">{t(`landing.pricing.tier.${tier}`)}</h3>
                       <div className="mt-3 flex items-baseline gap-1">
                         <span className="text-4xl font-bold tracking-tight text-slate-900">
                           ${meta.price}
                         </span>
-                        <span className="text-sm text-slate-500">/month</span>
+                        <span className="text-sm text-slate-500">{t("landing.pricing.perMonth")}</span>
                       </div>
-                      <p className="mt-3 text-sm leading-relaxed text-slate-600">{meta.blurb}</p>
+                      <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                        {t(`landing.pricing.tier.${tier}.blurb`)}
+                      </p>
                       <ul className="mt-5 flex-1 space-y-2.5">
-                        {meta.features.map((feature) => (
-                          <li key={feature} className="flex gap-2 text-sm text-slate-600">
+                        {TIER_FEATURE_KEYS[tier].map((featureKey) => (
+                          <li key={featureKey} className="flex gap-2 text-sm text-slate-600">
                             <Check className="mt-0.5 size-4 shrink-0 text-teal-600" />
-                            <span>{feature}</span>
+                            <span>{t(featureKey)}</span>
                           </li>
                         ))}
                       </ul>
@@ -546,7 +580,9 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
                         )}
                         variant={highlighted ? "default" : "outline"}
                       >
-                        {tier === "enterprise" ? "Contact sales" : "Start free"}
+                        {tier === "enterprise"
+                          ? t("landing.pricing.ctaEnterprise")
+                          : t("landing.pricing.ctaFree")}
                       </Button>
                     </CardContent>
                   </Card>
@@ -561,17 +597,16 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
       <section className="px-4 pb-16 sm:px-6 sm:pb-20 lg:px-8">
         <Reveal className="mx-auto max-w-5xl">
           <div className="rounded-3xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 px-6 py-12 text-center text-white shadow-lg shadow-teal-900/10 sm:px-12">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Ship on-brand, every time.</h2>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">{t("landing.cta.title")}</h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-teal-50 sm:text-base">
-              Spin up a sandbox workspace in under a minute — no credit card required, no data
-              retained, full audit trail included.
+              {t("landing.cta.sub")}
             </p>
             <Button
               onClick={onGetStarted}
               size="lg"
               className="mt-7 h-12 rounded-xl bg-white px-7 text-teal-700 shadow-sm hover:bg-teal-50"
             >
-              Get started free
+              {t("landing.cta.button")}
               <ArrowRight className="size-4" />
             </Button>
           </div>
@@ -581,13 +616,13 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
       {/* ── Footer ── */}
       <footer className="border-t border-slate-200 py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-sm text-slate-500 sm:flex-row sm:px-6 lg:px-8">
-          <p>© 2025 BrandShield AI · Explainable brand governance</p>
+          <p>{t("landing.footer.copyright")}</p>
           <Badge
             variant="outline"
             className="gap-1.5 border-emerald-200 bg-emerald-50 font-medium text-emerald-700"
           >
             <ShieldCheck className="size-3.5" />
-            Zero-Data-Retention by default
+            {t("landing.footer.zdr")}
           </Badge>
         </div>
       </footer>

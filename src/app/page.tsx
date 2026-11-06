@@ -4,13 +4,15 @@ import { useState } from "react";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useSession } from "@/lib/brandshield/client";
+import { useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-dash-a";
 import { useUIStore } from "@/lib/brandshield/store";
 import { Providers } from "@/components/brandshield/providers";
 import { Landing } from "@/components/brandshield/landing";
 import { AuthView } from "@/components/brandshield/auth-view";
 import { DemoTour } from "@/components/brandshield/demo-tour";
 import { Shell } from "@/components/brandshield/shell";
-import { DashboardView } from "@/components/brandshield/dashboard-view";
+import { RoleDashboard } from "@/components/brandshield/dashboards/role-dashboard";
 import { KnowledgeView } from "@/components/brandshield/knowledge-view";
 import { ScannerView } from "@/components/brandshield/scanner-view";
 import { FindingsView } from "@/components/brandshield/findings-view";
@@ -29,6 +31,7 @@ export default function Home() {
 
 function App() {
   const session = useSession();
+  const { t } = useLang();
   const [showAuth, setShowAuth] = useState(false);
 
   if (session.isLoading) {
@@ -43,7 +46,7 @@ function App() {
           <ShieldCheck className="h-7 w-7 text-white" />
         </motion.div>
         <div className="flex items-center gap-2 text-sm text-slate-400">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading BrandShield AI…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("app.loading")}
         </div>
       </div>
     );
@@ -87,6 +90,6 @@ function ViewRouter() {
     case "analytics": return <AnalyticsView />;
     case "billing": return <BillingView />;
     case "settings": return <SettingsView />;
-    default: return <DashboardView />;
+    default: return <RoleDashboard />;
   }
 }

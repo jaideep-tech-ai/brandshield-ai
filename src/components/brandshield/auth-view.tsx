@@ -23,6 +23,8 @@ import { useDemoLogin, useLogin, useRegister } from "@/lib/brandshield/client";
 import { firebaseEmailSignIn, firebaseEmailSignUp, isFirebaseConfigured } from "@/lib/brandshield/firebase";
 import type { Role } from "@/lib/brandshield/types";
 import { cn, initials } from "@/lib/brandshield/utils";
+import { LangToggle, useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,35 +32,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
-// ─── Demo personas ───────────────────────────────────────────────────────────
+// ─── Demo personas (names/emails are data — never translated) ────────────────
 
 const PERSONAS = [
   {
     email: "ava@nimbus.demo",
     name: "Ava Chen",
     role: "creator",
-    title: "Content Creator",
     avatarColor: "#0F766E",
   },
   {
     email: "marcus@nimbus.demo",
     name: "Marcus Reed",
     role: "reviewer",
-    title: "Brand Manager & Legal Reviewer",
     avatarColor: "#B45309",
   },
   {
     email: "priya@pixelworks.demo",
     name: "Priya Sharma",
     role: "contractor",
-    title: "External Agency (PixelWorks)",
     avatarColor: "#7C2D12",
   },
   {
     email: "elena@nimbus.demo",
     name: "Elena Rodriguez",
     role: "admin",
-    title: "CMO / Brand Admin",
     avatarColor: "#4D7C0F",
   },
 ] as const;
@@ -70,28 +68,23 @@ const ROLE_BADGE: Record<Role, string> = {
   admin: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
-const ROLE_OPTIONS: { value: Role; label: string; hint: string }[] = [
-  { value: "creator", label: "Content Creator", hint: "Draft, scan, fix, submit" },
-  { value: "reviewer", label: "Brand / Legal Reviewer", hint: "Approve or request changes" },
-  { value: "contractor", label: "External Agency", hint: "Sandboxed pre-checks" },
-  { value: "admin", label: "CMO / Brand Admin", hint: "Knowledge, billing, analytics" },
-];
+const ROLE_OPTIONS: Role[] = ["creator", "reviewer", "contractor", "admin"];
 
 const TRUST_MARKERS = [
   {
     icon: FileSearch,
-    title: "Explainable citations",
-    desc: "Every finding cites the exact rule and source document.",
+    titleKey: "auth.trust.citations.title",
+    descKey: "auth.trust.citations.desc",
   },
   {
     icon: Fingerprint,
-    title: "SHA-256 audit trail",
-    desc: "Tamper-evident chain of every review decision.",
+    titleKey: "auth.trust.audit.title",
+    descKey: "auth.trust.audit.desc",
   },
   {
     icon: ShieldCheck,
-    title: "Zero-data-retention",
-    desc: "Your drafts are never used for model training.",
+    titleKey: "auth.trust.retention.title",
+    descKey: "auth.trust.retention.desc",
   },
 ] as const;
 
@@ -100,6 +93,7 @@ type Mode = "signin" | "signup";
 // ─── Auth view ───────────────────────────────────────────────────────────────
 
 export function AuthView({ onBack }: { onBack: () => void }) {
+  const { t } = useLang();
   const [mode, setMode] = useState<Mode>("signin");
 
   const [email, setEmail] = useState("");
@@ -120,14 +114,15 @@ export function AuthView({ onBack }: { onBack: () => void }) {
 
   function handleDemo(personaEmail: string, personaName: string) {
     demo.mutate(personaEmail, {
-      onSuccess: (user) => toast.success(`Signed in as ${user.name || personaName}`),
+      onSuccess: (user) =>
+        toast.success(t("auth.toast.signedInAs", { name: user.name || personaName })),
     });
   }
 
   function handleLogin(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
-    const finish = () => toast.success("Signed in successfully");
+    const finish = () => toast.success(t("auth.toast.signedIn"));
     if (firebaseConnected) {
       firebaseEmailSignIn(email.trim(), password)
         .then(() => window.location.reload())
@@ -141,7 +136,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
     e.preventDefault();
     if (busy) return;
     if (password !== confirm) {
-      toast.error("Passwords don't match — please retype them.");
+      toast.error(t("auth.toast.passwordMismatch"));
       return;
     }
     if (firebaseConnected) {
@@ -154,7 +149,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
       { name: name.trim(), email: email.trim(), password, role, department: department.trim() || undefined },
       {
         onSuccess: (user) => {
-          toast.success(`Welcome aboard, ${user.name.split(" ")[0]}! Your guided tour is about to start.`);
+          toast.success(t("auth.toast.welcome", { name: user.name.split(" ")[0] }));
         },
       }
     );
@@ -180,27 +175,25 @@ export function AuthView({ onBack }: { onBack: () => void }) {
               </span>
             </div>
             <p className="mt-6 max-w-xs text-lg font-medium leading-snug text-slate-700">
-              Catch brand drift before it ships — with proof, not vibes.
+              {t("auth.brand.tagline")}
             </p>
           </div>
 
           <ul className="space-y-5">
             {TRUST_MARKERS.map((marker) => (
-              <li key={marker.title} className="flex gap-3">
+              <li key={marker.titleKey} className="flex gap-3">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-teal-100 bg-white text-teal-700 shadow-sm">
                   <marker.icon className="size-4.5" />
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">{marker.title}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{marker.desc}</p>
+                  <p className="text-sm font-semibold text-slate-900">{t(marker.titleKey)}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{t(marker.descKey)}</p>
                 </div>
               </li>
             ))}
           </ul>
 
-          <p className="text-xs text-slate-400">
-            Trusted by brand, legal & agency teams for pre-publishing governance.
-          </p>
+          <p className="text-xs text-slate-400">{t("auth.brand.footnote")}</p>
         </aside>
 
         {/* ── Auth panel ── */}
@@ -213,42 +206,44 @@ export function AuthView({ onBack }: { onBack: () => void }) {
               className="-ml-2 h-8 gap-1.5 px-2 text-slate-500 hover:text-slate-900"
             >
               <ArrowLeft className="size-4" />
-              <span className="hidden sm:inline">Back to overview</span>
-              <span className="sm:hidden">Back</span>
+              <span className="hidden sm:inline">{t("auth.action.backFull")}</span>
+              <span className="sm:hidden">{t("common.action.back")}</span>
             </Button>
-            <Badge
-              title={
-                firebaseConnected
-                  ? "Connected to your Firebase project — email/password auth runs through Firebase Authentication."
-                  : "Running in Firebase-compatible local mode. Add NEXT_PUBLIC_FIREBASE_* config to connect a real Firebase project — no UI changes needed."
-              }
-              className={cn(
-                "gap-1 border font-medium",
-                firebaseConnected
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-slate-200 bg-slate-50 text-slate-600"
-              )}
-            >
-              <Flame className="size-3 text-orange-500" />
-              <span className="hidden sm:inline">Firebase Auth</span>
-              <span className="sm:hidden">Firebase</span>
-              <span className={cn("ml-0.5 whitespace-nowrap rounded px-1 py-px text-[10px] font-semibold", firebaseConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600")}>
-                {firebaseConnected ? "Connected" : "Local mode"}
-              </span>
-            </Badge>
+            <div className="flex items-center gap-2">
+              {/* Language switcher — usable before signing in, on mobile too */}
+              <LangToggle />
+              <Badge
+                title={
+                  firebaseConnected
+                    ? t("auth.badge.connectedTitle")
+                    : t("auth.badge.localTitle")
+                }
+                className={cn(
+                  "gap-1 border font-medium",
+                  firebaseConnected
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 bg-slate-50 text-slate-600"
+                )}
+              >
+                <Flame className="size-3 text-orange-500" />
+                <span className="hidden sm:inline">Firebase Auth</span>
+                <span className="sm:hidden">Firebase</span>
+                <span className={cn("ml-0.5 whitespace-nowrap rounded px-1 py-px text-[10px] font-semibold", firebaseConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600")}>
+                  {firebaseConnected ? t("auth.badge.connected") : t("auth.badge.localMode")}
+                </span>
+              </Badge>
+            </div>
           </div>
 
           <h1 className="mt-4 text-xl font-semibold tracking-tight text-slate-900">
-            {mode === "signin" ? "Sign in to BrandShield" : "Create your BrandShield account"}
+            {mode === "signin" ? t("auth.signin.title") : t("auth.signup.title")}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            {mode === "signin"
-              ? "Email + password, Firebase-style — or jump in with a demo persona."
-              : "Email + password, Firebase-style. New teammates join the Nimbus Labs workspace with data pre-loaded."}
+            {mode === "signin" ? t("auth.signin.subtitle") : t("auth.signup.subtitle")}
           </p>
 
           {/* Mode tabs */}
-          <div className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Authentication mode">
+          <div className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" role="tablist" aria-label={t("auth.aria.modeTabs")}>
             {(["signin", "signup"] as const).map((m) => (
               <button
                 key={m}
@@ -268,7 +263,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                     transition={{ type: "spring", bounce: 0.18, duration: 0.45 }}
                   />
                 )}
-                <span className="relative">{m === "signin" ? "Sign in" : "Create account"}</span>
+                <span className="relative">{m === "signin" ? t("auth.tab.signin") : t("auth.tab.signup")}</span>
               </button>
             ))}
           </div>
@@ -285,7 +280,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                 >
                   {/* Demo personas */}
                   <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                    One-click demo personas
+                    {t("auth.demo.heading")}
                   </p>
                   <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     {PERSONAS.map((persona) => (
@@ -311,10 +306,12 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                               variant="outline"
                               className={cn("px-1.5 py-0 text-[10px] font-medium", ROLE_BADGE[persona.role as Role])}
                             >
-                              {persona.role}
+                              {t(`common.role.${persona.role}`)}
                             </Badge>
                           </div>
-                          <p className="mt-0.5 truncate text-xs text-slate-500">{persona.title}</p>
+                          <p className="mt-0.5 truncate text-xs text-slate-500">
+                            {t(`auth.persona.title.${persona.role}`)}
+                          </p>
                         </div>
                         {demo.isPending && demo.variables === persona.email ? (
                           <Loader2 className="size-4 shrink-0 animate-spin text-teal-600" />
@@ -330,13 +327,13 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                       <Separator className="w-full" />
                     </div>
                     <div className="relative flex justify-center">
-                      <span className="bg-white px-3 text-xs text-slate-400">or sign in with email</span>
+                      <span className="bg-white px-3 text-xs text-slate-400">{t("auth.divider.orEmail")}</span>
                     </div>
                   </div>
 
                   <form onSubmit={handleLogin} className="space-y-4" noValidate>
                     <div className="space-y-1.5">
-                      <Label htmlFor="auth-email">Email</Label>
+                      <Label htmlFor="auth-email">{t("auth.field.email")}</Label>
                       <div className="relative">
                         <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                         <Input
@@ -351,7 +348,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="auth-password">Password</Label>
+                      <Label htmlFor="auth-password">{t("auth.field.password")}</Label>
                       <PasswordInput
                         id="auth-password"
                         autoComplete="current-password"
@@ -362,11 +359,11 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                         onToggle={() => setShowPassword((v) => !v)}
                       />
                       <p className="text-xs text-slate-400">
-                        Any demo persona email works with password{" "}
+                        {t("auth.signin.helperPrefix")}{" "}
                         <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-600">
                           demo1234
                         </code>
-                        .
+                        {t("auth.signin.helperSuffix")}
                       </p>
                     </div>
 
@@ -387,7 +384,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                       className="h-10 w-full rounded-xl bg-teal-700 text-white shadow-sm hover:bg-teal-800"
                     >
                       {login.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-                      {login.isPending ? "Signing in…" : "Sign in"}
+                      {login.isPending ? t("auth.action.signingIn") : t("auth.action.signIn")}
                     </Button>
                   </form>
                 </motion.div>
@@ -404,13 +401,13 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                 >
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label htmlFor="reg-name">Full name</Label>
+                      <Label htmlFor="reg-name">{t("auth.signup.name")}</Label>
                       <div className="relative">
                         <UserRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                         <Input
                           id="reg-name"
                           autoComplete="name"
-                          placeholder="Jordan Lee"
+                          placeholder={t("auth.signup.namePlaceholder")}
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           className="h-10 rounded-xl pl-9"
@@ -419,11 +416,11 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="reg-dept">
-                        Team / department <span className="font-normal text-slate-400">(optional)</span>
+                        {t("auth.signup.department")} <span className="font-normal text-slate-400">{t("auth.optional")}</span>
                       </Label>
                       <Input
                         id="reg-dept"
-                        placeholder="Content Studio"
+                        placeholder={t("auth.signup.deptPlaceholder")}
                         value={department}
                         onChange={(e) => setDepartment(e.target.value)}
                         className="h-10 rounded-xl"
@@ -432,14 +429,14 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="reg-email">Email</Label>
+                    <Label htmlFor="reg-email">{t("auth.field.email")}</Label>
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                       <Input
                         id="reg-email"
                         type="email"
                         autoComplete="email"
-                        placeholder="you@company.com"
+                        placeholder={t("auth.signup.emailPlaceholder")}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="h-10 rounded-xl pl-9"
@@ -449,11 +446,11 @@ export function AuthView({ onBack }: { onBack: () => void }) {
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label htmlFor="reg-password">Password</Label>
+                      <Label htmlFor="reg-password">{t("auth.field.password")}</Label>
                       <PasswordInput
                         id="reg-password"
                         autoComplete="new-password"
-                        placeholder="6+ characters"
+                        placeholder={t("auth.signup.passwordPlaceholder")}
                         value={password}
                         onChange={setPassword}
                         show={showPassword}
@@ -461,14 +458,14 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="reg-confirm">Confirm password</Label>
+                      <Label htmlFor="reg-confirm">{t("auth.signup.confirm")}</Label>
                       <div className="relative">
                         <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                         <Input
                           id="reg-confirm"
                           type={showPassword ? "text" : "password"}
                           autoComplete="new-password"
-                          placeholder="Repeat it"
+                          placeholder={t("auth.signup.confirmPlaceholder")}
                           value={confirm}
                           onChange={(e) => setConfirm(e.target.value)}
                           className={cn(
@@ -478,32 +475,32 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                         />
                       </div>
                       {confirm && confirm !== password && (
-                        <p className="text-xs font-medium text-red-600">Passwords don&apos;t match yet.</p>
+                        <p className="text-xs font-medium text-red-600">{t("auth.error.mismatchLive")}</p>
                       )}
                     </div>
                   </div>
 
                   <fieldset className="space-y-1.5">
-                    <legend className="text-sm font-medium text-slate-700">Choose your role</legend>
+                    <legend className="text-sm font-medium text-slate-700">{t("auth.signup.roleLegend")}</legend>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {ROLE_OPTIONS.map((option) => (
+                      {ROLE_OPTIONS.map((value) => (
                         <button
-                          key={option.value}
+                          key={value}
                           type="button"
-                          onClick={() => setRole(option.value)}
-                          aria-pressed={role === option.value}
+                          onClick={() => setRole(value)}
+                          aria-pressed={role === value}
                           className={cn(
                             "rounded-xl border p-3 text-left transition",
-                            role === option.value
+                            role === value
                               ? "border-teal-400 bg-teal-50/70 ring-1 ring-teal-300"
                               : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                           )}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-slate-900">{option.label}</span>
-                            {role === option.value && <BadgeCheck className="size-4 text-teal-600" />}
+                            <span className="text-sm font-semibold text-slate-900">{t(`auth.role.label.${value}`)}</span>
+                            {role === value && <BadgeCheck className="size-4 text-teal-600" />}
                           </div>
-                          <p className="mt-0.5 text-xs text-slate-500">{option.hint}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">{t(`auth.role.hint.${value}`)}</p>
                         </button>
                       ))}
                     </div>
@@ -526,11 +523,11 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                     className="h-10 w-full rounded-xl bg-teal-700 text-white shadow-sm hover:bg-teal-800"
                   >
                     {register.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-                    {register.isPending ? "Creating account…" : "Create account & start tour"}
+                    {register.isPending ? t("auth.action.creatingAccount") : t("auth.action.signUp")}
                   </Button>
                   <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
                     <Users className="size-3.5" />
-                    You&apos;ll join the Nimbus Labs demo workspace — seeded with a real brand repository.
+                    {t("auth.signup.footer")}
                   </p>
                 </motion.form>
               )}
@@ -561,6 +558,7 @@ function PasswordInput({
   show: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useLang();
   return (
     <div className="relative">
       <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -576,7 +574,7 @@ function PasswordInput({
       <button
         type="button"
         onClick={onToggle}
-        aria-label={show ? "Hide password" : "Show password"}
+        aria-label={show ? t("auth.aria.hidePassword") : t("auth.aria.showPassword")}
         className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
       >
         {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}

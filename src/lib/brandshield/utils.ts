@@ -164,20 +164,28 @@ export function lineDiff(oldText: string, newText: string): DiffRow[] {
 
 // ─── Formatting helpers ──────────────────────────────────────────────────────
 
-export function timeAgo(dateStr: string): string {
+export function timeAgo(dateStr: string, lang: "en" | "hi" = "en"): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return lang === "hi" ? "अभी" : "just now";
+  if (mins < 60) return lang === "hi" ? `${mins} मि. पहले` : `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return lang === "hi" ? `${hours} घं. पहले` : `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+  if (days < 30) return lang === "hi" ? `${days} दि. पहले` : `${days}d ago`;
+  return lang === "hi"
+    ? new Date(dateStr).toLocaleDateString("hi-IN", { day: "numeric", month: "short", year: "numeric" })
+    : new Date(dateStr).toLocaleDateString();
 }
 
-export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+export function formatDate(dateStr: string, lang: "en" | "hi" = "en"): string {
+  return new Date(dateStr).toLocaleString(lang === "hi" ? "hi-IN" : "en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function initials(name: string): string {

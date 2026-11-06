@@ -29,6 +29,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-scanner";
 import {
   useCreateSubmission,
   useScanSubmission,
@@ -40,6 +42,15 @@ import { useUIStore } from "@/lib/brandshield/store";
 import { cn, extractImagePalette, timeAgo } from "@/lib/brandshield/utils";
 import { SEVERITY_META, type StageAResult, type StageBResult, type Severity } from "@/lib/brandshield/types";
 
+// Fixed server-side check names → i18n keys (unknown names fall back to raw).
+const CHECK_KEY: Record<string, string> = {
+  "Banned terms": "scanner.check.bannedTerms",
+  "Trademark glyphs": "scanner.check.trademarkGlyphs",
+  "Claim candidates": "scanner.check.claimCandidates",
+  "Hex discovery": "scanner.check.hexDiscovery",
+  "Style mechanics": "scanner.check.styleMechanics",
+};
+
 interface ScanOutcome {
   submissionId: string;
   score: number;
@@ -50,6 +61,7 @@ interface ScanOutcome {
 }
 
 export function ScannerView() {
+  const { t, lang } = useLang();
   const session = useSession();
   const setView = useUIStore((s) => s.setView);
   const createSubmission = useCreateSubmission();
@@ -68,32 +80,35 @@ export function ScannerView() {
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
 
-  const onFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload a PNG, JPG or WebP banner image");
-      return;
-    }
-    if (file.size > 6 * 1024 * 1024) {
-      toast.error("Image must be under 6 MB");
-      return;
-    }
-    try {
-      const { palette: p, dataUrl } = await extractImagePalette(file);
-      setImageData(dataUrl);
-      setPalette(p);
-      toast.success(`Banner loaded — ${p.length} dominant colors extracted`);
-    } catch {
-      toast.error("Could not read that image");
-    }
-  }, []);
+  const onFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) {
+        toast.error(t("scanner.toast.badType"));
+        return;
+      }
+      if (file.size > 6 * 1024 * 1024) {
+        toast.error(t("scanner.toast.tooBig"));
+        return;
+      }
+      try {
+        const { palette: p, dataUrl } = await extractImagePalette(file);
+        setImageData(dataUrl);
+        setPalette(p);
+        toast.success(t("scanner.toast.loaded", { n: p.length }));
+      } catch {
+        toast.error(t("scanner.toast.readFail"));
+      }
+    },
+    [t]
+  );
 
   const runScan = async () => {
     if (!outcome && tab === "text" && !title.trim()) {
-      toast.error("Give your draft a title first");
+      toast.error(t("scanner.toast.needTitle"));
       return;
     }
     if (!outcome && tab === "banner" && (!title.trim() || !imageData)) {
-      toast.error("Add a title and upload a banner image first");
+      toast.error(t("scanner.toast.needBanner"));
       return;
     }
     setOutcome(null);
@@ -107,7 +122,7 @@ export function ScannerView() {
         const sub = await createSubmission.mutateAsync({
           title: title.trim(),
           contentType: tab,
-          content: tab === "text" ? content : `Banner headline: ${title.trim()}`,
+          content: tab === "text" ? content : t("scanner.bannerHeadline", { title: title.trim() }),
           imageData: imageData ?? undefined,
           imagePalette: palette.length ? palette : undefined,
           creatorNote: note.trim() || undefined,
@@ -130,18 +145,18 @@ export function ScannerView() {
         counts,
         durationMs: res.inspection.durationMs,
       });
-      toast.success(`Pre-flight complete — compliance score ${res.inspection.complianceScore}/100`);
+      toast.success(t("scanner.toast.done", { score: res.inspection.complianceScore }));
     } catch (e) {
       clearTimeout(timer1);
       setPipelineStep(0);
       if (e instanceof ApiRequestError && e.status === 402) {
         toast.error(e.message, {
-          description: "Open Billing to upgrade your plan.",
-          action: session.data?.role === "admin" ? { label: "Go to Billing", onClick: () => setView("billing") } : undefined,
+          description: t("scanner.toast.quotaDesc"),
+          action: session.data?.role === "admin" ? { label: t("scanner.toast.goBilling"), onClick: () => setView("billing") } : undefined,
           duration: 8000,
         });
       } else {
-        toast.error(e instanceof Error ? e.message : "Scan failed");
+        toast.error(e instanceof Error ? e.message : t("scanner.toast.failed"));
       }
     }
   };
@@ -167,15 +182,13 @@ export function ScannerView() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600/10 text-teal-700">
               <ScanSearch className="h-5 w-5" />
             </span>
-            Pre-Flight Scanner
+            {t("scanner.title")}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Two-stage hybrid inspection — deterministic pre-filter, then RAG claim verification &amp; vision audit.
-          </p>
+          <p className="mt-1 text-sm text-slate-500">{t("scanner.subtitle")}</p>
         </div>
         {session.data?.zeroDataRetention && (
           <Badge variant="outline" className="gap-1 border-emerald-200 bg-emerald-50 text-emerald-700">
-            <ShieldCheck className="h-3.5 w-3.5" /> ZDR On — drafts never used for model training
+            <ShieldCheck className="h-3.5 w-3.5" /> {t("scanner.zdr")}
           </Badge>
         )}
       </div>
@@ -186,23 +199,23 @@ export function ScannerView() {
           <CardContent className="p-5 sm:p-6">
             <Tabs value={tab} onValueChange={(v) => { setTab(v); reset(); }}>
               <TabsList className="grid w-full grid-cols-2 rounded-xl">
-                <TabsTrigger value="text" className="gap-1.5"><FileText className="h-4 w-4" /> Copy / Document</TabsTrigger>
-                <TabsTrigger value="banner" className="gap-1.5"><ImageIcon className="h-4 w-4" /> Promotional Banner</TabsTrigger>
+                <TabsTrigger value="text" className="gap-1.5"><FileText className="h-4 w-4" /> {t("scanner.tab.text")}</TabsTrigger>
+                <TabsTrigger value="banner" className="gap-1.5"><ImageIcon className="h-4 w-4" /> {t("scanner.tab.banner")}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="text" className="mt-4 space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="scan-title">Draft title</Label>
-                  <Input id="scan-title" placeholder="e.g. Spring Boost Campaign — Email Hero" value={title} onChange={(e) => setTitle(e.target.value)} />
+                  <Label htmlFor="scan-title">{t("scanner.label.draftTitle")}</Label>
+                  <Input id="scan-title" placeholder={t("scanner.ph.draftTitle")} value={title} onChange={(e) => setTitle(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="scan-content">Campaign copy (Markdown supported)</Label>
-                    <span className={cn("text-xs", wordCount > 350 ? "text-amber-600" : "text-slate-400")}>{wordCount} words</span>
+                    <Label htmlFor="scan-content">{t("scanner.label.content")}</Label>
+                    <span className={cn("text-xs", wordCount > 350 ? "text-amber-600" : "text-slate-400")}>{t("scanner.words", { n: wordCount })}</span>
                   </div>
                   <Textarea
                     id="scan-content"
-                    placeholder="Paste or write the copy for pre-flight inspection…&#10;&#10;Try: “Our merchants see 10x ROI — guaranteed. nimbuspay is the world's best payment platform!!!”"
+                    placeholder={t("scanner.ph.content")}
                     className="min-h-[220px] font-[450] leading-relaxed"
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
@@ -212,14 +225,15 @@ export function ScannerView() {
 
               <TabsContent value="banner" className="mt-4 space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="scan-banner-title">Banner title</Label>
-                  <Input id="scan-banner-title" placeholder="e.g. Summer Splash — Social Banner" value={title} onChange={(e) => setTitle(e.target.value)} />
+                  <Label htmlFor="scan-banner-title">{t("scanner.label.bannerTitle")}</Label>
+                  <Input id="scan-banner-title" placeholder={t("scanner.ph.bannerTitle")} value={title} onChange={(e) => setTitle(e.target.value)} />
                 </div>
                 <input
                   ref={fileRef}
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   className="hidden"
+                  aria-label={t("scanner.aria.uploadBanner")}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) void onFile(f);
@@ -233,20 +247,20 @@ export function ScannerView() {
                     className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-teal-300 bg-teal-50/50 px-6 py-10 text-center transition hover:border-teal-400 hover:bg-teal-50"
                   >
                     <UploadCloud className="h-8 w-8 text-teal-600" />
-                    <span className="text-sm font-medium text-teal-800">Upload a promotional banner</span>
-                    <span className="text-xs text-teal-600/80">PNG, JPG or WebP · palette + WCAG contrast are extracted automatically</span>
+                    <span className="text-sm font-medium text-teal-800">{t("scanner.drop.title")}</span>
+                    <span className="text-xs text-teal-600/80">{t("scanner.drop.hint")}</span>
                   </button>
                 ) : (
                   <div className="space-y-3">
                     <div className="relative overflow-hidden rounded-xl border border-slate-200">
-                                    <img src={imageData} alt="Banner preview" className="max-h-64 w-full object-contain" />
-                      <Button size="icon" variant="secondary" className="absolute right-2 top-2 h-7 w-7" onClick={() => { setImageData(null); setPalette([]); }}>
+                                    <img src={imageData} alt={t("scanner.preview.alt")} className="max-h-64 w-full object-contain" />
+                      <Button size="icon" variant="secondary" className="absolute right-2 top-2 h-7 w-7" aria-label={t("scanner.aria.removeImage")} onClick={() => { setImageData(null); setPalette([]); }}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                     {palette.length > 0 && (
                       <div>
-                        <p className="mb-1.5 text-xs font-medium text-slate-500">Extracted dominant palette (client-side canvas)</p>
+                        <p className="mb-1.5 text-xs font-medium text-slate-500">{t("scanner.palette.label")}</p>
                         <div className="flex flex-wrap gap-1.5">
                           {palette.map((hex) => (
                             <span key={hex} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-600 shadow-sm">
@@ -263,19 +277,19 @@ export function ScannerView() {
             </Tabs>
 
             <div className="mt-4 space-y-1.5">
-              <Label htmlFor="scan-note">Context note for reviewers (optional)</Label>
-              <Input id="scan-note" placeholder="e.g. Hero copy for the spring re-engagement email" value={note} onChange={(e) => setNote(e.target.value)} />
+              <Label htmlFor="scan-note">{t("scanner.label.note")}</Label>
+              <Input id="scan-note" placeholder={t("scanner.ph.note")} value={note} onChange={(e) => setNote(e.target.value)} />
             </div>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <Button onClick={() => void runScan()} disabled={createSubmission.isPending || scan.isPending} className="min-h-11 gap-2 bg-teal-700 px-5 hover:bg-teal-800">
                 {createSubmission.isPending || scan.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-                Run Pre-Flight Scan
+                {t("scanner.btn.scan")}
               </Button>
               {outcome && (
-                <Button variant="ghost" onClick={reset} className="min-h-11">New scan</Button>
+                <Button variant="ghost" onClick={reset} className="min-h-11">{t("scanner.btn.newScan")}</Button>
               )}
-              <span className="text-xs text-slate-400">Stage 1 is token-free &lt;100ms · Stage 2 uses grounded LLM + vision</span>
+              <span className="text-xs text-slate-400">{t("scanner.hint.stages")}</span>
             </div>
 
             {/* Pipeline progress */}
@@ -283,8 +297,8 @@ export function ScannerView() {
               {(createSubmission.isPending || scan.isPending || pipelineStep > 0) && !outcome && (
                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                   <div className="mt-5 space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                    <PipelineRow active={pipelineStep >= 1} done={pipelineStep >= 3} icon={<Zap className="h-4 w-4" />} label="Stage 1 — Deterministic Pre-Filter" detail="Banned terms · trademark glyphs · claim extraction · hex discovery" />
-                    <PipelineRow active={pipelineStep >= 2} done={pipelineStep >= 3} icon={<BrainCircuit className="h-4 w-4" />} label="Stage 2 — Hybrid RAG + Vision Verification" detail="Dense-sparse retrieval · claim verdicts · tone scoring · WCAG math" delay={0.1} />
+                    <PipelineRow active={pipelineStep >= 1} done={pipelineStep >= 3} icon={<Zap className="h-4 w-4" />} label={t("scanner.pipe.stageA.label")} detail={t("scanner.pipe.stageA.detail")} />
+                    <PipelineRow active={pipelineStep >= 2} done={pipelineStep >= 3} icon={<BrainCircuit className="h-4 w-4" />} label={t("scanner.pipe.stageB.label")} detail={t("scanner.pipe.stageB.detail")} delay={0.1} />
                   </div>
                 </motion.div>
               )}
@@ -302,7 +316,7 @@ export function ScannerView() {
                 <Card>
                   <CardContent className="space-y-3 p-5">
                     <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                      <BrainCircuit className="h-4 w-4 text-teal-700" /> Stage 2 — Grounded verification
+                      <BrainCircuit className="h-4 w-4 text-teal-700" /> {t("scanner.stageB.title")}
                     </h3>
                     {outcome.stageB.claimVerdicts.length > 0 ? (
                       <ul className="space-y-2">
@@ -310,20 +324,20 @@ export function ScannerView() {
                           <li key={i} className="rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs">
                             <div className="flex items-start justify-between gap-2">
                               <span className="font-medium text-slate-700">{v.claim.slice(0, 70)}{v.claim.length > 70 ? "…" : ""}</span>
-                              <Badge variant="outline" className={cn("shrink-0 text-[10px]", v.verdict === "SUPPORTED" && "border-emerald-200 bg-emerald-50 text-emerald-700", v.verdict === "UNSUPPORTED" && "border-red-200 bg-red-50 text-red-700", v.verdict === "UNVERIFIABLE" && "border-slate-200 bg-slate-50 text-slate-500")}>{v.verdict}</Badge>
+                              <Badge variant="outline" className={cn("shrink-0 text-[10px]", v.verdict === "SUPPORTED" && "border-emerald-200 bg-emerald-50 text-emerald-700", v.verdict === "UNSUPPORTED" && "border-red-200 bg-red-50 text-red-700", v.verdict === "UNVERIFIABLE" && "border-slate-200 bg-slate-50 text-slate-500")}>{t(`common.verdict.${v.verdict}`)}</Badge>
                             </div>
                             {v.citation && <p className="mt-1 text-[11px] italic text-slate-500">“{v.citation.slice(0, 110)}{v.citation.length > 110 ? "…" : ""}”</p>}
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-xs text-slate-500">No numeric claims detected for RAG verification.</p>
+                      <p className="text-xs text-slate-500">{t("scanner.stageB.noClaims")}</p>
                     )}
                     {outcome.stageB.tone && (
                       <>
                         <Separator />
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-medium text-slate-600">Persona voice score</span>
+                          <span className="font-medium text-slate-600">{t("scanner.stageB.voiceScore")}</span>
                           <span className={cn("font-semibold", outcome.stageB.tone.score >= 80 ? "text-emerald-600" : outcome.stageB.tone.score >= 60 ? "text-amber-600" : "text-red-600")}>{outcome.stageB.tone.score}/100</span>
                         </div>
                         <Progress value={outcome.stageB.tone.score} className="h-1.5" />
@@ -334,7 +348,7 @@ export function ScannerView() {
                       <>
                         <Separator />
                         <div className="space-y-2 text-xs">
-                          <p className="flex items-center gap-1.5 font-medium text-slate-600"><Eye className="h-3.5 w-3.5 text-teal-700" /> Vision audit</p>
+                          <p className="flex items-center gap-1.5 font-medium text-slate-600"><Eye className="h-3.5 w-3.5 text-teal-700" /> {t("scanner.stageB.vision")}</p>
                           <p className="leading-relaxed text-slate-500">{outcome.stageB.vision.summary}</p>
                           <div className="flex flex-wrap gap-1.5">
                             {outcome.stageB.vision.dominantColors.map((hex) => {
@@ -354,20 +368,20 @@ export function ScannerView() {
                   </CardContent>
                 </Card>
                 <Button onClick={() => setView("findings", outcome.submissionId)} className="w-full min-h-11 gap-2 bg-teal-700 hover:bg-teal-800">
-                  Open explainable findings <ArrowRight className="h-4 w-4" />
+                  {t("scanner.action.openFindings")} <ArrowRight className="h-4 w-4" />
                 </Button>
               </motion.div>
             ) : (
               <motion.div key="recent" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <Card>
                   <CardContent className="p-5">
-                    <h3 className="text-sm font-semibold text-slate-800">Recent submissions</h3>
+                    <h3 className="text-sm font-semibold text-slate-800">{t("scanner.recent.title")}</h3>
                     {submissions.isLoading ? (
                       <div className="mt-3 space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-slate-100" />)}</div>
                     ) : myRecent.length === 0 ? (
                       <div className="mt-4 flex flex-col items-center gap-2 py-6 text-center">
                         <Info className="h-5 w-5 text-slate-300" />
-                        <p className="text-xs text-slate-400">Nothing yet — run your first pre-flight scan.</p>
+                        <p className="text-xs text-slate-400">{t("scanner.recent.empty")}</p>
                       </div>
                     ) : (
                       <ul className="mt-3 space-y-1.5">
@@ -379,7 +393,7 @@ export function ScannerView() {
                             >
                               <span className="min-w-0">
                                 <span className="block truncate text-xs font-medium text-slate-700">{s.title}</span>
-                                <span className="text-[10px] text-slate-400">{s.contentType === "banner" ? "Banner" : "Copy"} · {timeAgo(s.updatedAt)}</span>
+                                <span className="text-[10px] text-slate-400">{s.contentType === "banner" ? t("scanner.type.banner") : t("scanner.type.copy")} · {timeAgo(s.updatedAt, lang)}</span>
                               </span>
                               {s.complianceScore !== null && (
                                 <Badge variant="outline" className={cn("shrink-0 text-[10px]", s.complianceScore >= 85 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : s.complianceScore >= 60 ? "border-amber-200 bg-amber-50 text-amber-700" : "border-red-200 bg-red-50 text-red-700")}>
@@ -397,7 +411,7 @@ export function ScannerView() {
                   <CardContent className="flex gap-3 p-4">
                     <Gauge className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
                     <p className="text-xs leading-relaxed text-teal-900/80">
-                      Every flag must cite a verbatim guideline clause before it can fire — no black-box scores, no arbitrary rejections.
+                      {t("scanner.trust.copy")}
                     </p>
                   </CardContent>
                 </Card>
@@ -425,6 +439,7 @@ function PipelineRow({ active, done, icon, label, detail, delay = 0 }: { active:
 }
 
 function ScoreCard({ score, counts, durationMs }: { score: number; counts: Record<Severity, number>; durationMs: number }) {
+  const { t } = useLang();
   const tone = score >= 85 ? "text-emerald-600" : score >= 60 ? "text-amber-600" : "text-red-600";
   const ring = score >= 85 ? "stroke-emerald-500" : score >= 60 ? "stroke-amber-500" : "stroke-red-500";
   const circumference = 2 * Math.PI * 34;
@@ -445,16 +460,16 @@ function ScoreCard({ score, counts, durationMs }: { score: number; counts: Recor
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className={cn("text-xl font-bold", tone)}>{score}</span>
-            <span className="text-[9px] uppercase tracking-wide text-slate-400">score</span>
+            <span className="text-[9px] uppercase tracking-wide text-slate-400">{t("scanner.score.label")}</span>
           </div>
         </div>
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap gap-1.5">
-            <Badge variant="outline" className="gap-1 border-red-200 bg-red-50 text-red-700"><span className={cn("h-1.5 w-1.5 rounded-full", SEVERITY_META.critical.dot)} /> {counts.critical} critical</Badge>
-            <Badge variant="outline" className="gap-1 border-amber-200 bg-amber-50 text-amber-700"><span className={cn("h-1.5 w-1.5 rounded-full", SEVERITY_META.warning.dot)} /> {counts.warning} warnings</Badge>
-            <Badge variant="outline" className="gap-1 border-teal-200 bg-teal-50 text-teal-700"><span className={cn("h-1.5 w-1.5 rounded-full", SEVERITY_META.minor.dot)} /> {counts.minor} minor</Badge>
+            <Badge variant="outline" className="gap-1 border-red-200 bg-red-50 text-red-700"><span className={cn("h-1.5 w-1.5 rounded-full", SEVERITY_META.critical.dot)} /> {t("scanner.score.critical", { n: counts.critical })}</Badge>
+            <Badge variant="outline" className="gap-1 border-amber-200 bg-amber-50 text-amber-700"><span className={cn("h-1.5 w-1.5 rounded-full", SEVERITY_META.warning.dot)} /> {t("scanner.score.warnings", { n: counts.warning })}</Badge>
+            <Badge variant="outline" className="gap-1 border-teal-200 bg-teal-50 text-teal-700"><span className={cn("h-1.5 w-1.5 rounded-full", SEVERITY_META.minor.dot)} /> {t("scanner.score.minor", { n: counts.minor })}</Badge>
           </div>
-          <p className="text-[11px] text-slate-400">Full pipeline in {(durationMs / 1000).toFixed(1)}s · strict JSON citations enforced</p>
+          <p className="text-[11px] text-slate-400">{t("scanner.score.duration", { sec: (durationMs / 1000).toFixed(1) })}</p>
         </div>
       </CardContent>
     </Card>
@@ -462,19 +477,22 @@ function ScoreCard({ score, counts, durationMs }: { score: number; counts: Recor
 }
 
 function StageACard({ stageA }: { stageA: StageAResult }) {
+  const { t } = useLang();
   return (
     <Card>
       <CardContent className="p-5">
         <h3 className="flex items-center justify-between text-sm font-semibold text-slate-800">
-          <span className="flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" /> Stage 1 — Deterministic Pre-Filter</span>
+          <span className="flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" /> {t("scanner.pipe.stageA.label")}</span>
           <Badge variant="outline" className="text-[10px] text-slate-500">{stageA.durationMs} ms</Badge>
         </h3>
         <ul className="mt-3 space-y-1.5">
           {stageA.checks.map((c) => (
             <li key={c.name} className="flex items-center justify-between rounded-lg bg-slate-50/70 px-2.5 py-1.5 text-xs">
               <span className="flex items-center gap-1.5 text-slate-600">
-                {c.passed ? <CircleCheck className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
-                {c.name}
+                <span role="img" aria-label={c.passed ? t("scanner.check.passed") : t("scanner.check.attention")}>
+                  {c.passed ? <CircleCheck className="h-3.5 w-3.5 text-emerald-500" /> : <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                </span>
+                {CHECK_KEY[c.name] ? t(CHECK_KEY[c.name]) : c.name}
               </span>
               <span className="font-mono text-[10px] text-slate-400">{c.count} · {c.ms}ms</span>
             </li>

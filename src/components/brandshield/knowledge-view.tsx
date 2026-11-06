@@ -31,6 +31,8 @@ import {
 } from "@/lib/brandshield/client";
 import type { GuidelineDoc, VisualToken } from "@/lib/brandshield/types";
 import { cn, timeAgo, readableOn } from "@/lib/brandshield/utils";
+import { useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-knowledge";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -63,19 +65,23 @@ import { Textarea } from "@/components/ui/textarea";
 
 // ─── Meta maps ───────────────────────────────────────────────────────────────
 
-const DOC_TYPE_META: Record<string, { label: string; cls: string }> = {
-  guideline: { label: "Guideline", cls: "bg-slate-100 text-slate-700 border-slate-200" },
-  datasheet: { label: "Product Datasheet", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  terminology: { label: "Terminology", cls: "bg-cyan-50 text-cyan-700 border-cyan-200" },
-  banned_words: { label: "Banned Words", cls: "bg-red-50 text-red-700 border-red-200" },
-  trademark: { label: "Trademark", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  tone: { label: "Tone of Voice", cls: "bg-teal-50 text-teal-700 border-teal-200" },
+// Display labels come from the i18n dict (`doctype.*` / `tokentype.*`); the
+// maps below carry only styling so stored docType values (data) stay raw.
+const DOC_TYPE_META: Record<string, { cls: string }> = {
+  guideline: { cls: "bg-slate-100 text-slate-700 border-slate-200" },
+  datasheet: { cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  terminology: { cls: "bg-cyan-50 text-cyan-700 border-cyan-200" },
+  banned_words: { cls: "bg-red-50 text-red-700 border-red-200" },
+  trademark: { cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  tone: { cls: "bg-teal-50 text-teal-700 border-teal-200" },
 };
 
-const TOKEN_TYPE_META: Record<string, { label: string; icon: typeof Palette }> = {
-  color: { label: "Color", icon: Palette },
-  typography: { label: "Typography", icon: Type },
-  logo: { label: "Logo / Mark", icon: ImageIcon },
+const DOC_TYPE_DEFAULT_CLS = "bg-slate-100 text-slate-700 border-slate-200";
+
+const TOKEN_TYPE_META: Record<string, { icon: typeof Palette }> = {
+  color: { icon: Palette },
+  typography: { icon: Type },
+  logo: { icon: ImageIcon },
 };
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -101,6 +107,19 @@ function StatChip({ icon: Icon, label, value, iconCls }: { icon: typeof Layers; 
 // ─── View ────────────────────────────────────────────────────────────────────
 
 export function KnowledgeView() {
+  const { t, lang } = useLang();
+
+  // Raw docType/tokenType values are stored data — translate only the display
+  // label, falling back to the raw value when no dict entry exists.
+  const docTypeLabel = (v: string) => {
+    const key = `doctype.${v}`;
+    return t(key) === key ? v : t(key);
+  };
+  const tokenTypeLabel = (v: string) => {
+    const key = `tokentype.${v}`;
+    return t(key) === key ? v : t(key);
+  };
+
   const { data: session } = useSession();
   const isAdmin = session?.role === "admin";
 
@@ -148,9 +167,9 @@ export function KnowledgeView() {
       const text = String(reader.result ?? "");
       setDocContent(text);
       setDocTitle(file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim());
-      toast.info(`Imported "${file.name}" — review title & content, then ingest.`);
+      toast.info(t("knowledge.toast.imported", { name: file.name }));
     };
-    reader.onerror = () => toast.error("Could not read that file.");
+    reader.onerror = () => toast.error(t("knowledge.toast.readFail"));
     reader.readAsText(file);
     e.target.value = "";
   };
@@ -158,28 +177,28 @@ export function KnowledgeView() {
   // ── Submit handlers ──
   const submitDoc = async () => {
     if (!docTitle.trim() || !docContent.trim()) {
-      toast.error("Title and content are required.");
+      toast.error(t("knowledge.toast.docValidation"));
       return;
     }
     try {
       await createGuideline.mutateAsync({ title: docTitle.trim(), docType, content: docContent.trim() });
-      toast.success("Document ingested & chunked");
+      toast.success(t("knowledge.toast.docIngested"));
       setAddDocOpen(false);
       setDocTitle("");
-      setDocContent("");
+      setDocContent("knowledge.");
       setDocType("guideline");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to ingest document.");
+      toast.error(err instanceof Error ? err.message : t("knowledge.toast.docFail"));
     }
   };
 
   const submitToken = async () => {
     if (!tokenName.trim() || !tokenValue.trim()) {
-      toast.error("Token name and value are required.");
+      toast.error(t("knowledge.toast.tokenValidation"));
       return;
     }
     if (tokenType === "color" && !HEX_RE.test(tokenValue.trim())) {
-      toast.error("Color value must be a hex code like #0F766E.");
+      toast.error(t("knowledge.toast.hexValidation"));
       return;
     }
     try {
@@ -190,14 +209,14 @@ export function KnowledgeView() {
         secondary: tokenSecondary.trim() || undefined,
         usageNotes: tokenNotes.trim() || undefined,
       });
-      toast.success("Visual token added");
+      toast.success(t("knowledge.toast.tokenAdded"));
       setAddTokenOpen(false);
       setTokenName("");
       setTokenValue("");
       setTokenSecondary("");
       setTokenNotes("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to add token.");
+      toast.error(err instanceof Error ? err.message : t("knowledge.toast.tokenFail"));
     }
   };
 
@@ -214,16 +233,13 @@ export function KnowledgeView() {
       {/* Header */}
       <motion.div {...fadeUp(0)} className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Ground-Truth Knowledge Base</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Approved guidelines, product facts, terminology and visual tokens — chunked and indexed for
-            retrieval-grounded verification.
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">{t("knowledge.title")}</h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">{t("knowledge.subtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatChip icon={FileText} label="documents" value={guidelines.isLoading ? "…" : docs.length} iconCls="text-teal-700" />
-          <StatChip icon={Layers} label="chunks" value={guidelines.isLoading ? "…" : totalChunks} iconCls="text-emerald-600" />
-          <StatChip icon={Palette} label="tokens" value={visualTokens.isLoading ? "…" : tokens.length} iconCls="text-amber-600" />
+          <StatChip icon={FileText} label={t("knowledge.stat.documents")} value={guidelines.isLoading ? "…" : docs.length} iconCls="text-teal-700" />
+          <StatChip icon={Layers} label={t("knowledge.stat.chunks")} value={guidelines.isLoading ? "…" : totalChunks} iconCls="text-emerald-600" />
+          <StatChip icon={Palette} label={t("knowledge.stat.tokens")} value={visualTokens.isLoading ? "…" : tokens.length} iconCls="text-amber-600" />
         </div>
       </motion.div>
 
@@ -232,8 +248,8 @@ export function KnowledgeView() {
         <motion.div {...fadeUp(1)}>
           <Alert className="border-amber-200 bg-amber-50 text-amber-800">
             <Eye className="text-amber-600" />
-            <AlertTitle>Read-only</AlertTitle>
-            <AlertDescription>Brand Admins manage the ground-truth repository.</AlertDescription>
+            <AlertTitle>{t("knowledge.readonly.title")}</AlertTitle>
+            <AlertDescription>{t("knowledge.readonly.body")}</AlertDescription>
           </Alert>
         </motion.div>
       )}
@@ -245,13 +261,13 @@ export function KnowledgeView() {
             value="documents"
             className="rounded-lg px-4 py-1.5 text-sm data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm"
           >
-            <FileText className="h-4 w-4" /> Documents
+            <FileText className="h-4 w-4" /> {t("knowledge.tab.documents")}
           </TabsTrigger>
           <TabsTrigger
             value="tokens"
             className="rounded-lg px-4 py-1.5 text-sm data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm"
           >
-            <Palette className="h-4 w-4" /> Visual Tokens
+            <Palette className="h-4 w-4" /> {t("knowledge.tab.tokens")}
           </TabsTrigger>
         </TabsList>
 
@@ -259,17 +275,21 @@ export function KnowledgeView() {
         <TabsContent value="documents" className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-500">
-              {guidelines.isLoading ? "Loading repository…" : `${docs.length} approved document${docs.length === 1 ? "" : "s"} indexed for retrieval`}
+              {guidelines.isLoading
+                ? t("knowledge.docs.loading")
+                : docs.length === 1
+                  ? t("knowledge.docs.countedOne", { count: docs.length })
+                  : t("knowledge.docs.countedMany", { count: docs.length })}
             </p>
             {isAdmin && (
               <Button size="sm" className="bg-teal-700 text-white hover:bg-teal-800" onClick={() => setAddDocOpen(true)}>
-                <Plus className="h-4 w-4" /> Add Document
+                <Plus className="h-4 w-4" /> {t("knowledge.docs.add")}
               </Button>
             )}
           </div>
 
           {guidelines.isLoading ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div role="status" aria-label={t("knowledge.docs.loadingAria")} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Card key={i} className="rounded-2xl border-slate-200 shadow-sm">
                   <CardContent className="space-y-3 p-6">
@@ -289,29 +309,27 @@ export function KnowledgeView() {
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50">
                 <Database className="h-6 w-6 text-teal-700" />
               </div>
-              <p className="text-sm font-semibold text-slate-900">No documents yet</p>
+              <p className="text-sm font-semibold text-slate-900">{t("knowledge.docs.empty.title")}</p>
               <p className="max-w-sm text-xs text-slate-500">
-                {isAdmin
-                  ? "Add your first document — approved copy guidelines, product datasheets or banned-word lists."
-                  : "Add your first document once a Brand Admin seeds the repository."}
+                {isAdmin ? t("knowledge.docs.empty.admin") : t("knowledge.docs.empty.viewer")}
               </p>
               {isAdmin && (
                 <Button size="sm" className="mt-1 bg-teal-700 text-white hover:bg-teal-800" onClick={() => setAddDocOpen(true)}>
-                  <Plus className="h-4 w-4" /> Add your first document
+                  <Plus className="h-4 w-4" /> {t("knowledge.docs.empty.addFirst")}
                 </Button>
               )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {docs.map((doc, i) => {
-                const meta = DOC_TYPE_META[doc.docType] ?? { label: doc.docType, cls: "bg-slate-100 text-slate-700 border-slate-200" };
+                const meta = DOC_TYPE_META[doc.docType];
                 return (
                   <motion.div key={doc.id} {...fadeUp(i)}>
                     <Card className="flex h-full flex-col rounded-2xl border-slate-200 shadow-sm transition-shadow hover:shadow-md">
                       <CardContent className="flex h-full flex-col gap-3 p-6">
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={cn("border", meta.cls)}>
-                            {meta.label}
+                          <Badge variant="outline" className={cn("border", meta?.cls ?? DOC_TYPE_DEFAULT_CLS)}>
+                            {docTypeLabel(doc.docType)}
                           </Badge>
                           <Badge variant="outline" className="border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-500">
                             v{doc.version}
@@ -320,7 +338,7 @@ export function KnowledgeView() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              aria-label={`Delete ${doc.title}`}
+                              aria-label={t("knowledge.aria.deleteDoc", { title: doc.title })}
                               className="ml-auto h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-600"
                               onClick={() => setDocToDelete(doc)}
                             >
@@ -334,11 +352,11 @@ export function KnowledgeView() {
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
                           <span className="inline-flex items-center gap-1">
                             <Layers className="h-3.5 w-3.5 text-teal-600" />
-                            {doc.chunkCount} chunks
+                            {t("knowledge.docs.chunks", { count: doc.chunkCount })}
                           </span>
                           <span className="inline-flex items-center gap-1">
                             <History className="h-3.5 w-3.5" />
-                            Updated {timeAgo(doc.updatedAt ?? doc.createdAt)}
+                            {t("knowledge.docs.updated", { time: timeAgo(doc.updatedAt ?? doc.createdAt, lang) })}
                           </span>
                           {doc.sourceName && (
                             <span className="inline-flex max-w-full items-center gap-1 truncate">
@@ -359,7 +377,7 @@ export function KnowledgeView() {
                           className="-ml-2 mt-auto self-start text-teal-700 hover:bg-teal-50 hover:text-teal-800"
                           onClick={() => setFullDoc(doc)}
                         >
-                          <Maximize2 className="h-3.5 w-3.5" /> Show full document
+                          <Maximize2 className="h-3.5 w-3.5" /> {t("knowledge.docs.showFull")}
                         </Button>
                       </CardContent>
                     </Card>
@@ -374,7 +392,11 @@ export function KnowledgeView() {
         <TabsContent value="tokens" className="space-y-8">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-500">
-              {visualTokens.isLoading ? "Loading tokens…" : `${tokens.length} visual token${tokens.length === 1 ? "" : "s"} enforced by the vision & style validators`}
+              {visualTokens.isLoading
+                ? t("knowledge.tokens.loading")
+                : tokens.length === 1
+                  ? t("knowledge.tokens.countedOne", { count: tokens.length })
+                  : t("knowledge.tokens.countedMany", { count: tokens.length })}
             </p>
             {isAdmin && (
               <Button
@@ -386,13 +408,13 @@ export function KnowledgeView() {
                   setAddTokenOpen(true);
                 }}
               >
-                <Plus className="h-4 w-4" /> Add Token
+                <Plus className="h-4 w-4" /> {t("knowledge.tokens.add")}
               </Button>
             )}
           </div>
 
           {visualTokens.isLoading ? (
-            <div className="space-y-6">
+            <div role="status" aria-label={t("knowledge.tokens.loadingAria")} className="space-y-6">
               <Skeleton className="h-5 w-40" />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -406,12 +428,12 @@ export function KnowledgeView() {
               <section className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Palette className="h-4 w-4 text-teal-700" />
-                  <h2 className="text-sm font-semibold text-slate-900">Approved Palette</h2>
+                  <h2 className="text-sm font-semibold text-slate-900">{t("knowledge.tokens.palette")}</h2>
                   <span className="text-xs text-slate-400">({colorTokens.length})</span>
                 </div>
                 {colorTokens.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
-                    No color tokens yet — the vision stage skips WCAG checks until a palette exists.
+                    {t("knowledge.tokens.emptyColor")}
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -428,7 +450,7 @@ export function KnowledgeView() {
                               </span>
                               {isAdmin && (
                                 <button
-                                  aria-label={`Delete ${token.name}`}
+                                  aria-label={t("knowledge.aria.deleteToken", { name: token.name })}
                                   className="rounded-md p-1 transition-colors hover:bg-black/10"
                                   style={{ color: readableOn(token.value) }}
                                   onClick={() => setTokenToDelete(token)}
@@ -459,12 +481,12 @@ export function KnowledgeView() {
               <section className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Type className="h-4 w-4 text-teal-700" />
-                  <h2 className="text-sm font-semibold text-slate-900">Typography</h2>
+                  <h2 className="text-sm font-semibold text-slate-900">{t("knowledge.tokens.typography")}</h2>
                   <span className="text-xs text-slate-400">({typographyTokens.length})</span>
                 </div>
                 {typographyTokens.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
-                    No typography tokens yet.
+                    {t("knowledge.tokens.emptyTypography")}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -486,7 +508,7 @@ export function KnowledgeView() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label={`Delete ${token.name}`}
+                                aria-label={t("knowledge.aria.deleteToken", { name: token.name })}
                                 className="h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-600"
                                 onClick={() => setTokenToDelete(token)}
                               >
@@ -505,12 +527,12 @@ export function KnowledgeView() {
               <section className="space-y-3">
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-4 w-4 text-teal-700" />
-                  <h2 className="text-sm font-semibold text-slate-900">Logo &amp; Marks</h2>
+                  <h2 className="text-sm font-semibold text-slate-900">{t("knowledge.tokens.logos")}</h2>
                   <span className="text-xs text-slate-400">({logoTokens.length})</span>
                 </div>
                 {logoTokens.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
-                    No logo tokens yet.
+                    {t("knowledge.tokens.emptyLogo")}
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -529,7 +551,7 @@ export function KnowledgeView() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label={`Delete ${token.name}`}
+                                aria-label={t("knowledge.aria.deleteToken", { name: token.name })}
                                 className="h-8 w-8 shrink-0 text-slate-400 hover:bg-red-50 hover:text-red-600"
                                 onClick={() => setTokenToDelete(token)}
                               >
@@ -552,34 +574,32 @@ export function KnowledgeView() {
       <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
         <DialogContent className="max-h-[92vh] overflow-y-auto rounded-2xl sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Ingest document</DialogTitle>
-            <DialogDescription>
-              Paste approved text or import a file. Content is chunked and embedded on save.
-            </DialogDescription>
+            <DialogTitle className="text-slate-900">{t("knowledge.addDoc.title")}</DialogTitle>
+            <DialogDescription>{t("knowledge.addDoc.description")}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="kb-title" className="text-slate-700">Title</Label>
+              <Label htmlFor="kb-title" className="text-slate-700">{t("knowledge.addDoc.titleLabel")}</Label>
               <Input
                 id="kb-title"
                 value={docTitle}
                 onChange={(e) => setDocTitle(e.target.value)}
-                placeholder="e.g. Claims & Substantiation Policy"
+                placeholder={t("knowledge.addDoc.titlePlaceholder")}
                 className="border-slate-200"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-slate-700">Document type</Label>
+              <Label className="text-slate-700">{t("knowledge.addDoc.typeLabel")}</Label>
               <Select value={docType} onValueChange={setDocType}>
                 <SelectTrigger className="w-full border-slate-200">
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder={t("knowledge.selectType")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(DOC_TYPE_META).map(([value, meta]) => (
+                  {Object.keys(DOC_TYPE_META).map((value) => (
                     <SelectItem key={value} value={value}>
-                      {meta.label}
+                      {docTypeLabel(value)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -587,20 +607,20 @@ export function KnowledgeView() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="kb-content" className="text-slate-700">Content</Label>
+              <Label htmlFor="kb-content" className="text-slate-700">{t("knowledge.addDoc.contentLabel")}</Label>
               <Textarea
                 id="kb-content"
                 value={docContent}
                 onChange={(e) => setDocContent(e.target.value)}
-                placeholder="Paste approved guideline text…"
+                placeholder={t("knowledge.addDoc.contentPlaceholder")}
                 className="min-h-[220px] border-slate-200 font-mono text-xs"
               />
             </div>
 
             <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-6 text-center transition-colors hover:border-teal-500 hover:bg-teal-50/40">
               <FileUp className="h-5 w-5 text-slate-400" />
-              <span className="text-xs font-medium text-slate-600">Import a .txt, .md or .csv file</span>
-              <span className="text-[11px] text-slate-400">Title is derived from the filename; text fills the content field.</span>
+              <span className="text-xs font-medium text-slate-600">{t("knowledge.addDoc.importLabel")}</span>
+              <span className="text-[11px] text-slate-400">{t("knowledge.addDoc.importHint")}</span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -613,7 +633,7 @@ export function KnowledgeView() {
 
           <DialogFooter>
             <Button variant="outline" className="border-slate-200" onClick={() => setAddDocOpen(false)}>
-              Cancel
+              {t("common.action.cancel")}
             </Button>
             <Button
               className="bg-teal-700 text-white hover:bg-teal-800"
@@ -621,7 +641,7 @@ export function KnowledgeView() {
               onClick={submitDoc}
             >
               {createGuideline.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Ingest &amp; chunk
+              {t("knowledge.addDoc.submit")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -634,18 +654,18 @@ export function KnowledgeView() {
             <>
               <DialogHeader>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className={cn("border", (DOC_TYPE_META[fullDoc.docType] ?? { cls: "bg-slate-100 text-slate-700 border-slate-200" }).cls)}>
-                    {(DOC_TYPE_META[fullDoc.docType] ?? { label: fullDoc.docType }).label}
+                  <Badge variant="outline" className={cn("border", DOC_TYPE_META[fullDoc.docType]?.cls ?? DOC_TYPE_DEFAULT_CLS)}>
+                    {docTypeLabel(fullDoc.docType)}
                   </Badge>
                   <Badge variant="outline" className="border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-500">
                     v{fullDoc.version}
                   </Badge>
                   <Badge variant="outline" className="border-slate-200 bg-slate-50 text-[10px] text-slate-500">
-                    {fullDoc.chunkCount} chunks
+                    {t("knowledge.docs.chunks", { count: fullDoc.chunkCount })}
                   </Badge>
                 </div>
                 <DialogTitle className="pt-1 text-slate-900">{fullDoc.title}</DialogTitle>
-                <DialogDescription>Full approved content — the retrieval source of truth.</DialogDescription>
+                <DialogDescription>{t("knowledge.fullDoc.description")}</DialogDescription>
               </DialogHeader>
               <div className="max-h-[55vh] overflow-y-auto rounded-lg border border-slate-100 bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-600">
                 <div className="whitespace-pre-wrap">{fullDoc.content}</div>
@@ -659,21 +679,21 @@ export function KnowledgeView() {
       <Dialog open={addTokenOpen} onOpenChange={setAddTokenOpen}>
         <DialogContent className="max-h-[92vh] overflow-y-auto rounded-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-slate-900">Add visual token</DialogTitle>
-            <DialogDescription>Tokens are enforced by the deterministic &amp; vision validators.</DialogDescription>
+            <DialogTitle className="text-slate-900">{t("knowledge.addToken.title")}</DialogTitle>
+            <DialogDescription>{t("knowledge.addToken.description")}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-slate-700">Token type</Label>
+              <Label className="text-slate-700">{t("knowledge.addToken.typeLabel")}</Label>
               <Select value={tokenType} onValueChange={setTokenType}>
                 <SelectTrigger className="w-full border-slate-200">
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder={t("knowledge.selectType")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(TOKEN_TYPE_META).map(([value, meta]) => (
+                  {Object.keys(TOKEN_TYPE_META).map((value) => (
                     <SelectItem key={value} value={value}>
-                      {meta.label}
+                      {tokenTypeLabel(value)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -681,19 +701,25 @@ export function KnowledgeView() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="tok-name" className="text-slate-700">Name</Label>
+              <Label htmlFor="tok-name" className="text-slate-700">{t("knowledge.addToken.nameLabel")}</Label>
               <Input
                 id="tok-name"
                 value={tokenName}
                 onChange={(e) => setTokenName(e.target.value)}
-                placeholder={tokenType === "color" ? "e.g. Deep Teal — primary" : tokenType === "typography" ? "e.g. Headline face" : "e.g. Primary wordmark"}
+                placeholder={
+                  tokenType === "color"
+                    ? t("knowledge.addToken.namePlaceholderColor")
+                    : tokenType === "typography"
+                      ? t("knowledge.addToken.namePlaceholderTypography")
+                      : t("knowledge.addToken.namePlaceholderLogo")
+                }
                 className="border-slate-200"
               />
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="tok-value" className="text-slate-700">
-                {tokenType === "color" ? "Hex value" : tokenType === "typography" ? "Font stack" : "Image URL"}
+                {tokenType === "color" ? t("knowledge.addToken.valueHex") : tokenType === "typography" ? t("knowledge.addToken.valueFont") : t("knowledge.addToken.valueUrl")}
               </Label>
               {tokenType === "color" ? (
                 <div className="flex items-center gap-2">
@@ -726,7 +752,7 @@ export function KnowledgeView() {
             {tokenType === "color" && (
               <div className="space-y-1.5">
                 <Label htmlFor="tok-secondary" className="text-slate-700">
-                  Secondary pairing <span className="font-normal text-slate-400">(optional)</span>
+                  {t("knowledge.addToken.secondaryLabel")} <span className="font-normal text-slate-400">{t("knowledge.optional")}</span>
                 </Label>
                 <Input
                   id="tok-secondary"
@@ -740,13 +766,13 @@ export function KnowledgeView() {
 
             <div className="space-y-1.5">
               <Label htmlFor="tok-notes" className="text-slate-700">
-                Usage notes <span className="font-normal text-slate-400">(optional)</span>
+                {t("knowledge.addToken.notesLabel")} <span className="font-normal text-slate-400">{t("knowledge.optional")}</span>
               </Label>
               <Textarea
                 id="tok-notes"
                 value={tokenNotes}
                 onChange={(e) => setTokenNotes(e.target.value)}
-                placeholder="Where and how this token may be used…"
+                placeholder={t("knowledge.addToken.notesPlaceholder")}
                 className="min-h-[72px] border-slate-200"
               />
             </div>
@@ -754,7 +780,7 @@ export function KnowledgeView() {
 
           <DialogFooter>
             <Button variant="outline" className="border-slate-200" onClick={() => setAddTokenOpen(false)}>
-              Cancel
+              {t("common.action.cancel")}
             </Button>
             <Button
               className="bg-teal-700 text-white hover:bg-teal-800"
@@ -762,7 +788,7 @@ export function KnowledgeView() {
               onClick={submitToken}
             >
               {createToken.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Add token
+              {t("knowledge.addToken.submit")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -772,14 +798,13 @@ export function KnowledgeView() {
       <AlertDialog open={!!docToDelete} onOpenChange={(o) => !o && setDocToDelete(null)}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-slate-900">Delete document?</AlertDialogTitle>
+            <AlertDialogTitle className="text-slate-900">{t("knowledge.delDoc.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{docToDelete?.title}&rdquo; will be removed from the repository and its vector chunks
-              purged. Scans will no longer cite this source.
+              {t("knowledge.delDoc.body", { title: docToDelete?.title ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-slate-200">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="border-slate-200">{t("common.action.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-700"
               disabled={deleteGuideline.isPending}
@@ -787,15 +812,15 @@ export function KnowledgeView() {
                 if (!docToDelete) return;
                 try {
                   await deleteGuideline.mutateAsync(docToDelete.id);
-                  toast.success("Document deleted");
+                  toast.success(t("knowledge.toast.docDeleted"));
                 } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "Delete failed.");
+                  toast.error(err instanceof Error ? err.message : t("knowledge.toast.deleteFail"));
                 }
                 setDocToDelete(null);
               }}
             >
               {deleteGuideline.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Delete
+              {t("common.action.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -805,13 +830,13 @@ export function KnowledgeView() {
       <AlertDialog open={!!tokenToDelete} onOpenChange={(o) => !o && setTokenToDelete(null)}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-slate-900">Delete token?</AlertDialogTitle>
+            <AlertDialogTitle className="text-slate-900">{t("knowledge.delTok.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{tokenToDelete?.name}&rdquo; will no longer be enforced by the brand validators.
+              {t("knowledge.delTok.body", { name: tokenToDelete?.name ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-slate-200">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="border-slate-200">{t("common.action.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-700"
               disabled={deleteToken.isPending}
@@ -819,15 +844,15 @@ export function KnowledgeView() {
                 if (!tokenToDelete) return;
                 try {
                   await deleteToken.mutateAsync(tokenToDelete.id);
-                  toast.success("Token deleted");
+                  toast.success(t("knowledge.toast.tokenDeleted"));
                 } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "Delete failed.");
+                  toast.error(err instanceof Error ? err.message : t("knowledge.toast.deleteFail"));
                 }
                 setTokenToDelete(null);
               }}
             >
               {deleteToken.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Delete
+              {t("common.action.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

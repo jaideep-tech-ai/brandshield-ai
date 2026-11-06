@@ -34,7 +34,9 @@ import {
 import { useAnalytics } from "@/lib/brandshield/client";
 import { useUIStore } from "@/lib/brandshield/store";
 import { cn } from "@/lib/brandshield/utils";
-import { SEVERITY_META, type Severity } from "@/lib/brandshield/types";
+import { useLang } from "@/lib/brandshield/i18n";
+import "@/lib/brandshield/i18n/dict-analytics";
+import { type Severity } from "@/lib/brandshield/types";
 
 const SEVERITY_COLORS: Record<Severity, string> = { critical: "#DC2626", warning: "#D97706", minor: "#0D9488" };
 const CATEGORY_COLORS: Record<string, string> = {
@@ -48,21 +50,22 @@ const CATEGORY_COLORS: Record<string, string> = {
 export function AnalyticsView() {
   const analytics = useAnalytics();
   const setView = useUIStore((s) => s.setView);
+  const { t } = useLang();
   const d = analytics.data;
 
   if (analytics.isLoading || !d) {
     return (
       <div className="flex h-72 items-center justify-center text-slate-400">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Crunching governance data…
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("analytics.loading")}
       </div>
     );
   }
 
   const statCards = [
-    { icon: FileCheck2, label: "Avg compliance score", value: `${d.totals.avgCompliance}/100`, tone: d.totals.avgCompliance >= 85 ? "text-emerald-600" : d.totals.avgCompliance >= 60 ? "text-amber-600" : "text-red-600" },
-    { icon: Gauge, label: "Pre-flight scans", value: String(d.totals.scans), tone: "text-teal-700" },
-    { icon: AlertOctagon, label: "Open findings", value: String(d.totals.openFindings), tone: d.totals.openFindings > 0 ? "text-amber-600" : "text-emerald-600" },
-    { icon: Timer, label: "Avg resolution time", value: `${d.totals.avgResolutionHours}h`, tone: "text-slate-700" },
+    { icon: FileCheck2, label: t("analytics.statAvgCompliance"), value: `${d.totals.avgCompliance}/100`, tone: d.totals.avgCompliance >= 85 ? "text-emerald-600" : d.totals.avgCompliance >= 60 ? "text-amber-600" : "text-red-600" },
+    { icon: Gauge, label: t("analytics.statScans"), value: String(d.totals.scans), tone: "text-teal-700" },
+    { icon: AlertOctagon, label: t("analytics.statOpenFindings"), value: String(d.totals.openFindings), tone: d.totals.openFindings > 0 ? "text-amber-600" : "text-emerald-600" },
+    { icon: Timer, label: t("analytics.statAvgResolution"), value: t("analytics.valueResolution", { h: d.totals.avgResolutionHours }), tone: "text-slate-700" },
   ];
 
   return (
@@ -73,21 +76,21 @@ export function AnalyticsView() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600/10 text-teal-700">
               <BarChart3 className="h-5 w-5" />
             </span>
-            Brand Drift &amp; Rule Friction Analytics
+            {t("analytics.title")}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Continuous governance — where content drifts, which rules get violated, and which policies confuse your teams.
+            {t("analytics.subtitle")}
           </p>
         </div>
         <Badge variant="outline" className="gap-1 border-teal-200 bg-teal-50 text-teal-700">
-          <Repeat2 className="h-3.5 w-3.5" /> Bi-directional feedback loop active
+          <Repeat2 className="h-3.5 w-3.5" /> {t("analytics.feedbackBadge")}
         </Badge>
       </div>
 
       {/* Stat band */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {statCards.map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+          <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <Card>
               <CardContent className="p-4 sm:p-5">
                 <div className="flex items-center justify-between">
@@ -105,7 +108,7 @@ export function AnalyticsView() {
         {/* Scan trend */}
         <Card className="min-w-0 lg:col-span-2">
           <CardContent className="p-5">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><TrendingUp className="h-4 w-4 text-teal-700" /> Governance velocity — last 14 days</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><TrendingUp className="h-4 w-4 text-teal-700" /> {t("analytics.chartVelocity")}</h3>
             <div className="mt-4 h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={d.scanTrend} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
@@ -123,8 +126,8 @@ export function AnalyticsView() {
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94A3B8" }} interval={2} />
                   <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} allowDecimals={false} />
                   <ChartTooltip contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 }} />
-                  <Area type="monotone" dataKey="scans" stroke="#0D9488" strokeWidth={2} fill="url(#scanFill)" name="Scans" />
-                  <Area type="monotone" dataKey="findings" stroke="#D97706" strokeWidth={2} fill="url(#findFill)" name="Findings" />
+                  <Area type="monotone" dataKey="scans" stroke="#0D9488" strokeWidth={2} fill="url(#scanFill)" name={t("analytics.seriesScans")} />
+                  <Area type="monotone" dataKey="findings" stroke="#D97706" strokeWidth={2} fill="url(#findFill)" name={t("analytics.seriesFindings")} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -135,12 +138,12 @@ export function AnalyticsView() {
         {/* Severity mix */}
         <Card>
           <CardContent className="p-5">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><AlertOctagon className="h-4 w-4 text-teal-700" /> Severity mix</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><AlertOctagon className="h-4 w-4 text-teal-700" /> {t("analytics.chartSeverity")}</h3>
             <div className="mt-2 h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={d.severityBreakdown.filter((s) => s.count > 0).map((s) => ({ name: SEVERITY_META[s.severity].label.split(" — ")[0], value: s.count, severity: s.severity }))}
+                    data={d.severityBreakdown.filter((s) => s.count > 0).map((s) => ({ name: t(`common.severity.${s.severity}`).split(" — ")[0], value: s.count, severity: s.severity }))}
                     dataKey="value"
                     innerRadius={52}
                     outerRadius={80}
@@ -164,9 +167,9 @@ export function AnalyticsView() {
         {/* Top violated rules */}
         <Card className="min-w-0">
           <CardContent className="p-5">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><ArrowUpDown className="h-4 w-4 text-teal-700" /> Top violated rules</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><ArrowUpDown className="h-4 w-4 text-teal-700" /> {t("analytics.chartTopRules")}</h3>
             {d.topViolatedRules.length === 0 ? (
-              <p className="mt-6 text-center text-sm text-slate-400">No violations recorded yet.</p>
+              <p className="mt-6 text-center text-sm text-slate-400">{t("analytics.noViolations")}</p>
             ) : (
               <div className="mt-4 h-56">
                 <ResponsiveContainer width="100%" height="100%">
@@ -176,7 +179,7 @@ export function AnalyticsView() {
                     <YAxis type="category" dataKey="name" width={30} tick={{ fontSize: 10, fill: "#94A3B8" }} />
                     <ChartTooltip
                       contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0", fontSize: 12 }}
-                      formatter={(value) => [`${value} violations`, "Count"]}
+                      formatter={(value) => [t("analytics.violationsCount", { n: String(value) }), t("analytics.count")]}
                       labelFormatter={(_l, payload) => {
                         const p = payload?.[0]?.payload as { rule?: string } | undefined;
                         return p?.rule?.slice(0, 80) ?? "";
@@ -205,9 +208,9 @@ export function AnalyticsView() {
         {/* Department scores */}
         <Card>
           <CardContent className="p-5">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><Gauge className="h-4 w-4 text-teal-700" /> Department compliance scores</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800"><Gauge className="h-4 w-4 text-teal-700" /> {t("analytics.chartDept")}</h3>
             {d.departmentScores.length === 0 ? (
-              <p className="mt-6 text-center text-sm text-slate-400">No scored submissions yet.</p>
+              <p className="mt-6 text-center text-sm text-slate-400">{t("analytics.noDeptScores")}</p>
             ) : (
               <div className="mt-4 space-y-4">
                 {d.departmentScores.map((dept) => (
@@ -215,7 +218,7 @@ export function AnalyticsView() {
                     <div className="mb-1 flex items-center justify-between text-xs">
                       <span className="font-medium text-slate-600">{dept.department}</span>
                       <span className={cn("font-semibold", dept.avgScore >= 85 ? "text-emerald-600" : dept.avgScore >= 60 ? "text-amber-600" : "text-red-600")}>
-                        {dept.avgScore} <span className="text-[10px] font-normal text-slate-400">· {dept.submissions} drafts</span>
+                        {dept.avgScore} <span className="text-[10px] font-normal text-slate-400">· {t("analytics.draftsCount", { n: dept.submissions })}</span>
                       </span>
                     </div>
                     <Progress value={dept.avgScore} className={cn("h-2", dept.avgScore < 60 && "[&>div]:bg-red-500", dept.avgScore >= 60 && dept.avgScore < 85 && "[&>div]:bg-amber-500")} />
@@ -232,12 +235,12 @@ export function AnalyticsView() {
         <CardContent className="p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              <ShieldQuestion className="h-4 w-4 text-amber-600" /> Bi-directional feedback — rules flagged as ambiguous / high friction
+              <ShieldQuestion className="h-4 w-4 text-amber-600" /> {t("analytics.ambiguousTitle")}
             </h3>
-            <Badge variant="outline" className="border-amber-300 bg-amber-100/60 text-[10px] text-amber-800">repeated triggers across teams → refine the rule</Badge>
+            <Badge variant="outline" className="border-amber-300 bg-amber-100/60 text-[10px] text-amber-800">{t("analytics.ambiguousHint")}</Badge>
           </div>
           {d.ambiguousPolicies.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">No policy friction detected — teams are finding the guidelines clear.</p>
+            <p className="mt-4 text-sm text-slate-500">{t("analytics.noFriction")}</p>
           ) : (
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {d.ambiguousPolicies.map((p, i) => (
@@ -245,19 +248,19 @@ export function AnalyticsView() {
                   <div className="flex items-start justify-between gap-2">
                     <p className="line-clamp-2 text-xs font-medium leading-relaxed text-slate-700">{p.rule}</p>
                     <Badge variant="outline" className={cn("shrink-0 text-[10px]", p.frictionScore >= 0.6 ? "border-red-200 bg-red-50 text-red-600" : p.frictionScore >= 0.35 ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-50 text-slate-500")}>
-                      {p.frictionScore >= 0.6 ? "Ambiguous" : p.frictionScore >= 0.35 ? "High friction" : "Watch"}
+                      {p.frictionScore >= 0.6 ? t("analytics.frictionAmbiguous") : p.frictionScore >= 0.35 ? t("analytics.frictionHigh") : t("analytics.frictionWatch")}
                     </Badge>
                   </div>
                   <p className="mt-1 text-[11px] text-slate-400">{p.sourceDoc}</p>
                   <div className="mt-2.5 flex items-center gap-4 text-[11px] text-slate-500">
-                    <span>{p.triggers} triggers</span>
-                    <span>{Math.round(p.overrideRate * 100)}% overridden</span>
-                    <span>{Math.round(p.openRate * 100)}% still open</span>
+                    <span>{t("analytics.triggersCount", { n: p.triggers })}</span>
+                    <span>{t("analytics.overriddenPct", { n: Math.round(p.overrideRate * 100) })}</span>
+                    <span>{t("analytics.openPct", { n: Math.round(p.openRate * 100) })}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <Progress value={p.frictionScore * 100} className="h-1.5 flex-1 [&>div]:bg-amber-500" />
                     <button onClick={() => setView("knowledge")} className="shrink-0 text-[11px] font-medium text-teal-700 underline-offset-2 hover:underline">
-                      Refine guideline →
+                      {t("analytics.refineGuideline")}
                     </button>
                   </div>
                 </motion.div>

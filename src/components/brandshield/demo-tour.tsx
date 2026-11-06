@@ -4,91 +4,93 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "reac
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
+  BarChart3,
   ClipboardCheck,
+  CreditCard,
   Database,
   FileSearch,
+  Flag,
+  Gauge,
+  GitBranch,
   GraduationCap,
+  HeartPulse,
+  ListOrdered,
+  Lock,
   PartyPopper,
+  PenLine,
+  Radar,
   ScanSearch,
+  Settings,
   Sparkles,
-  BarChart3,
   X,
+  type LucideIcon,
 } from "lucide-react";
+import { useLang } from "@/lib/brandshield/i18n";
 import { useUIStore, type ViewKey } from "@/lib/brandshield/store";
 import type { Role } from "@/lib/brandshield/types";
 import { cn } from "@/lib/brandshield/utils";
 import { Button } from "@/components/ui/button";
+import "@/lib/brandshield/i18n/dict-tour";
 
-export const TOUR_STORAGE_KEY = "bs_tour_done_v2";
+// Per-role storage: switching demo personas replays that role's own tour.
+export function tourKey(role: Role) {
+  return `bs_tour_done_v3_${role}`;
+}
 
 interface TourStep {
   view: ViewKey;
-  target: string | null; // [data-tour=…] selector; null = centered completion card
-  icon: typeof Sparkles;
-  title: string;
-  body: string;
+  target: string | null; // [data-tour=…] selector; null = centered card (intro / completion)
+  icon: LucideIcon;
+  titleKey: string;
+  bodyKey: string;
 }
 
+// ─── Role-specific scripts (copy lives in dict-tour → tour.<role>.s<n>.*) ────
+
 function buildSteps(role: Role): TourStep[] {
-  const steps: TourStep[] = [
-    {
-      view: "dashboard",
-      target: "[data-tour='stats']",
-      icon: Sparkles,
-      title: "Your governance cockpit",
-      body:
-        role === "creator" || role === "contractor"
-          ? "Live counters for your submissions, open findings, average compliance score and review queue — all updating in real time."
-          : "Live counters for team submissions, open findings, average compliance score and the review queue — all updating in real time.",
-    },
-    {
-      view: "dashboard",
-      target: "[data-tour='quick-actions']",
-      icon: Sparkles,
-      title: "One-click shortcuts",
-      body: "Every common task is one click away. Try “Run a pre-flight scan” — we'll walk you through it next.",
-    },
-    {
-      view: "knowledge",
-      target: "[data-tour='page-root']",
-      icon: Database,
-      title: "Stage 1 · Ground-truth repository",
-      body: "Upload brand guidelines, product facts and visual tokens. Documents are chunked and indexed so every future finding can cite a verbatim rule.",
-    },
-    {
-      view: "scanner",
-      target: "[data-tour='page-root']",
-      icon: ScanSearch,
-      title: "Stage 2 · Pre-flight scanner",
-      body: "Paste copy or drop a banner. A deterministic pre-filter runs first (<100 ms, no AI cost), then the RAG + vision pipeline verifies claims, tone and color contrast.",
-    },
-    {
-      view: "findings",
-      target: "[data-tour='page-root']",
-      icon: FileSearch,
-      title: "Stage 3 · Explainable findings",
-      body: "Each flag shows the exact phrase, the rule it broke, why it matters — and a one-click rewrite that fixes intent, not just words.",
-    },
-    {
-      view: "approvals",
-      target: "[data-tour='page-root']",
-      icon: ClipboardCheck,
-      title: "Stage 4 · Sign-off & audit trail",
-      body: "Reviewers compare versions side-by-side, approve or request changes, and every decision is hashed into a tamper-evident SHA-256 audit chain.",
-    },
-  ];
-
-  if (role === "reviewer" || role === "admin") {
-    steps.push({
-      view: "analytics",
-      target: "[data-tour='page-root']",
-      icon: BarChart3,
-      title: "Stage 5 · Drift analytics",
-      body: "Spot where brand drift happens, which departments are fastest, and which rules keep triggering — a signal that a rule is ambiguous or too strict.",
-    });
+  switch (role) {
+    case "creator":
+      return [
+        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.creator.s1.title", bodyKey: "tour.creator.s1.body" },
+        { view: "dashboard", target: "[data-tour='composer']", icon: PenLine, titleKey: "tour.creator.s2.title", bodyKey: "tour.creator.s2.body" },
+        { view: "dashboard", target: "[data-tour='pipeline']", icon: GitBranch, titleKey: "tour.creator.s3.title", bodyKey: "tour.creator.s3.body" },
+        { view: "dashboard", target: "[data-tour='attention']", icon: Flag, titleKey: "tour.creator.s4.title", bodyKey: "tour.creator.s4.body" },
+        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.creator.s5.title", bodyKey: "tour.creator.s5.body" },
+        { view: "scanner", target: "[data-tour='page-root']", icon: ScanSearch, titleKey: "tour.creator.s6.title", bodyKey: "tour.creator.s6.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.creator.s7.title", bodyKey: "tour.creator.s7.body" },
+        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.creator.s8.title", bodyKey: "tour.creator.s8.body" },
+      ];
+    case "reviewer":
+      return [
+        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.reviewer.s1.title", bodyKey: "tour.reviewer.s1.body" },
+        { view: "dashboard", target: "[data-tour='queue']", icon: ListOrdered, titleKey: "tour.reviewer.s2.title", bodyKey: "tour.reviewer.s2.body" },
+        { view: "dashboard", target: "[data-tour='risk']", icon: Radar, titleKey: "tour.reviewer.s3.title", bodyKey: "tour.reviewer.s3.body" },
+        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.reviewer.s4.title", bodyKey: "tour.reviewer.s4.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.reviewer.s5.title", bodyKey: "tour.reviewer.s5.body" },
+        { view: "analytics", target: "[data-tour='page-root']", icon: BarChart3, titleKey: "tour.reviewer.s6.title", bodyKey: "tour.reviewer.s6.body" },
+      ];
+    case "contractor":
+      return [
+        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.contractor.s1.title", bodyKey: "tour.contractor.s1.body" },
+        { view: "dashboard", target: "[data-tour='sandbox-hero']", icon: Lock, titleKey: "tour.contractor.s2.title", bodyKey: "tour.contractor.s2.body" },
+        { view: "dashboard", target: "[data-tour='steps']", icon: ListOrdered, titleKey: "tour.contractor.s3.title", bodyKey: "tour.contractor.s3.body" },
+        { view: "scanner", target: "[data-tour='page-root']", icon: ScanSearch, titleKey: "tour.contractor.s4.title", bodyKey: "tour.contractor.s4.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.contractor.s5.title", bodyKey: "tour.contractor.s5.body" },
+        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.contractor.s6.title", bodyKey: "tour.contractor.s6.body" },
+      ];
+    case "admin":
+      return [
+        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.admin.s1.title", bodyKey: "tour.admin.s1.body" },
+        { view: "dashboard", target: "[data-tour='kpi']", icon: Gauge, titleKey: "tour.admin.s2.title", bodyKey: "tour.admin.s2.body" },
+        { view: "dashboard", target: "[data-tour='health']", icon: HeartPulse, titleKey: "tour.admin.s3.title", bodyKey: "tour.admin.s3.body" },
+        { view: "dashboard", target: "[data-tour='kb']", icon: Database, titleKey: "tour.admin.s4.title", bodyKey: "tour.admin.s4.body" },
+        { view: "dashboard", target: "[data-tour='billing-snap']", icon: CreditCard, titleKey: "tour.admin.s5.title", bodyKey: "tour.admin.s5.body" },
+        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.admin.s6.title", bodyKey: "tour.admin.s6.body" },
+        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.admin.s7.title", bodyKey: "tour.admin.s7.body" },
+        { view: "analytics", target: "[data-tour='page-root']", icon: BarChart3, titleKey: "tour.admin.s8.title", bodyKey: "tour.admin.s8.body" },
+        { view: "settings", target: "[data-tour='page-root']", icon: Settings, titleKey: "tour.admin.s9.title", bodyKey: "tour.admin.s9.body" },
+      ];
   }
-
-  return steps;
 }
 
 interface Rect {
@@ -100,8 +102,17 @@ interface Rect {
 
 export function DemoTour({ role }: { role: Role }) {
   const { tourOpen, setTourOpen, view, setView } = useUIStore();
+  const { t } = useLang();
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  const [lastRole, setLastRole] = useState(role);
+
+  // A persona switch mid-tour restarts that role's own script.
+  // (Adjust state during render — the React-endorsed alternative to effects.)
+  if (lastRole !== role) {
+    setLastRole(role);
+    setStepIndex(0);
+  }
 
   // Stable identity across renders — otherwise the step effect would
   // re-fire every render and loop forever.
@@ -109,16 +120,17 @@ export function DemoTour({ role }: { role: Role }) {
   const step = steps[Math.min(stepIndex, steps.length - 1)];
   const isLast = stepIndex === steps.length;
   const total = steps.length + 1;
+  const roleLabel = t(`common.role.${role}`);
 
   const finish = useCallback(() => {
     try {
-      window.localStorage.setItem(TOUR_STORAGE_KEY, "1");
+      window.localStorage.setItem(tourKey(role), "1");
     } catch {
       /* private mode — ignore */
     }
     setTourOpen(false);
     setView("dashboard");
-  }, [setTourOpen, setView]);
+  }, [role, setTourOpen, setView]);
 
   const start = useCallback(() => {
     setStepIndex(0);
@@ -132,19 +144,19 @@ export function DemoTour({ role }: { role: Role }) {
     return () => window.removeEventListener("brandshield:start-tour", handler);
   }, [start]);
 
-  // Auto-start on first ever login
+  // Auto-start on this role's first ever login
   useEffect(() => {
     if (!tourOpen) {
       try {
-        if (!window.localStorage.getItem(TOUR_STORAGE_KEY)) {
-          const t = window.setTimeout(() => start(), 700);
-          return () => window.clearTimeout(t);
+        if (!window.localStorage.getItem(tourKey(role))) {
+          const timer = window.setTimeout(() => start(), 700);
+          return () => window.clearTimeout(timer);
         }
       } catch {
         /* ignore */
       }
     }
-  }, [tourOpen, start]);
+  }, [tourOpen, start, role]);
 
   // Navigate to the step's view, then locate the spotlight target
   useEffect(() => {
@@ -179,11 +191,15 @@ export function DemoTour({ role }: { role: Role }) {
       }
     };
     // Clear the previous spotlight and re-locate asynchronously (avoids
-    // synchronous setState inside the effect body).
-    const timeout = window.setTimeout(() => {
-      setRect(null);
-      if (!isLast) tick();
-    }, isLast ? 0 : 420); // let AnimatePresence switch views
+    // synchronous setState inside the effect body). Target-less intro steps
+    // and the completion card center immediately.
+    const timeout = window.setTimeout(
+      () => {
+        setRect(null);
+        if (!isLast && step.target) tick();
+      },
+      isLast || !step.target ? 0 : 420 // let AnimatePresence switch views
+    );
     return () => {
       window.clearTimeout(timeout);
       window.cancelAnimationFrame(raf);
@@ -240,7 +256,12 @@ export function DemoTour({ role }: { role: Role }) {
     : undefined;
 
   return (
-    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Guided product tour">
+    <div
+      className="fixed inset-0 z-[70]"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("tour.aria.dialog")}
+    >
       {/* Spotlight + scrim — glides smoothly between steps */}
       {rect && (
         <motion.div
@@ -266,7 +287,7 @@ export function DemoTour({ role }: { role: Role }) {
         </motion.div>
       )}
 
-      {/* Centered scrim when no target (welcome-adjacent & completion steps) */}
+      {/* Centered scrim when no target (intro & completion steps) */}
       {!rect && <div className="absolute inset-0 bg-slate-950/55" />}
 
       {/* Tooltip card */}
@@ -293,17 +314,17 @@ export function DemoTour({ role }: { role: Role }) {
                 </span>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-widest text-teal-600">
-                    {isLast ? "You're all set" : `Step ${stepIndex + 1} of ${total}`}
+                    {isLast ? t("tour.allSet") : t("tour.stepCounter", { x: stepIndex + 1, y: total })}
                   </p>
                   <h2 className="text-sm font-semibold leading-tight text-slate-900">
-                    {isLast ? "Tour complete — you're ready to ship on-brand" : step.title}
+                    {isLast ? t("tour.complete.title") : t(step.titleKey, { role: roleLabel })}
                   </h2>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={finish}
-                aria-label="Skip tour"
+                aria-label={t("tour.aria.skip")}
                 className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               >
                 <X className="size-4" />
@@ -312,8 +333,8 @@ export function DemoTour({ role }: { role: Role }) {
 
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
               {isLast
-                ? "Jump in with the demo personas on the sign-in screen — each one shows a different role's workspace. You can replay this tour anytime from the 🎓 button in the header."
-                : step.body}
+                ? t(`tour.${role}.done.body`, { role: roleLabel })
+                : t(step.bodyKey, { role: roleLabel })}
             </p>
 
             {/* Progress dots */}
@@ -331,12 +352,12 @@ export function DemoTour({ role }: { role: Role }) {
 
             <div className="mt-4 flex items-center justify-between">
               <Button variant="ghost" size="sm" onClick={finish} className="text-slate-500 hover:text-slate-800">
-                Skip tour
+                {t("tour.btn.skip")}
               </Button>
               <div className="flex items-center gap-2">
                 {stepIndex > 0 && !isLast && (
                   <Button variant="outline" size="sm" onClick={back} className="rounded-lg">
-                    Back
+                    {t("tour.btn.back")}
                   </Button>
                 )}
                 <Button
@@ -344,7 +365,7 @@ export function DemoTour({ role }: { role: Role }) {
                   onClick={next}
                   className="gap-1.5 rounded-lg bg-teal-700 text-white hover:bg-teal-800"
                 >
-                  {isLast ? "Finish" : stepIndex === 0 ? "Let's go" : "Next"}
+                  {isLast ? t("tour.btn.finish") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}
                   {!isLast && <ArrowRight className="size-3.5" />}
                 </Button>
               </div>
