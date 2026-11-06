@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { markAuthHint, useDemoLogin, useLogin, useRegister } from "@/lib/brandshield/client";
 import { firebaseEmailSignIn, firebaseEmailSignUp, isFirebaseConfigured } from "@/lib/brandshield/firebase";
+import { warmSignedInChunksWhenIdle } from "@/components/brandshield/lazy-views";
 import type { Role, SessionUser } from "@/lib/brandshield/types";
 import { cn, initials } from "@/lib/brandshield/utils";
 import { LangToggle, useLang } from "@/lib/brandshield/i18n";
@@ -146,6 +147,12 @@ export function AuthView({ onBack }: { onBack: () => void }) {
   const register = useRegister();
   const queryClient = useQueryClient();
   const busy = login.isPending || register.isPending || demo.isPending;
+
+  // While the user types their credentials, prefetch the signed-in chunks at
+  // idle time — first sign-in swaps into the dashboard with zero chunk wait.
+  useEffect(() => {
+    warmSignedInChunksWhenIdle();
+  }, []);
 
   // Swap straight into the dashboard SPA-style — no full page reload, so the
   // session query is satisfied from the synced user and the shell mounts

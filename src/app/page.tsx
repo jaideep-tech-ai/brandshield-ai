@@ -3,7 +3,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-import dynamic from "next/dynamic";
 import { useSession, hasAuthHint } from "@/lib/brandshield/client";
 import { useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-dash-a";
@@ -11,64 +10,19 @@ import { useUIStore } from "@/lib/brandshield/store";
 import { Providers } from "@/components/brandshield/providers";
 import { Landing } from "@/components/brandshield/landing";
 import { AuthView } from "@/components/brandshield/auth-view";
-
-// ─── Signed-in code splitting ────────────────────────────────────────────────
-// The landing + auth screen ship in the initial bundle so the first paint and
-// the "Get Started" click are instant. Everything behind sign-in is split
-// into lazy chunks that download in parallel with the session check (warm-up
-// below), so returning users never wait on them either.
-
-const loadShell = () => import("@/components/brandshield/shell").then((m) => ({ default: m.Shell }));
-const loadDemoTour = () => import("@/components/brandshield/demo-tour").then((m) => ({ default: m.DemoTour }));
-const loadRoleDashboard = () =>
-  import("@/components/brandshield/dashboards/role-dashboard").then((m) => ({ default: m.RoleDashboard }));
-const loadKnowledge = () => import("@/components/brandshield/knowledge-view").then((m) => ({ default: m.KnowledgeView }));
-const loadScanner = () => import("@/components/brandshield/scanner-view").then((m) => ({ default: m.ScannerView }));
-const loadFindings = () => import("@/components/brandshield/findings-view").then((m) => ({ default: m.FindingsView }));
-const loadApprovals = () => import("@/components/brandshield/approvals-view").then((m) => ({ default: m.ApprovalsView }));
-const loadAnalytics = () => import("@/components/brandshield/analytics-view").then((m) => ({ default: m.AnalyticsView }));
-const loadBilling = () => import("@/components/brandshield/billing-view").then((m) => ({ default: m.BillingView }));
-const loadSettings = () => import("@/components/brandshield/settings-view").then((m) => ({ default: m.SettingsView }));
-
-function ChunkFallback({ full }: { full?: boolean }) {
-  return (
-    <div
-      className={
-        full
-          ? "flex min-h-screen items-center justify-center bg-[#FAFAF9]"
-          : "flex min-h-[50vh] items-center justify-center"
-      }
-    >
-      <Loader2 className="size-6 animate-spin text-teal-600" />
-    </div>
-  );
-}
-
-const Shell = dynamic(loadShell, { ssr: false, loading: () => <ChunkFallback full /> });
-const RoleDashboard = dynamic(loadRoleDashboard, { ssr: false, loading: () => <ChunkFallback /> });
-const KnowledgeView = dynamic(loadKnowledge, { ssr: false, loading: () => <ChunkFallback /> });
-const ScannerView = dynamic(loadScanner, { ssr: false, loading: () => <ChunkFallback /> });
-const FindingsView = dynamic(loadFindings, { ssr: false, loading: () => <ChunkFallback /> });
-const ApprovalsView = dynamic(loadApprovals, { ssr: false, loading: () => <ChunkFallback /> });
-const AnalyticsView = dynamic(loadAnalytics, { ssr: false, loading: () => <ChunkFallback /> });
-const BillingView = dynamic(loadBilling, { ssr: false, loading: () => <ChunkFallback /> });
-const SettingsView = dynamic(loadSettings, { ssr: false, loading: () => <ChunkFallback /> });
-// Overlay component — mount silently once the chunk arrives.
-const DemoTour = dynamic(loadDemoTour, { ssr: false });
-
-/** Download the signed-in chunks ahead of time (idempotent — import() caches). */
-function warmSignedInChunks() {
-  void loadShell();
-  void loadDemoTour();
-  void loadRoleDashboard();
-  void loadKnowledge();
-  void loadScanner();
-  void loadFindings();
-  void loadApprovals();
-  void loadAnalytics();
-  void loadBilling();
-  void loadSettings();
-}
+import {
+  Shell,
+  DemoTour,
+  RoleDashboard,
+  KnowledgeView,
+  ScannerView,
+  FindingsView,
+  ApprovalsView,
+  AnalyticsView,
+  BillingView,
+  SettingsView,
+  warmSignedInChunks,
+} from "@/components/brandshield/lazy-views";
 
 export default function Home() {
   return (
