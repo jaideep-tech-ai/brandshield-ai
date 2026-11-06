@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import ZAI from "z-ai-web-dev-sdk";
 import { db } from "@/lib/db";
 import type { Finding, StageAResult, StageBResult } from "../types";
-import { contrastRatio, isNeutralColor, colorDistance, readableOn } from "../utils";
+import { contrastRatio, isNeutralColor, colorDistance, readableOn } from "../shared";
 
 // ─── Text utilities ──────────────────────────────────────────────────────────
 
