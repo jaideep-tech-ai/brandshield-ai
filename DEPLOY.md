@@ -116,7 +116,9 @@ karti hain. App kabhi 500 nahi marega.
 - ✅ **Prisma engine**: `rhel-openssl-3.0.x` binaryTarget — Vercel runtime
   ke liye pre-bundled, cold start pe engine download nahi hota
 - ✅ **`maxDuration = 60`**: scan route Hobby plan limit ke andar
-- ✅ **Prisma generate**: `postinstall` hook — har deploy pe client fresh
+- ✅ **Prisma generate (schema-aware)**: `postinstall` hook automatically
+  builds the **PostgreSQL client on Vercel** (`DATABASE_URL` postgres se
+  shuru hota hai) aur SQLite client sandbox mein — koi manual step nahi
 - ✅ **Production logging off**: query logs sirf dev mein
 
 ---
@@ -135,7 +137,7 @@ karti hain. App kabhi 500 nahi marega.
 
 | Problem | Fix |
 |---|---|
-| `Query engine library not found` | `bun run db:sync:pg` dobara chalao (binaryTargets fix ho jayega) + redeploy |
+| `Query engine library not found` | Ab automatic fix ho chuka — `postinstall` DATABASE_URL dekh kar sahi Prisma client banata hai. Phir bhi issue ho toh redeploy karo |
 | `P1001: Can't reach database` | `DATABASE_URL` mein pooler URL (6543) hai? Password mein special chars hain toh URL-encode karo |
 | Login pe 500 | `SESSION_SECRET` env var set hai? `DIRECT_URL` bhi set karo |
 | Build fail: prisma | Vercel → Settings → Environment Variables mein `DIRECT_URL` add karo (postinstall generate ke liye chahiye) |
