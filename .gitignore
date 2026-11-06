@@ -56,3 +56,5 @@ server.log
 db/*.db
 *.sqlite
 upload/
+# allow the template itself
+!.env.example
