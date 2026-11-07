@@ -1,0 +1,676 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState, type FormEvent } from "react";
+     4→import { AnimatePresence, motion } from "framer-motion";
+     5→import {
+     6→  ArrowLeft,
+     7→  ArrowRight,
+     8→  BadgeCheck,
+     9→  Building2,
+    10→  Eye,
+    11→  EyeOff,
+    12→  FileSearch,
+    13→  Flame,
+    14→  Fingerprint,
+    15→  Loader2,
+    16→  Lock,
+    17→  Mail,
+    18→  ShieldCheck,
+    19→  UserRound,
+    20→  Users,
+    21→} from "lucide-react";
+    22→import { toast } from "sonner";
+    23→import { useQueryClient } from "@tanstack/react-query";
+    24→import { markAuthHint, useDemoLogin, useLogin, useRegister } from "@/lib/brandshield/client";
+    25→import { firebaseEmailSignIn, firebaseEmailSignUp, isFirebaseConfigured } from "@/lib/brandshield/firebase";
+    26→import { warmSignedInChunksWhenIdle } from "@/components/brandshield/lazy-views";
+    27→import type { Role, SessionUser } from "@/lib/brandshield/types";
+    28→import { cn, initials } from "@/lib/brandshield/utils";
+    29→import { LangToggle, useLang } from "@/lib/brandshield/i18n";
+    30→import "@/lib/brandshield/i18n/dict-auth";
+    31→import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+    32→import { Badge } from "@/components/ui/badge";
+    33→import { Button } from "@/components/ui/button";
+    34→import { Input } from "@/components/ui/input";
+    35→import { Label } from "@/components/ui/label";
+    36→import { Separator } from "@/components/ui/separator";
+    37→
+    38→// ─── Demo personas (names/emails are data — never translated) ────────────────
+    39→
+    40→const PERSONAS = [
+    41→  {
+    42→    email: "ava@nimbus.demo",
+    43→    name: "Ava Chen",
+    44→    role: "creator",
+    45→    avatarColor: "#0F766E",
+    46→  },
+    47→  {
+    48→    email: "marcus@nimbus.demo",
+    49→    name: "Marcus Reed",
+    50→    role: "reviewer",
+    51→    avatarColor: "#B45309",
+    52→  },
+    53→  {
+    54→    email: "priya@pixelworks.demo",
+    55→    name: "Priya Sharma",
+    56→    role: "contractor",
+    57→    avatarColor: "#7C2D12",
+    58→  },
+    59→  {
+    60→    email: "elena@nimbus.demo",
+    61→    name: "Elena Rodriguez",
+    62→    role: "admin",
+    63→    avatarColor: "#4D7C0F",
+    64→  },
+    65→] as const;
+    66→
+    67→const ROLE_BADGE: Record<Role, string> = {
+    68→  creator: "border-teal-200 bg-teal-50 text-teal-700",
+    69→  reviewer: "border-amber-200 bg-amber-50 text-amber-700",
+    70→  contractor: "border-orange-200 bg-orange-50 text-orange-700",
+    71→  admin: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    72→};
+    73→
+    74→const ROLE_OPTIONS: Role[] = ["creator", "reviewer", "contractor", "admin"];
+    75→
+    76→const TRUST_MARKERS = [
+    77→  {
+    78→    icon: FileSearch,
+    79→    titleKey: "auth.trust.citations.title",
+    80→    descKey: "auth.trust.citations.desc",
+    81→  },
+    82→  {
+    83→    icon: Fingerprint,
+    84→    titleKey: "auth.trust.audit.title",
+    85→    descKey: "auth.trust.audit.desc",
+    86→  },
+    87→  {
+    88→    icon: ShieldCheck,
+    89→    titleKey: "auth.trust.retention.title",
+    90→    descKey: "auth.trust.retention.desc",
+    91→  },
+    92→] as const;
+    93→
+    94→type Mode = "signin" | "signup";
+    95→
+    96→// Server error codes that have localized translations (see dict-auth "err.*").
+    97→const KNOWN_ERR_CODES = new Set([
+    98→  "invalid-email",
+    99→  "missing-password",
+   100→  "weak-password",
+   101→  "missing-name",
+   102→  "email-already-in-use",
+   103→  "user-not-found",
+   104→  "wrong-password",
+   105→  "invalid-credential",
+   106→  "missing-credentials",
+   107→  "too-many-requests",
+   108→]);
+   109→
+   110→// ─── Auth view ───────────────────────────────────────────────────────────────
+   111→
+   112→export function AuthView({ onBack }: { onBack: () => void }) {
+   113→  const { t } = useLang();
+   114→  const [mode, setMode] = useState<Mode>("signin");
+   115→
+   116→  const [email, setEmail] = useState("");
+   117→  const [password, setPassword] = useState("");
+   118→  const [showPassword, setShowPassword] = useState(false);
+   119→
+   120→  const [name, setName] = useState("");
+   121→  const [confirm, setConfirm] = useState("");
+   122→  const [role, setRole] = useState<Role>("creator");
+   123→  const [department, setDepartment] = useState("");
+   124→  const [organizationName, setOrganizationName] = useState("");
+   125→
+   126→  // Demo personas only exist when the deployment seeds them (DEMO_SEED not
+   127→  // set to "off"). Production deployments start clean — the buttons stay
+   128→  // hidden there and users sign up for real. null = still checking (hidden).
+   129→  const [demoEnabled, setDemoEnabled] = useState<boolean | null>(null);
+   130→  useEffect(() => {
+   131→    let cancelled = false;
+   132→    fetch("/api/auth/demo-status")
+   133→      .then((r) => (r.ok ? r.json() : { demoEnabled: false }))
+   134→      .then((j: { demoEnabled?: boolean }) => {
+   135→        if (!cancelled) setDemoEnabled(!!j.demoEnabled);
+   136→      })
+   137→      .catch(() => {
+   138→        if (!cancelled) setDemoEnabled(false);
+   139→      });
+   140→    return () => {
+   141→      cancelled = true;
+   142→    };
+   143→  }, []);
+   144→
+   145→  const demo = useDemoLogin();
+   146→  const login = useLogin();
+   147→  const register = useRegister();
+   148→  const queryClient = useQueryClient();
+   149→  const busy = login.isPending || register.isPending || demo.isPending;
+   150→
+   151→  // While the user types their credentials, prefetch the signed-in chunks at
+   152→  // idle time — first sign-in swaps into the dashboard with zero chunk wait.
+   153→  useEffect(() => {
+   154→    warmSignedInChunksWhenIdle();
+   155→  }, []);
+   156→
+   157→  // Swap straight into the dashboard SPA-style — no full page reload, so the
+   158→  // session query is satisfied from the synced user and the shell mounts
+   159→  // immediately (signed-in chunks are already warmed by the shell itself).
+   160→  function finishFirebaseSession(user: SessionUser) {
+   161→    markAuthHint();
+   162→    queryClient.setQueryData(["session"], user);
+   163→  }
+   164→  const rawError = (mode === "signin" ? login.error : register.error) ?? null;
+   165→  // Server codes arrive Firebase-style ("auth/email-already-in-use") — strip
+   166→  // the namespace for dictionary lookup, e.g. auth.err.email-already-in-use.
+   167→  const rawErrCode = (rawError as (Error & { code?: string }) | null)?.code?.split("/").pop();
+   168→  // Localize known Firebase-style codes; rare/unknown codes fall back to the
+   169→  // server message (they only occur with external providers attached).
+   170→  const formError = rawError
+   171→    ? rawErrCode && KNOWN_ERR_CODES.has(rawErrCode)
+   172→      ? t(`auth.err.${rawErrCode}`)
+   173→      : rawError.message
+   174→    : null;
+   175→  const firebaseConnected = isFirebaseConfigured();
+   176→
+   177→  function handleDemo(personaEmail: string, personaName: string) {
+   178→    demo.mutate(personaEmail, {
+   179→      onSuccess: (user) =>
+   180→        toast.success(t("auth.toast.signedInAs", { name: user.name || personaName })),
+   181→    });
+   182→  }
+   183→
+   184→  function handleLogin(e: FormEvent) {
+   185→    e.preventDefault();
+   186→    if (busy) return;
+   187→    const finish = () => toast.success(t("auth.toast.signedIn"));
+   188→    if (firebaseConnected) {
+   189→      firebaseEmailSignIn(email.trim(), password)
+   190→        .then(finishFirebaseSession)
+   191→        .catch((err: Error) => toast.error(err.message));
+   192→      return;
+   193→    }
+   194→    login.mutate({ email: email.trim(), password }, { onSuccess: finish });
+   195→  }
+   196→
+   197→  function handleRegister(e: FormEvent) {
+   198→    e.preventDefault();
+   199→    if (busy) return;
+   200→    if (password !== confirm) {
+   201→      toast.error(t("auth.toast.passwordMismatch"));
+   202→      return;
+   203→    }
+   204→    if (firebaseConnected) {
+   205→      firebaseEmailSignUp({ email: email.trim(), password, name: name.trim() })
+   206→        .then(finishFirebaseSession)
+   207→        .catch((err: Error) => toast.error(err.message));
+   208→      return;
+   209→    }
+   210→    register.mutate(
+   211→      {
+   212→        name: name.trim(),
+   213→        email: email.trim(),
+   214→        password,
+   215→        role,
+   216→        department: department.trim() || undefined,
+   217→        organizationName: organizationName.trim() || undefined,
+   218→      },
+   219→      {
+   220→        onSuccess: (user) => {
+   221→          toast.success(t("auth.toast.welcome", { name: user.name.split(" ")[0] }));
+   222→        },
+   223→      }
+   224→    );
+   225→  }
+   226→
+   227→  return (
+   228→    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-white via-white to-teal-50 p-4 sm:p-6 lg:p-8">
+   229→      <motion.div
+   230→        initial={{ opacity: 0, y: 16 }}
+   231→        animate={{ opacity: 1, y: 0 }}
+   232→        transition={{ duration: 0.45, ease: "easeOut" }}
+   233→        className="grid w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-teal-900/5 lg:grid-cols-2"
+   234→      >
+   235→        {/* ── Brand panel (desktop) ── */}
+   236→        <aside className="hidden flex-col justify-between border-r border-slate-100 bg-gradient-to-br from-teal-50 via-white to-white p-8 lg:flex">
+   237→          <div>
+   238→            <div className="flex items-center gap-2.5">
+   239→              <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-700 to-emerald-600 text-white shadow-sm">
+   240→                <ShieldCheck className="size-5" />
+   241→              </span>
+   242→              <span className="text-base font-semibold tracking-tight text-slate-900">
+   243→                BrandShield <span className="text-teal-700">AI</span>
+   244→              </span>
+   245→            </div>
+   246→            <p className="mt-6 max-w-xs text-lg font-medium leading-snug text-slate-700">
+   247→              {t("auth.brand.tagline")}
+   248→            </p>
+   249→          </div>
+   250→
+   251→          <ul className="space-y-5">
+   252→            {TRUST_MARKERS.map((marker) => (
+   253→              <li key={marker.titleKey} className="flex gap-3">
+   254→                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-teal-100 bg-white text-teal-700 shadow-sm">
+   255→                  <marker.icon className="size-4.5" />
+   256→                </span>
+   257→                <div>
+   258→                  <p className="text-sm font-semibold text-slate-900">{t(marker.titleKey)}</p>
+   259→                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{t(marker.descKey)}</p>
+   260→                </div>
+   261→              </li>
+   262→            ))}
+   263→          </ul>
+   264→
+   265→          <p className="text-xs text-slate-400">{t("auth.brand.footnote")}</p>
+   266→        </aside>
+   267→
+   268→        {/* ── Auth panel ── */}
+   269→        <div className="min-w-0 p-5 sm:p-8">
+   270→          <div className="flex flex-wrap items-center justify-between gap-2">
+   271→            <Button
+   272→              variant="ghost"
+   273→              size="sm"
+   274→              onClick={onBack}
+   275→              className="-ml-2 h-8 gap-1.5 px-2 text-slate-500 hover:text-slate-900"
+   276→            >
+   277→              <ArrowLeft className="size-4" />
+   278→              <span className="hidden sm:inline">{t("auth.action.backFull")}</span>
+   279→              <span className="sm:hidden">{t("common.action.back")}</span>
+   280→            </Button>
+   281→            <div className="flex items-center gap-2">
+   282→              {/* Language switcher — usable before signing in, on mobile too */}
+   283→              <LangToggle />
+   284→              <Badge
+   285→                title={
+   286→                  firebaseConnected
+   287→                    ? t("auth.badge.connectedTitle")
+   288→                    : t("auth.badge.localTitle")
+   289→                }
+   290→                className={cn(
+   291→                  "gap-1 border font-medium",
+   292→                  firebaseConnected
+   293→                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+   294→                    : "border-slate-200 bg-slate-50 text-slate-600"
+   295→                )}
+   296→              >
+   297→                <Flame className="size-3 text-orange-500" />
+   298→                <span className="hidden sm:inline">Firebase Auth</span>
+   299→                <span className="sm:hidden">Firebase</span>
+   300→                <span className={cn("ml-0.5 whitespace-nowrap rounded px-1 py-px text-[10px] font-semibold", firebaseConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600")}>
+   301→                  {firebaseConnected ? t("auth.badge.connected") : t("auth.badge.localMode")}
+   302→                </span>
+   303→              </Badge>
+   304→            </div>
+   305→          </div>
+   306→
+   307→          <h1 className="mt-4 text-xl font-semibold tracking-tight text-slate-900">
+   308→            {mode === "signin" ? t("auth.signin.title") : t("auth.signup.title")}
+   309→          </h1>
+   310→          <p className="mt-1 text-sm text-slate-500">
+   311→            {mode === "signin" ? t("auth.signin.subtitle") : t("auth.signup.subtitle")}
+   312→          </p>
+   313→
+   314→          {/* Mode tabs */}
+   315→          <div className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" role="tablist" aria-label={t("auth.aria.modeTabs")}>
+   316→            {(["signin", "signup"] as const).map((m) => (
+   317→              <button
+   318→                key={m}
+   319→                type="button"
+   320→                role="tab"
+   321→                aria-selected={mode === m}
+   322→                onClick={() => setMode(m)}
+   323→                className={cn(
+   324→                  "relative rounded-lg py-2 text-sm font-medium transition-colors",
+   325→                  mode === m ? "text-teal-800" : "text-slate-500 hover:text-slate-700"
+   326→                )}
+   327→              >
+   328→                {mode === m && (
+   329→                  <motion.span
+   330→                    layoutId="auth-tab-pill"
+   331→                    className="absolute inset-0 rounded-lg bg-white shadow-sm"
+   332→                    transition={{ type: "spring", bounce: 0.18, duration: 0.45 }}
+   333→                  />
+   334→                )}
+   335→                <span className="relative">{m === "signin" ? t("auth.tab.signin") : t("auth.tab.signup")}</span>
+   336→              </button>
+   337→            ))}
+   338→          </div>
+   339→
+   340→          <div className="mt-5">
+   341→            <AnimatePresence mode="wait" initial={false}>
+   342→              {mode === "signin" ? (
+   343→                <motion.div
+   344→                  key="signin"
+   345→                  initial={{ opacity: 0, x: -12 }}
+   346→                  animate={{ opacity: 1, x: 0 }}
+   347→                  exit={{ opacity: 0, x: 12 }}
+   348→                  transition={{ duration: 0.18 }}
+   349→                >
+   350→                  {/* Demo personas (hidden on clean production deployments) */}
+   351→                  {demoEnabled && (
+   352→                    <>
+   353→                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+   354→                        {t("auth.demo.heading")}
+   355→                      </p>
+   356→                      <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+   357→                        {PERSONAS.map((persona) => (
+   358→                          <button
+   359→                            key={persona.email}
+   360→                            type="button"
+   361→                            disabled={demo.isPending}
+   362→                            onClick={() => handleDemo(persona.email, persona.name)}
+   363→                            className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-teal-300 hover:bg-teal-50/50 hover:shadow-sm disabled:pointer-events-none disabled:opacity-60"
+   364→                          >
+   365→                            <Avatar className="size-10 border border-black/5">
+   366→                              <AvatarFallback
+   367→                                style={{ backgroundColor: persona.avatarColor }}
+   368→                                className="text-sm font-semibold text-white"
+   369→                              >
+   370→                                {initials(persona.name)}
+   371→                              </AvatarFallback>
+   372→                            </Avatar>
+   373→                            <div className="min-w-0 flex-1">
+   374→                              <div className="flex items-center gap-1.5">
+   375→                                <span className="truncate text-sm font-semibold text-slate-900">{persona.name}</span>
+   376→                                <Badge
+   377→                                  variant="outline"
+   378→                                  className={cn("px-1.5 py-0 text-[10px] font-medium", ROLE_BADGE[persona.role as Role])}
+   379→                                >
+   380→                                  {t(`common.role.${persona.role}`)}
+   381→                                </Badge>
+   382→                              </div>
+   383→                              <p className="mt-0.5 truncate text-xs text-slate-500">
+   384→                                {t(`auth.persona.title.${persona.role}`)}
+   385→                              </p>
+   386→                            </div>
+   387→                            {demo.isPending && demo.variables === persona.email ? (
+   388→                              <Loader2 className="size-4 shrink-0 animate-spin text-teal-600" />
+   389→                            ) : (
+   390→                              <ArrowRight className="size-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-600" />
+   391→                            )}
+   392→                          </button>
+   393→                        ))}
+   394→                      </div>
+   395→
+   396→                      <div className="relative my-5">
+   397→                        <div className="absolute inset-0 flex items-center">
+   398→                          <Separator className="w-full" />
+   399→                        </div>
+   400→                        <div className="relative flex justify-center">
+   401→                          <span className="bg-white px-3 text-xs text-slate-400">{t("auth.divider.orEmail")}</span>
+   402→                        </div>
+   403→                      </div>
+   404→                    </>
+   405→                  )}
+   406→
+   407→                  <form onSubmit={handleLogin} className="space-y-4" noValidate>
+   408→                    <div className="space-y-1.5">
+   409→                      <Label htmlFor="auth-email">{t("auth.field.email")}</Label>
+   410→                      <div className="relative">
+   411→                        <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+   412→                        <Input
+   413→                          id="auth-email"
+   414→                          type="email"
+   415→                          autoComplete="email"
+   416→                          placeholder="ava@nimbus.demo"
+   417→                          value={email}
+   418→                          onChange={(e) => setEmail(e.target.value)}
+   419→                          className="h-10 rounded-xl pl-9"
+   420→                        />
+   421→                      </div>
+   422→                    </div>
+   423→                    <div className="space-y-1.5">
+   424→                      <Label htmlFor="auth-password">{t("auth.field.password")}</Label>
+   425→                      <PasswordInput
+   426→                        id="auth-password"
+   427→                        autoComplete="current-password"
+   428→                        placeholder="demo1234"
+   429→                        value={password}
+   430→                        onChange={setPassword}
+   431→                        show={showPassword}
+   432→                        onToggle={() => setShowPassword((v) => !v)}
+   433→                      />
+   434→                      <p className="text-xs text-slate-400">
+   435→                        {t("auth.signin.helperPrefix")}{" "}
+   436→                        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-600">
+   437→                          demo1234
+   438→                        </code>
+   439→                        {t("auth.signin.helperSuffix")}
+   440→                      </p>
+   441→                    </div>
+   442→
+   443→                    {formError && (
+   444→                      <motion.p
+   445→                        initial={{ opacity: 0, y: -4 }}
+   446→                        animate={{ opacity: 1, y: 0 }}
+   447→                        role="alert"
+   448→                        className="text-sm font-medium text-red-600"
+   449→                      >
+   450→                        {formError}
+   451→                      </motion.p>
+   452→                    )}
+   453→
+   454→                    <Button
+   455→                      type="submit"
+   456→                      disabled={busy}
+   457→                      className="h-10 w-full rounded-xl bg-teal-700 text-white shadow-sm hover:bg-teal-800"
+   458→                    >
+   459→                      {login.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+   460→                      {login.isPending ? t("auth.action.signingIn") : t("auth.action.signIn")}
+   461→                    </Button>
+   462→                  </form>
+   463→                </motion.div>
+   464→              ) : (
+   465→                <motion.form
+   466→                  key="signup"
+   467→                  initial={{ opacity: 0, x: 12 }}
+   468→                  animate={{ opacity: 1, x: 0 }}
+   469→                  exit={{ opacity: 0, x: -12 }}
+   470→                  transition={{ duration: 0.18 }}
+   471→                  onSubmit={handleRegister}
+   472→                  className="space-y-4"
+   473→                  noValidate
+   474→                >
+   475→                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   476→                    <div className="space-y-1.5">
+   477→                      <Label htmlFor="reg-name">{t("auth.signup.name")}</Label>
+   478→                      <div className="relative">
+   479→                        <UserRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+   480→                        <Input
+   481→                          id="reg-name"
+   482→                          autoComplete="name"
+   483→                          placeholder={t("auth.signup.namePlaceholder")}
+   484→                          value={name}
+   485→                          onChange={(e) => setName(e.target.value)}
+   486→                          className="h-10 rounded-xl pl-9"
+   487→                        />
+   488→                      </div>
+   489→                    </div>
+   490→                    <div className="space-y-1.5">
+   491→                      <Label htmlFor="reg-dept">
+   492→                        {t("auth.signup.department")} <span className="font-normal text-slate-400">{t("auth.optional")}</span>
+   493→                      </Label>
+   494→                      <Input
+   495→                        id="reg-dept"
+   496→                        placeholder={t("auth.signup.deptPlaceholder")}
+   497→                        value={department}
+   498→                        onChange={(e) => setDepartment(e.target.value)}
+   499→                        className="h-10 rounded-xl"
+   500→                      />
+   501→                    </div>
+   502→                  </div>
+   503→
+   504→                  <div className="space-y-1.5">
+   505→                    <Label htmlFor="reg-org">
+   506→                      {t("auth.signup.organization")} <span className="font-normal text-slate-400">{t("auth.optional")}</span>
+   507→                    </Label>
+   508→                    <div className="relative">
+   509→                      <Building2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+   510→                      <Input
+   511→                        id="reg-org"
+   512→                        autoComplete="organization"
+   513→                        placeholder={t("auth.signup.orgPlaceholder")}
+   514→                        value={organizationName}
+   515→                        onChange={(e) => setOrganizationName(e.target.value)}
+   516→                        className="h-10 rounded-xl pl-9"
+   517→                      />
+   518→                    </div>
+   519→                    <p className="text-xs text-slate-400">{t("auth.signup.orgHint")}</p>
+   520→                  </div>
+   521→
+   522→                  <div className="space-y-1.5">
+   523→                    <Label htmlFor="reg-email">{t("auth.field.email")}</Label>
+   524→                    <div className="relative">
+   525→                      <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+   526→                      <Input
+   527→                        id="reg-email"
+   528→                        type="email"
+   529→                        autoComplete="email"
+   530→                        placeholder={t("auth.signup.emailPlaceholder")}
+   531→                        value={email}
+   532→                        onChange={(e) => setEmail(e.target.value)}
+   533→                        className="h-10 rounded-xl pl-9"
+   534→                      />
+   535→                    </div>
+   536→                  </div>
+   537→
+   538→                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   539→                    <div className="space-y-1.5">
+   540→                      <Label htmlFor="reg-password">{t("auth.field.password")}</Label>
+   541→                      <PasswordInput
+   542→                        id="reg-password"
+   543→                        autoComplete="new-password"
+   544→                        placeholder={t("auth.signup.passwordPlaceholder")}
+   545→                        value={password}
+   546→                        onChange={setPassword}
+   547→                        show={showPassword}
+   548→                        onToggle={() => setShowPassword((v) => !v)}
+   549→                      />
+   550→                    </div>
+   551→                    <div className="space-y-1.5">
+   552→                      <Label htmlFor="reg-confirm">{t("auth.signup.confirm")}</Label>
+   553→                      <div className="relative">
+   554→                        <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+   555→                        <Input
+   556→                          id="reg-confirm"
+   557→                          type={showPassword ? "text" : "password"}
+   558→                          autoComplete="new-password"
+   559→                          placeholder={t("auth.signup.confirmPlaceholder")}
+   560→                          value={confirm}
+   561→                          onChange={(e) => setConfirm(e.target.value)}
+   562→                          className={cn(
+   563→                            "h-10 rounded-xl pl-9",
+   564→                            confirm && confirm !== password && "border-red-300 focus-visible:ring-red-200"
+   565→                          )}
+   566→                        />
+   567→                      </div>
+   568→                      {confirm && confirm !== password && (
+   569→                        <p className="text-xs font-medium text-red-600">{t("auth.error.mismatchLive")}</p>
+   570→                      )}
+   571→                    </div>
+   572→                  </div>
+   573→
+   574→                  <fieldset className="space-y-1.5">
+   575→                    <legend className="text-sm font-medium text-slate-700">{t("auth.signup.roleLegend")}</legend>
+   576→                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+   577→                      {ROLE_OPTIONS.map((value) => (
+   578→                        <button
+   579→                          key={value}
+   580→                          type="button"
+   581→                          onClick={() => setRole(value)}
+   582→                          aria-pressed={role === value}
+   583→                          className={cn(
+   584→                            "rounded-xl border p-3 text-left transition",
+   585→                            role === value
+   586→                              ? "border-teal-400 bg-teal-50/70 ring-1 ring-teal-300"
+   587→                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+   588→                          )}
+   589→                        >
+   590→                          <div className="flex items-center justify-between">
+   591→                            <span className="text-sm font-semibold text-slate-900">{t(`auth.role.label.${value}`)}</span>
+   592→                            {role === value && <BadgeCheck className="size-4 text-teal-600" />}
+   593→                          </div>
+   594→                          <p className="mt-0.5 text-xs text-slate-500">{t(`auth.role.hint.${value}`)}</p>
+   595→                        </button>
+   596→                      ))}
+   597→                    </div>
+   598→                  </fieldset>
+   599→
+   600→                  {formError && (
+   601→                    <motion.p
+   602→                      initial={{ opacity: 0, y: -4 }}
+   603→                      animate={{ opacity: 1, y: 0 }}
+   604→                      role="alert"
+   605→                      className="text-sm font-medium text-red-600"
+   606→                    >
+   607→                      {formError}
+   608→                    </motion.p>
+   609→                  )}
+   610→
+   611→                  <Button
+   612→                    type="submit"
+   613→                    disabled={busy || (confirm.length > 0 && confirm !== password)}
+   614→                    className="h-10 w-full rounded-xl bg-teal-700 text-white shadow-sm hover:bg-teal-800"
+   615→                  >
+   616→                    {register.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+   617→                    {register.isPending ? t("auth.action.creatingAccount") : t("auth.action.signUp")}
+   618→                  </Button>
+   619→                  <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
+   620→                    <Users className="size-3.5" />
+   621→                    {t("auth.signup.footer")}
+   622→                  </p>
+   623→                </motion.form>
+   624→              )}
+   625→            </AnimatePresence>
+   626→          </div>
+   627→        </div>
+   628→      </motion.div>
+   629→    </div>
+   630→  );
+   631→}
+   632→
+   633→// ─── Password input with visibility toggle ───────────────────────────────────
+   634→
+   635→function PasswordInput({
+   636→  id,
+   637→  value,
+   638→  onChange,
+   639→  placeholder,
+   640→  autoComplete,
+   641→  show,
+   642→  onToggle,
+   643→}: {
+   644→  id: string;
+   645→  value: string;
+   646→  onChange: (v: string) => void;
+   647→  placeholder?: string;
+   648→  autoComplete?: string;
+   649→  show: boolean;
+   650→  onToggle: () => void;
+   651→}) {
+   652→  const { t } = useLang();
+   653→  return (
+   654→    <div className="relative">
+   655→      <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+   656→      <Input
+   657→        id={id}
+   658→        type={show ? "text" : "password"}
+   659→        autoComplete={autoComplete}
+   660→        placeholder={placeholder}
+   661→        value={value}
+   662→        onChange={(e) => onChange(e.target.value)}
+   663→        className="h-10 rounded-xl pl-9 pr-10"
+   664→      />
+   665→      <button
+   666→        type="button"
+   667→        onClick={onToggle}
+   668→        aria-label={show ? t("auth.aria.hidePassword") : t("auth.aria.showPassword")}
+   669→        className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+   670→      >
+   671→        {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+   672→      </button>
+   673→    </div>
+   674→  );
+   675→}
+   676→
