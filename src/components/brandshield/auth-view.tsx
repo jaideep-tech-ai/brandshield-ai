@@ -22,7 +22,12 @@ import {
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { markAuthHint, useDemoLogin, useLogin, useRegister } from "@/lib/brandshield/client";
-import { firebaseEmailSignIn, firebaseEmailSignUp, isFirebaseConfigured } from "@/lib/brandshield/firebase";
+import {
+  firebaseEmailSignIn,
+  firebaseEmailSignUp,
+  isFirebaseConfigured,
+  preloadFirebaseSdk,
+} from "@/lib/brandshield/firebase";
 import { warmSignedInChunksWhenIdle } from "@/components/brandshield/lazy-views";
 import type { Role, SessionUser } from "@/lib/brandshield/types";
 import { cn, initials } from "@/lib/brandshield/utils";
@@ -146,12 +151,20 @@ export function AuthView({ onBack }: { onBack: () => void }) {
   const login = useLogin();
   const register = useRegister();
   const queryClient = useQueryClient();
-  const busy = login.isPending || register.isPending || demo.isPending;
+  // Firebase sign-in/up runs outside React Query, so its pending state is
+  // tracked here — otherwise the submit button shows no feedback during the
+  // (network-bound) Firebase auth + /api/auth/firebase-sync round trip and
+  // the swap to the dashboard feels broken/stuck.
+  const [firebaseBusy, setFirebaseBusy] = useState(false);
+  const busy = login.isPending || register.isPending || demo.isPending || firebaseBusy;
 
   // While the user types their credentials, prefetch the signed-in chunks at
   // idle time — first sign-in swaps into the dashboard with zero chunk wait.
+  // The Firebase SDK chunks download right away (small, and definitely needed
+  // the moment the user submits) so first sign-in skips that round trip too.
   useEffect(() => {
     warmSignedInChunksWhenIdle();
+    preloadFirebaseSdk();
   }, []);
 
   // Swap straight into the dashboard SPA-style — no full page reload, so the
@@ -186,9 +199,11 @@ export function AuthView({ onBack }: { onBack: () => void }) {
     if (busy) return;
     const finish = () => toast.success(t("auth.toast.signedIn"));
     if (firebaseConnected) {
+      setFirebaseBusy(true);
       firebaseEmailSignIn(email.trim(), password)
         .then(finishFirebaseSession)
-        .catch((err: Error) => toast.error(err.message));
+        .catch((err: Error) => toast.error(err.message))
+        .finally(() => setFirebaseBusy(false));
       return;
     }
     login.mutate({ email: email.trim(), password }, { onSuccess: finish });
@@ -202,9 +217,11 @@ export function AuthView({ onBack }: { onBack: () => void }) {
       return;
     }
     if (firebaseConnected) {
+      setFirebaseBusy(true);
       firebaseEmailSignUp({ email: email.trim(), password, name: name.trim() })
         .then(finishFirebaseSession)
-        .catch((err: Error) => toast.error(err.message));
+        .catch((err: Error) => toast.error(err.message))
+        .finally(() => setFirebaseBusy(false));
       return;
     }
     register.mutate(
@@ -456,8 +473,8 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                       disabled={busy}
                       className="h-10 w-full rounded-xl bg-teal-700 text-white shadow-sm hover:bg-teal-800"
                     >
-                      {login.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-                      {login.isPending ? t("auth.action.signingIn") : t("auth.action.signIn")}
+                      {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                      {busy ? t("auth.action.signingIn") : t("auth.action.signIn")}
                     </Button>
                   </form>
                 </motion.div>
@@ -613,8 +630,8 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                     disabled={busy || (confirm.length > 0 && confirm !== password)}
                     className="h-10 w-full rounded-xl bg-teal-700 text-white shadow-sm hover:bg-teal-800"
                   >
-                    {register.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-                    {register.isPending ? t("auth.action.creatingAccount") : t("auth.action.signUp")}
+                    {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {busy ? t("auth.action.creatingAccount") : t("auth.action.signUp")}
                   </Button>
                   <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
                     <Users className="size-3.5" />

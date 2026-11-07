@@ -44,6 +44,16 @@ export function isFirebaseConfigured(): boolean {
   return getFirebaseConfig() !== null;
 }
 
+/** Download the Firebase SDK chunks ahead of the first submit. Called when
+ *  the auth screen mounts; `import()` caches its promise, so the later
+ *  `loadFirebaseAuth()` inside signIn/signUp resolves instantly instead of
+ *  waiting on a ~100KB chunk round trip. Idempotent. */
+export function preloadFirebaseSdk(): void {
+  if (typeof window === "undefined" || !isFirebaseConfigured()) return;
+  void import("firebase/app");
+  void import("firebase/auth");
+}
+
 async function loadFirebaseAuth() {
   const [{ initializeApp, getApps, getApp }, { getAuth }] = await Promise.all([
     import("firebase/app"),
