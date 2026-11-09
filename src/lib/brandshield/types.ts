@@ -28,6 +28,10 @@ export interface GuidelineDoc {
   sourceName: string | null;
   status: string;
   chunkCount: number;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  pageCount?: number | null;
+  errorMessage?: string | null;
   version: string;
   createdAt: string;
   updatedAt: string;

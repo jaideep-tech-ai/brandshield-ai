@@ -54,7 +54,9 @@ server.log
 /skills/
 # local database & user uploads (never publish)
 db/*.db
+prisma/db/
 *.sqlite
-upload/
+/upload/
+/uploads/
 # allow the template itself
 !.env.example

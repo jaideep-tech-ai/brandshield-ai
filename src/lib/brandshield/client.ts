@@ -178,6 +178,50 @@ export function useDeleteGuideline() {
   });
 }
 
+export function useUploadGuidelinePdf() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await fetch("/api/guidelines/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to upload guideline PDF");
+      }
+      return res.json() as Promise<GuidelineDoc>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["guidelines"] }),
+  });
+}
+
+export function useReindexGuideline() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<{ ok: boolean; chunkCount: number }>(`/api/guidelines/${id}/reindex`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["guidelines"] }),
+  });
+}
+
+export interface SearchPassage {
+  id: string;
+  documentId: string;
+  documentTitle: string;
+  pageNumber: number;
+  ruleTag: string | null;
+  text: string;
+  score: number;
+  matchType: "hybrid" | "vector" | "lexical";
+}
+
+export function useSearchKnowledge() {
+  return useMutation({
+    mutationFn: (input: { query: string; documentId?: string; limit?: number }) =>
+      api.post<{ passages: SearchPassage[]; total: number; query: string }>("/api/guidelines/search", input),
+  });
+}
+
 export function useVisualTokens() {
   return useQuery<VisualToken[]>({ queryKey: ["visual-tokens"], queryFn: () => api.get("/api/visual-tokens") });
 }
