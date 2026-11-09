@@ -76,8 +76,8 @@ export function warmSignedInChunksWhenIdle() {
   if (typeof window === "undefined") return;
   const warm = () => warmSignedInChunks();
   if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(warm, { timeout: 2500 });
+    (window as Window & { requestIdleCallback: (cb: () => void, opts: { timeout: number }) => void }).requestIdleCallback(warm, { timeout: 2500 });
   } else {
-    window.setTimeout(warm, 1200);
+    setTimeout(warm, 1200);
   }
 }

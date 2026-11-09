@@ -21,6 +21,8 @@ import {
   Layers,
   Eye,
   MessageSquareQuote,
+  Download,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -376,22 +378,65 @@ function HighlightedContent({ content, findings, selectedId, onSelect }: { conte
   );
 }
 
-function BannerAnnotator({ sub, findings, selectedId, onSelect }: { sub: { id: string; imageData?: string | null; imagePalette: string[] }; findings: Finding[]; selectedId: string | null; onSelect: (id: string) => void }) {
+function BannerAnnotator({
+  sub,
+  findings,
+  selectedId,
+  onSelect,
+}: {
+  sub: { id: string; title?: string; imageData?: string | null; imagePalette: string[]; inspections?: any[] };
+  findings: Finding[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
   const { t } = useLang();
   const colorFindings = findings.filter((f) => /^#[0-9a-fA-F]{3,8}/.test(f.flaggedText));
   const offColors = new Map(colorFindings.map((f) => [f.flaggedText.toUpperCase(), f]));
+  const contrastFindings = findings.filter((f) => f.category === "visual" && f.ruleCitation.includes("WCAG"));
+
+  const lastVision = sub.inspections?.[0]?.stageB?.vision;
+  const paletteClusters = lastVision?.paletteClusters ?? [];
+  const wcagMatrix = lastVision?.wcagMatrix ?? [];
+
   // Prefer the lightweight cached binary endpoint; fall back to the inline
   // data URL (freshly-created submissions before the list refresh).
   const src = sub.imageData ?? `/api/submissions/${sub.id}/image`;
+
   return (
-    <div className="space-y-3">
-      <div className="overflow-hidden rounded-xl border border-slate-200">
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
         <img src={src} alt={t("findings.banner.alt")} className="max-h-72 w-full object-contain" />
       </div>
+
+      {/* Dominant Palette Section */}
       <div>
-        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-500"><Palette className="h-3.5 w-3.5 text-teal-700" /> {t("findings.banner.paletteHint")}</p>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+            <Palette className="h-3.5 w-3.5 text-teal-700" /> {t("findings.banner.paletteHint")}
+          </p>
+          {lastVision?.overallLevel && (
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-[10px] font-semibold",
+                lastVision.overallLevel === "AAA"
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                  : lastVision.overallLevel === "AA"
+                  ? "border-teal-300 bg-teal-50 text-teal-800"
+                  : "border-red-300 bg-red-50 text-red-800"
+              )}
+            >
+              WCAG 2.1 {lastVision.overallLevel}
+            </Badge>
+          )}
+        </div>
+
         <div className="flex flex-wrap gap-2">
-          {sub.imagePalette.map((hex) => {
+          {(paletteClusters.length > 0
+            ? paletteClusters
+            : sub.imagePalette.map((hex) => ({ hex, percentage: 0 }))
+          ).map((c: any) => {
+            const hex = c.hex;
             const f = offColors.get(hex.toUpperCase());
             const sev = f?.severity;
             return (
@@ -399,19 +444,116 @@ function BannerAnnotator({ sub, findings, selectedId, onSelect }: { sub: { id: s
                 key={hex}
                 onClick={() => f && onSelect(f.id)}
                 className={cn(
-                  "group relative flex h-12 w-12 items-end justify-center overflow-hidden rounded-lg border-2 transition",
-                  f ? (sev === "critical" ? "border-red-400" : sev === "warning" ? "border-amber-400" : "border-teal-400") : "border-slate-200",
-                  f && selectedId === f.id && "ring-2 ring-offset-1 ring-slate-900"
+                  "group relative flex h-13 w-14 flex-col items-center justify-between overflow-hidden rounded-lg border-2 p-1 transition",
+                  f
+                    ? sev === "critical"
+                      ? "border-red-500 shadow-xs"
+                      : sev === "warning"
+                      ? "border-amber-500 shadow-xs"
+                      : "border-teal-500 shadow-xs"
+                    : "border-slate-200",
+                  f && selectedId === f.id && "ring-2 ring-slate-900 ring-offset-1"
                 )}
                 style={{ backgroundColor: hex }}
                 title={f ? `${hex} — ${f.rationale}` : hex}
               >
-                <span className="w-full bg-white/85 py-0.5 text-center font-mono text-[8px] text-slate-700">{hex}</span>
+                <div className="flex w-full justify-between items-center">
+                  {f && <AlertTriangle className="h-3 w-3 text-red-500 bg-white/90 rounded-full p-0.5" />}
+                  {c.percentage > 0 && (
+                    <span className="ml-auto rounded bg-black/70 px-1 py-0.2 text-[8px] font-semibold text-white">
+                      {c.percentage}%
+                    </span>
+                  )}
+                </div>
+                <span className="w-full rounded bg-white/90 py-0.5 text-center font-mono text-[8px] font-medium text-slate-800">
+                  {hex}
+                </span>
               </button>
             );
           })}
         </div>
       </div>
+
+      {/* WCAG Contrast Results Section */}
+      {(wcagMatrix.length > 0 || contrastFindings.length > 0) && (
+        <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+            <Eye className="h-3.5 w-3.5 text-teal-700" /> WCAG 2.1 Contrast Analysis
+          </p>
+          <div className="space-y-1.5">
+            {wcagMatrix.length > 0 ? (
+              wcagMatrix.map((m: any, idx: number) => (
+                <div key={idx} className="flex flex-col gap-1 rounded-lg border border-slate-200/80 bg-white p-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-3.5 w-3.5 rounded border" style={{ backgroundColor: m.foregroundHex }} />
+                      <span className="font-mono text-[10px]">{m.foregroundHex}</span>
+                      <span className="text-slate-400 text-[10px]">on</span>
+                      <span className="h-3.5 w-3.5 rounded border" style={{ backgroundColor: m.backgroundHex }} />
+                      <span className="font-mono text-[10px]">{m.backgroundHex}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold text-slate-800 text-[11px]">{m.contrastRatio}:1</span>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[9px] py-0 px-1 font-semibold",
+                          m.normalTextAA ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
+                        )}
+                      >
+                        {m.normalTextAA ? "AA PASS" : "AA FAIL"}
+                      </Badge>
+                      {m.normalTextAAA && (
+                        <Badge variant="outline" className="text-[9px] py-0 px-1 border-teal-200 bg-teal-50 text-teal-700 font-semibold">
+                          AAA
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  {m.remediationSuggestion && (
+                    <p className="text-[10px] text-amber-700 leading-tight">
+                      💡 {m.remediationSuggestion}
+                    </p>
+                  )}
+                </div>
+              ))
+            ) : (
+              contrastFindings.map((f) => (
+                <div key={f.id} className="rounded-lg border border-red-200 bg-red-50/50 p-2 text-xs text-red-800">
+                  <p className="font-medium">{f.flaggedText}</p>
+                  <p className="text-[10px] text-red-700/80">{f.rationale}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Download Accessibility Report Button */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full text-xs gap-1.5 min-h-9 text-slate-700"
+        onClick={() => {
+          const report = {
+            submissionId: sub.id,
+            title: sub.title,
+            generatedAt: new Date().toISOString(),
+            palette: paletteClusters.length > 0 ? paletteClusters : sub.imagePalette,
+            wcagMatrix: wcagMatrix,
+            findings: findings.filter((f) => f.category === "visual"),
+          };
+          const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `visual-accessibility-report-${sub.id}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }}
+      >
+        <Download className="h-3.5 w-3.5 text-teal-700" /> Export Accessibility Audit Certificate (JSON)
+      </Button>
     </div>
   );
 }

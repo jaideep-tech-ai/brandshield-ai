@@ -107,6 +107,10 @@ export interface StageBResult {
     logoPresent: boolean | null;
     ocrText: string;
     summary: string;
+    paletteClusters?: ExtractedColorCluster[];
+    wcagMatrix?: WcagMatrixItem[];
+    overallLevel?: "AAA" | "AA" | "FAIL";
+    passed?: boolean;
   } | null;
 }
 
@@ -277,3 +281,61 @@ export const TIER_META: Record<Tier, { name: string; price: number; blurb: strin
     scanLimit: -1,
   },
 };
+
+// ─── Visual & WCAG Inspection Contracts ──────────────────────────────────────
+
+export interface ExtractedColorCluster {
+  hex: string;
+  rgb: [number, number, number];
+  percentage: number;
+  isApproved: boolean;
+  isNeutral: boolean;
+  nearestApprovedToken?: { name: string; hex: string; deltaE: number };
+}
+
+export interface ColorFindingItem {
+  hex: string;
+  isOffBrand: boolean;
+  deltaE: number;
+  nearestTokenName?: string;
+  nearestHex?: string;
+  rationale: string;
+  suggestion?: string;
+}
+
+export interface WcagMatrixItem {
+  foregroundHex: string;
+  backgroundHex: string;
+  contrastRatio: number;
+  normalTextAA: boolean;       // ratio >= 4.5
+  largeTextAA: boolean;        // ratio >= 3.0
+  normalTextAAA: boolean;      // ratio >= 7.0
+  largeTextAAA: boolean;       // ratio >= 4.5
+  overallStatus: "AAA" | "AA" | "FAIL";
+  remediationSuggestion?: string;
+}
+
+export interface VisualInspectionData {
+  id: string;
+  orgId: string;
+  userId?: string | null;
+  submissionId?: string | null;
+  assetName: string;
+  assetUrl: string;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  width?: number | null;
+  height?: number | null;
+  status: "pending" | "completed" | "failed";
+  dominantPalette: ExtractedColorCluster[];
+  colorFindings: ColorFindingItem[];
+  wcagResults: WcagMatrixItem[];
+  accessibilityScore: number;
+  overallLevel: "AAA" | "AA" | "FAIL";
+  passed: boolean;
+  summary: string;
+  durationMs: number;
+  createdAt: string;
+  updatedAt: string;
+}
+

@@ -115,8 +115,8 @@ export function chunkDocumentPages(
 // ─── Phase 4: Embedding Provider & Batch Generation ───────────────────────────
 
 export interface EmbeddingConfig {
-  apiKey?: string;
-  baseUrl?: string;
+  apiKey: string;
+  baseUrl: string;
   model: string;
   dimensions: number;
 }

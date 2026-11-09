@@ -1,8 +1,10 @@
 import { createHash } from "crypto";
 import ZAI from "z-ai-web-dev-sdk";
 import { db } from "@/lib/db";
-import type { Finding, StageAResult, StageBResult } from "../types";
+import type { Finding, StageAResult, StageBResult, ExtractedColorCluster, WcagMatrixItem } from "../types";
 import { contrastRatio, isNeutralColor, colorDistance, readableOn } from "../shared";
+import { processImageForColorClusters } from "./kmeans";
+import { computeWcagMatrix } from "./wcag";
 
 // ─── Text utilities ──────────────────────────────────────────────────────────
 
@@ -469,6 +471,10 @@ export interface VisionResult {
   logoPresent: boolean | null;
   ocrText: string;
   summary: string;
+  paletteClusters?: ExtractedColorCluster[];
+  wcagMatrix?: WcagMatrixItem[];
+  overallLevel?: "AAA" | "AA" | "FAIL";
+  passed?: boolean;
 }
 
 export async function visionInspect(
@@ -479,29 +485,68 @@ export async function visionInspect(
 ): Promise<VisionResult> {
   const issues: VisionResult["contrastIssues"] = [];
   const offBrand: string[] = [];
-  const dominant = clientPalette.slice(0, 8);
+  let dominant = clientPalette.slice(0, 8);
+  let paletteClusters: ExtractedColorCluster[] = [];
+  let wcagMatrix: WcagMatrixItem[] = [];
+  let overallLevel: "AAA" | "AA" | "FAIL" = "AA";
+  let passed = true;
 
-  // Deterministic WCAG math on extracted palette
-  if (clientPalette.length >= 2) {
-    const background = clientPalette[0];
-    for (const fg of clientPalette.slice(1, 6)) {
-      const ratio = contrastRatio(fg, background);
-      if (ratio < 4.5) {
-        issues.push({
-          foreground: fg,
-          background,
-          ratio: +ratio.toFixed(2),
-          requirement: "WCAG 2.1 AA requires ≥ 4.5:1 for normal text",
-        });
+  // 1. Server-side K-Means++ & WCAG 2.1 Matrix Processing
+  try {
+    let rawBase64 = imageData;
+    const commaIdx = imageData.indexOf(",");
+    if (commaIdx !== -1) rawBase64 = imageData.slice(commaIdx + 1);
+    const buffer = Buffer.from(rawBase64, "base64");
+
+    if (buffer.length > 0) {
+      const kmeans = await processImageForColorClusters(buffer, approvedColors, 5);
+      const wcag = computeWcagMatrix(kmeans.palette);
+
+      paletteClusters = kmeans.palette;
+      dominant = kmeans.palette.map((p) => p.hex);
+      wcagMatrix = wcag.wcagMatrix;
+      overallLevel = wcag.overallLevel;
+      passed = wcag.passed;
+
+      for (const f of kmeans.colorFindings) {
+        if (!offBrand.includes(f.hex)) offBrand.push(f.hex);
+      }
+      for (const m of wcag.wcagMatrix) {
+        if (!m.normalTextAA) {
+          issues.push({
+            foreground: m.foregroundHex,
+            background: m.backgroundHex,
+            ratio: m.contrastRatio,
+            requirement: "WCAG 2.1 AA requires ≥ 4.5:1 for normal text",
+          });
+        }
       }
     }
-  }
-  for (const hex of dominant) {
-    if (approvedColors.length && !isNeutralColor(hex)) {
-      const nearest = approvedColors
-        .map((a) => ({ a, d: colorDistance(hex, a.hex) }))
-        .sort((x, y) => x.d - y.d)[0];
-      if (nearest && nearest.d > 90) offBrand.push(hex);
+  } catch (err) {
+    // Graceful fallback to client-quantized palette if buffer parsing fails
+    console.warn("Server-side K-Means clustering fallback to client palette:", err);
+
+    if (clientPalette.length >= 2) {
+      const background = clientPalette[0];
+      for (const fg of clientPalette.slice(1, 6)) {
+        const ratio = contrastRatio(fg, background);
+        if (ratio < 4.5) {
+          issues.push({
+            foreground: fg,
+            background,
+            ratio: +ratio.toFixed(2),
+            requirement: "WCAG 2.1 AA requires ≥ 4.5:1 for normal text",
+          });
+        }
+      }
+    }
+    for (const hex of dominant) {
+      if (approvedColors.length && !isNeutralColor(hex)) {
+        const nearest = approvedColors
+          .map((a) => ({ a, d: colorDistance(hex, a.hex) }))
+          .sort((x, y) => x.d - y.d)[0];
+        if (nearest && nearest.d > 90) offBrand.push(hex);
+      }
     }
   }
   // Suggest nearest approved hex for each off-brand color
@@ -548,7 +593,18 @@ export async function visionInspect(
     summary += " Vision-model OCR was unavailable; contrast and palette checks ran locally.";
   }
 
-  return { dominantColors: dominant, offBrandColors: offBrand, contrastIssues: issues, logoPresent, ocrText, summary };
+  return {
+    dominantColors: dominant,
+    offBrandColors: offBrand,
+    contrastIssues: issues,
+    logoPresent,
+    ocrText,
+    summary,
+    paletteClusters,
+    wcagMatrix,
+    overallLevel,
+    passed,
+  };
 }
 
 // ─── Full pipeline orchestration ─────────────────────────────────────────────
@@ -740,6 +796,54 @@ export async function runPreFlightInspection(submission: {
   // Persist
   await db.finding.deleteMany({ where: { submissionId: submission.id, status: "open" } });
   await db.finding.createMany({ data: seeds.map((s) => ({ ...s, submissionId: submission.id })) });
+
+  // If banner, persist/update visual inspection record
+  if (isBanner && submission.imageData && vision) {
+    try {
+      const existingVI = await db.visualInspection.findFirst({ where: { submissionId: submission.id } });
+      const viData = {
+        orgId: submission.orgId,
+        submissionId: submission.id,
+        assetName: `banner-${submission.id}.png`,
+        assetUrl: `/api/submissions/${submission.id}/image`,
+        status: "completed",
+        dominantPalette: JSON.stringify(
+          vision.paletteClusters && vision.paletteClusters.length > 0
+            ? vision.paletteClusters
+            : vision.dominantColors.map((hex) => ({
+                hex,
+                rgb: [0, 0, 0],
+                percentage: 0,
+                isApproved: !vision.offBrandColors.includes(hex),
+                isNeutral: isNeutralColor(hex),
+              }))
+        ),
+        colorFindings: JSON.stringify(
+          vision.offBrandColors.map((hex) => ({
+            hex,
+            isOffBrand: true,
+            deltaE: 15,
+            rationale: `Color ${hex} is not in the approved brand palette.`,
+          }))
+        ),
+        wcagResults: JSON.stringify(vision.wcagMatrix ?? vision.contrastIssues),
+        accessibilityScore: vision.passed ? 100 : Math.max(0, 100 - vision.contrastIssues.length * 25),
+        overallLevel: vision.overallLevel ?? (vision.contrastIssues.length === 0 ? "AA" : "FAIL"),
+        passed: vision.passed ?? (vision.contrastIssues.length === 0),
+        summary: vision.summary,
+        durationMs,
+      };
+
+      if (existingVI) {
+        await db.visualInspection.update({ where: { id: existingVI.id }, data: viData });
+      } else {
+        await db.visualInspection.create({ data: viData });
+      }
+    } catch (err) {
+      console.error("Could not persist visualInspection record:", err);
+    }
+  }
+
   const inspection = await db.inspection.create({
     data: {
       submissionId: submission.id,
