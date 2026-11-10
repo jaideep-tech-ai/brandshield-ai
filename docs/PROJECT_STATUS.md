@@ -3,7 +3,7 @@
 **Last Updated**: 2026-11-10  
 **Current Branch**: `main` (synchronized with `feat/complete-platform-hardening`)  
 **Production URL**: https://brandshield-ai-five.vercel.app  
-**Vercel Production Deployment**: `dpl_C4MYLQ8N19kBBtHahnwRuq5zofHc` (Status: ● Ready)  
+**Vercel Production Deployment**: `dpl_DodnJAVvTyVn746ANrq6CCSAdcPK` (Status: ● Ready)  
 **Database**: Neon PostgreSQL (Synced live with all tables)  
 **Lead Engineer / Architect**: AI Engineering Partner
 
@@ -17,8 +17,8 @@ All core subsystems, zero-touch automated access, pre-publishing webhook receive
 - **TypeScript (`bun x tsc --noEmit`)**: 0 errors
 - **ESLint (`bun run lint`)**: 0 errors, 0 warnings
 - **i18n Translation Integrity (`bun scripts/check-i18n.ts`)**: 910/910 keys resolved across 136 files (100% type-checked bilingual EN ⇄ HI)
-- **Feature Verification Test Suite (`bun scripts/verify-features.mjs`)**: 44/44 tests passed across 12 comprehensive suites
-- **Next.js Production Build (`bun run build`)**: 38/38 static pages and dynamic API routes compiled successfully
+- **Feature Verification Test Suite (`bun scripts/verify-features.mjs`)**: 80/80 tests passed across 15 comprehensive suites
+- **Next.js Production Build (`bun run build`)**: 42/42 static pages and dynamic API routes compiled successfully
 
 ---
 
@@ -30,12 +30,13 @@ All core subsystems, zero-touch automated access, pre-publishing webhook receive
 | **Feature 2: Dynamic Vector-RAG Ingestion Engine** | **Completed & Hardened** | Zero-dependency streaming PDF parser with page tracking (`pdf-parser.ts`), semantic recursive chunker with rule tags (`vector-rag.ts`), OpenAI-compatible 1536-dim embedding generator with batching & backoffs, hybrid search with BM25 + Reciprocal Rank Fusion (RRF, k=60), multi-tenant `orgId` isolation, UI document manager & search sandbox (`knowledge-view.tsx`), background queue migration to Next.js `after()` with `maxDuration = 60`. | ✅ Yes | ✅ Yes |
 | **Feature 3: Pre-Publishing Authoring Extensions & Webhooks** | **Completed (Full Scope)** | Google Docs OAuth & inspection engine (`/api/integrations/google/*`), Figma REST API token analyzer & WCAG contrast matrix (`/api/integrations/figma/*`), SSRF-safe webhook dispatcher (`ssrf.ts`), HMAC-SHA256 signatures (`webhooks.ts`), endpoints CRUD (`/api/webhooks`), inbound pre-publishing webhook (`/api/webhooks/incoming/prepublish`), and unified frontend UI (`IntegrationsView`). | ✅ Yes | ✅ Yes |
 | **Google OAuth Security & Token Management** | **Completed & Hardened** | Cryptographic nonce + user binding + 10-minute timestamp HMAC state validation (`verifyGoogleOAuthState`), AES-256-GCM encryption at rest (`crypto.ts`), auto-refresh via in-flight deduplication mutex (`getValidGoogleDocsToken`), status API (`GET /api/integrations/google/status`), disconnect & revocation API with tamper-evident audit logs (`POST /api/integrations/google/disconnect`), and UI integration with URL state cleanup (`page.tsx` & `integrations-view.tsx`). | ✅ Yes (44/44 tests) | ✅ Yes |
-| **Figma OAuth 2.0 Security & Token Management** | **Completed & Hardened** | Cryptographic nonce + user binding + 10-minute timestamp HMAC state validation (`verifyFigmaOAuthState`), AES-256-GCM encryption at rest, automatic token refresh via `/v1/oauth/refresh` with basic auth header (`getValidFigmaToken`), status API (`GET /api/integrations/figma/status`), disconnect API with tamper-evident audit logs (`POST /api/integrations/figma/disconnect`), PAT removal, and UI integration (`page.tsx` & `integrations-view.tsx`). | ✅ Yes (55/55 tests) | ⚠️ Deploying to Prod |
+| **Figma OAuth 2.0 Security & Token Management** | **Completed & Hardened** | Cryptographic nonce + user binding + 10-minute timestamp HMAC state validation (`verifyFigmaOAuthState`), AES-256-GCM encryption at rest, automatic token refresh via `/v1/oauth/refresh` with basic auth header (`getValidFigmaToken`), status API (`GET /api/integrations/figma/status`), disconnect API with tamper-evident audit logs (`POST /api/integrations/figma/disconnect`), PAT removal, and UI integration (`page.tsx` & `integrations-view.tsx`). | ✅ Yes (80/80 tests) | ✅ Yes |
+| **Figma Delta-E Matching & Composite Compliance Scoring** | **Completed & Hardened** | Ground-truth fallback brand tokens (`DEFAULT_BRAND_TOKENS`), self-seeding `db.visualToken`, robust float color clamping, container & sibling shape background tracking in `extractFigmaTokens`, WCAG 2.1 large text threshold distinction (3.0:1 vs 4.5:1), structural neutral exemption (slates, grays with RGB spread $\le 42$), and weighted composite compliance scoring (60% contrast + 40% palette compliance with measured deductions). | ✅ Yes (Suite 15) | ✅ Yes |
 | **1-Click Auto Access / Instant Authentication** | **Completed** | Prominent "Instant Auto Access / One-Click Sign In" button on `auth-view.tsx`. Direct auto-provisioning via `POST /api/auth/auto-login` with session cookies. Fallback handling for unconfigured Firebase instances ensures zero dead-ends on live deployments. | ✅ Yes | ✅ Yes |
 | **4-Role One-Click Evaluation Switcher** | **Completed** | Built persistent switcher across all 4 enterprise personas (`admin`: Brand Director / Super Admin, `reviewer`: Compliance Officer, `creator`: Content Creator, `contractor`: Auditor / Viewer). Implemented `POST /api/auth/switch-role` with session cookie update, role metadata, and UI dropdown in shell header & mobile drawer. | ✅ Yes | ✅ Yes |
 | **AI Brand Governance Copilot / Chatbot** | **Completed** | Dedicated interactive Copilot view (`copilot-view.tsx`) wired to Vector-RAG retrieval (`/api/rag/query` & `/api/copilot/chat`). Returns verified rule citations (`[RULE: Page X]`), WCAG 2.1 contrast calculations, prompt starters, markdown rendering, and database persistence (`GovernanceChatSession`, `GovernanceChatMessage`). | ✅ Yes | ✅ Yes |
 | **Cross-Platform & Flutter Web Design Tokens** | **Completed** | Created `GET /api/system/tokens` exporting organization visual tokens (colors, typography, logos) and WCAG thresholds in W3C DTCG format with 32-bit ARGB hex integers for Flutter / mobile clients (`0xFF0F766E`). | ✅ Yes | ✅ Yes |
-| **Database & Schema Synchronization** | **Completed** | Added `GoogleOAuthConnection`, `GovernanceChatSession`, `GovernanceChatMessage`, `AssetAudit`, `WebhookEndpoint`, and `WebhookDeliveryLog` with strict `orgId` multi-tenant indexes. Synchronized canonical SQLite (`schema.prisma`) and PostgreSQL (`schema.postgres.prisma`). | ✅ Yes | ✅ Yes (Neon PG live) |
+| **Database & Schema Synchronization** | **Completed** | Added `GoogleOAuthConnection`, `FigmaOAuthConnection`, `GovernanceChatSession`, `GovernanceChatMessage`, `AssetAudit`, `WebhookEndpoint`, and `WebhookDeliveryLog` with strict `orgId` multi-tenant indexes. Synchronized canonical SQLite (`schema.prisma`) and PostgreSQL (`schema.postgres.prisma`). | ✅ Yes | ✅ Yes (Neon PG live) |
 
 ---
 
