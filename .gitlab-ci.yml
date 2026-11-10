@@ -49,10 +49,11 @@ brandshield-governance-audit:
       EOF
       )
     - |
+      set +x
       RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BRANDSHIELD_URL}/api/webhooks/incoming/prepublish?orgSlug=${BRANDSHIELD_ORG_SLUG}" \
         -H "Content-Type: application/json" \
         -H "X-Gitlab-Event: Push Hook" \
-        -H "X-Gitlab-Token: ${BRANDSHIELD_WEBHOOK_SECRET}" \
+        -H "X-Gitlab-Token: ${GITLAB_WEBHOOK_SECRET:-$BRANDSHIELD_WEBHOOK_SECRET}" \
         -d "$PAYLOAD")
       HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
       BODY=$(echo "$RESPONSE" | sed '$d')
@@ -92,3 +93,4 @@ production-build:
     - bun install --frozen-lockfile || bun install
   script:
     - bun run build
+
