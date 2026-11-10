@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const clientId = process.env.FIGMA_CLIENT_ID?.trim();
+  const clientId = process.env.FIGMA_CLIENT_ID?.split(/\r?\n/)[0]?.trim();
 
   if (!clientId) {
     return NextResponse.json(
@@ -21,7 +21,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const redirectUri = process.env.FIGMA_REDIRECT_URI || `${req.nextUrl.origin}/api/integrations/figma/callback`;
+  const redirectUri =
+    process.env.FIGMA_REDIRECT_URI?.split(/\r?\n/)[0]?.trim() ||
+    `${req.nextUrl.origin}/api/integrations/figma/callback`;
   const { state, nonce } = generateFigmaOAuthState(user.id);
 
   const scopes = process.env.FIGMA_OAUTH_SCOPES?.trim() || "file_content:read,current_user:read";
@@ -45,3 +47,4 @@ export async function GET(req: NextRequest) {
 
   return res;
 }
+

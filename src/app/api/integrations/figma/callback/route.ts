@@ -52,9 +52,11 @@ export async function GET(req: NextRequest) {
     markFigmaNonceConsumed(stateCheck.nonce);
   }
 
-  const clientId = process.env.FIGMA_CLIENT_ID?.trim();
-  const clientSecret = process.env.FIGMA_CLIENT_SECRET?.trim();
-  const redirectUri = process.env.FIGMA_REDIRECT_URI || `${req.nextUrl.origin}/api/integrations/figma/callback`;
+  const clientId = process.env.FIGMA_CLIENT_ID?.split(/\r?\n/)[0]?.trim();
+  const clientSecret = process.env.FIGMA_CLIENT_SECRET?.split(/\r?\n/)[0]?.trim();
+  const redirectUri =
+    process.env.FIGMA_REDIRECT_URI?.split(/\r?\n/)[0]?.trim() ||
+    `${req.nextUrl.origin}/api/integrations/figma/callback`;
 
   if (!clientId || !clientSecret) {
     const res = NextResponse.redirect(
@@ -146,3 +148,4 @@ export async function GET(req: NextRequest) {
     return res;
   }
 }
+

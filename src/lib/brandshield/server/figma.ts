@@ -247,8 +247,8 @@ export async function getValidFigmaToken(userId: string): Promise<string | null>
   const refreshPromise = (async () => {
     try {
       const rawRefreshToken = decryptToken(connection.encryptedRefreshToken!);
-      const clientId = process.env.FIGMA_CLIENT_ID?.trim();
-      const clientSecret = process.env.FIGMA_CLIENT_SECRET?.trim();
+      const clientId = process.env.FIGMA_CLIENT_ID?.split(/\r?\n/)[0]?.trim();
+      const clientSecret = process.env.FIGMA_CLIENT_SECRET?.split(/\r?\n/)[0]?.trim();
 
       if (!clientId || !clientSecret) {
         throw new Error("Missing Figma OAuth credentials for token refresh.");
@@ -304,3 +304,4 @@ export async function getValidFigmaToken(userId: string): Promise<string | null>
   inFlightFigmaRefreshes.set(userId, refreshPromise);
   return refreshPromise;
 }
+
