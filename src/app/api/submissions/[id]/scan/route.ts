@@ -59,15 +59,24 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       details: { findings: result.findingsCount, score: result.score, submissionTitle: sub.title },
     });
 
-    const [inspection, submission] = await Promise.all([
+    const [inspection, submission, visualInspection] = await Promise.all([
       db.inspection.findUnique({ where: { id: result.inspectionId } }),
       db.submission.findUnique({ where: { id: sub.id }, include: { findings: true } }),
+      db.visualInspection.findFirst({ where: { submissionId: sub.id }, orderBy: { createdAt: "desc" } }),
     ]);
 
     return NextResponse.json({
       submission,
       inspection: inspection
         ? { ...inspection, stageA: JSON.parse(inspection.stageA), stageB: JSON.parse(inspection.stageB) }
+        : null,
+      visualInspection: visualInspection
+        ? {
+            ...visualInspection,
+            dominantPalette: JSON.parse(visualInspection.dominantPalette),
+            colorFindings: JSON.parse(visualInspection.colorFindings),
+            wcagResults: JSON.parse(visualInspection.wcagResults),
+          }
         : null,
     });
   } catch (e) {

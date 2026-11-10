@@ -18,6 +18,7 @@ import {
   Info,
   UploadCloud,
   X,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -364,20 +365,135 @@ export function ScannerView() {
                     {outcome.stageB.vision && (
                       <>
                         <Separator />
-                        <div className="space-y-2 text-xs">
-                          <p className="flex items-center gap-1.5 font-medium text-slate-600"><Eye className="h-3.5 w-3.5 text-teal-700" /> {t("scanner.stageB.vision")}</p>
+                        <div className="space-y-3 text-xs">
+                          <div className="flex items-center justify-between">
+                            <p className="flex items-center gap-1.5 font-medium text-slate-700">
+                              <Eye className="h-3.5 w-3.5 text-teal-700" /> {t("scanner.stageB.vision")}
+                            </p>
+                            {outcome.stageB.vision.overallLevel && (
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] font-semibold",
+                                  outcome.stageB.vision.overallLevel === "AAA"
+                                    ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                                    : outcome.stageB.vision.overallLevel === "AA"
+                                    ? "border-teal-300 bg-teal-50 text-teal-800"
+                                    : "border-red-300 bg-red-50 text-red-800"
+                                )}
+                              >
+                                WCAG 2.1 {outcome.stageB.vision.overallLevel}
+                              </Badge>
+                            )}
+                          </div>
                           <p className="leading-relaxed text-slate-500">{outcome.stageB.vision.summary}</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {outcome.stageB.vision.dominantColors.map((hex) => {
-                              const off = outcome.stageB?.vision?.offBrandColors.includes(hex);
-                              return (
-                                <span key={hex} className={cn("flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px]", off ? "border-red-200 bg-red-50 text-red-600" : "border-slate-200 bg-white text-slate-500")}>
-                                  <span className="h-3 w-3 rounded-sm border" style={{ backgroundColor: hex }} />
-                                  {hex}
-                                  {off && <AlertTriangle className="h-3 w-3" />}
-                                </span>
-                              );
-                            })}
+
+                          {/* K-Means Dominant Palette with area percentages */}
+                          <div className="space-y-1.5">
+                            <span className="font-semibold text-slate-700 text-[11px]">Dominant K-Means Palette & Area Weight:</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {(outcome.stageB.vision.paletteClusters && outcome.stageB.vision.paletteClusters.length > 0
+                                ? outcome.stageB.vision.paletteClusters
+                                : outcome.stageB.vision.dominantColors.map((hex) => ({
+                                    hex,
+                                    percentage: 0,
+                                    isApproved: !outcome.stageB?.vision?.offBrandColors.includes(hex),
+                                  }))
+                              ).map((cluster) => {
+                                const off = !cluster.isApproved;
+                                return (
+                                  <span
+                                    key={cluster.hex}
+                                    className={cn(
+                                      "flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] shadow-2xs",
+                                      off ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-700"
+                                    )}
+                                    title={cluster.percentage ? `${cluster.hex} (${cluster.percentage}% area)` : cluster.hex}
+                                  >
+                                    <span className="h-3.5 w-3.5 rounded-sm border" style={{ backgroundColor: cluster.hex }} />
+                                    <span>{cluster.hex}</span>
+                                    {cluster.percentage > 0 && <span className="text-[9px] text-slate-400 font-sans">{cluster.percentage}%</span>}
+                                    {off ? (
+                                      <span title="Off-brand deviation"><AlertTriangle className="h-3 w-3 text-red-500" /></span>
+                                    ) : (
+                                      <span title="Approved brand color"><CircleCheck className="h-3 w-3 text-emerald-500" /></span>
+                                    )}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* WCAG Contrast Results Table / Matrix */}
+                          {outcome.stageB.vision.wcagMatrix && outcome.stageB.vision.wcagMatrix.length > 0 && (
+                            <div className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+                              <span className="font-semibold text-slate-700 text-[11px]">WCAG 2.1 Contrast Ratios:</span>
+                              <div className="space-y-1.5">
+                                {outcome.stageB.vision.wcagMatrix.slice(0, 4).map((m, idx) => (
+                                  <div key={idx} className="flex flex-col gap-1 rounded bg-white p-1.5 border border-slate-100 text-[11px]">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="h-3.5 w-3.5 rounded border" style={{ backgroundColor: m.foregroundHex }} />
+                                        <span className="font-mono text-[10px]">{m.foregroundHex}</span>
+                                        <span className="text-slate-400">on</span>
+                                        <span className="h-3.5 w-3.5 rounded border" style={{ backgroundColor: m.backgroundHex }} />
+                                        <span className="font-mono text-[10px]">{m.backgroundHex}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-bold text-slate-800">{m.contrastRatio}:1</span>
+                                        <Badge
+                                          variant="outline"
+                                          className={cn(
+                                            "text-[9px] py-0 px-1 font-semibold",
+                                            m.normalTextAA ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
+                                          )}
+                                        >
+                                          {m.normalTextAA ? "AA PASS" : "AA FAIL"}
+                                        </Badge>
+                                        {m.normalTextAAA && (
+                                          <Badge variant="outline" className="text-[9px] py-0 px-1 border-teal-200 bg-teal-50 text-teal-700 font-semibold">
+                                            AAA
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {m.remediationSuggestion && (
+                                      <p className="text-[10px] text-amber-700/90 leading-tight">
+                                        💡 {m.remediationSuggestion}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Download Report Button */}
+                          <div className="pt-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-[11px] gap-1.5 min-h-8"
+                              onClick={() => {
+                                const report = {
+                                  submissionId: outcome.submissionId,
+                                  title,
+                                  generatedAt: new Date().toISOString(),
+                                  score: outcome.score,
+                                  visionAudit: outcome.stageB.vision,
+                                  checks: outcome.stageA.checks,
+                                };
+                                const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `brandshield-visual-audit-${outcome.submissionId}.json`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }}
+                            >
+                              <Download className="h-3 w-3" /> Download Visual Compliance Report
+                            </Button>
                           </div>
                         </div>
                       </>

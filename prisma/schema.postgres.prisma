@@ -28,6 +28,7 @@ model Organization {
   submissions      Submission[]
   auditLogs        AuditLog[]
   subscription     Subscription?
+  visualInspections VisualInspection[]
 }
 
 model User {
@@ -45,6 +46,7 @@ model User {
   submissions  Submission[]
   auditLogs    AuditLog[]
   revisions    Revision[]
+  visualInspections VisualInspection[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -55,31 +57,46 @@ model User {
 // ─── Stage 1: Ground-Truth Repository & Brand Tokenization ───────────────────
 
 model GuidelineDocument {
-  id         String   @id @default(cuid())
-  orgId      String
-  title      String
-  docType    String // guideline | datasheet | terminology | banned_words | trademark | tone
-  content    String
-  sourceName String?
-  status     String   @default("indexed") // processing | indexed
-  chunkCount Int      @default(0)
-  version    String   @default("1.0")
+  id           String   @id @default(cuid())
+  orgId        String
+  title        String
+  docType      String // guideline | datasheet | terminology | banned_words | trademark | tone
+  content      String
+  sourceName   String?
+  fileSize     Int?
+  mimeType     String?
+  pageCount    Int      @default(1)
+  status       String   @default("indexed") // uploaded | processing | indexed | failed
+  errorMessage String?
+  chunkCount   Int      @default(0)
+  version      String   @default("1.0")
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  chunks     KnowledgeChunk[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  chunks       KnowledgeChunk[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, status])
 }
 
 model KnowledgeChunk {
-  id         String   @id @default(cuid())
-  documentId String
-  orgId      String
-  chunkIndex Int
-  text       String
-  ruleTag    String? // e.g. CLAIM-01, VOICE-02, TM-01
-  keywords   String   @default("") // pre-tokenized for lexical (sparse) retrieval
-  document   GuidelineDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  id             String   @id @default(cuid())
+  documentId     String
+  orgId          String
+  chunkIndex     Int
+  pageNumber     Int      @default(1)
+  text           String
+  ruleTag        String? // e.g. CLAIM-01, VOICE-02, TM-01
+  keywords       String   @default("") // pre-tokenized for lexical (sparse) retrieval
+  embedding      String?  // Serialized float array [e1, e2, ... e1536]
+  embeddingModel String?  // e.g. "text-embedding-3-small"
+  embeddingDim   Int?     // e.g. 1536
+  document       GuidelineDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@index([orgId])
+  @@index([documentId])
+  @@index([pageNumber])
 }
 
 model VisualToken {
@@ -117,6 +134,7 @@ model Submission {
   revisions       Revision[]
   auditLogs       AuditLog[]
   inspections     Inspection[]
+  visualInspections VisualInspection[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -134,6 +152,39 @@ model Inspection {
   complianceScore Int     @default(0)
   submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
+}
+
+model VisualInspection {
+  id                 String       @id @default(cuid())
+  orgId              String
+  userId             String?
+  submissionId       String?
+  assetName          String
+  assetUrl           String       // Data URL, relative path, or remote storage reference
+  fileSize           Int?         // File size in bytes
+  mimeType           String?      // image/png, image/jpeg, image/webp
+  width              Int?
+  height             Int?
+  status             String       @default("completed") // pending | completed | failed
+  dominantPalette    String       @default("[]") // JSON string of extracted hex colors + percentage weights
+  colorFindings      String       @default("[]") // JSON string of approved/unapproved color analysis
+  wcagResults        String       @default("[]") // JSON string of WCAG 2.1 contrast ratio calculations
+  accessibilityScore Int?         // 0-100 overall visual compliance score
+  overallLevel       String       @default("AA") // AAA | AA | FAIL
+  passed             Boolean      @default(false)
+  summary            String?      // Automated compliance assessment text
+  durationMs         Int          @default(0) // Processing duration in milliseconds
+  organization       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user               User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  submission         Submission?  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([orgId, createdAt])
+  @@index([submissionId])
+  @@index([userId])
 }
 
 model Finding {

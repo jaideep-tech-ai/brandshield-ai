@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, useEffect, type ChangeEvent } from "react";
 import { motion } from "framer-motion";
 import {
   BookOpen,
@@ -17,6 +17,13 @@ import {
   Trash2,
   Type,
   Eye,
+  UploadCloud,
+  Search,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,9 +32,13 @@ import {
   useGuidelines,
   useCreateGuideline,
   useDeleteGuideline,
+  useUploadGuidelinePdf,
+  useReindexGuideline,
+  useSearchKnowledge,
   useVisualTokens,
   useCreateVisualToken,
   useDeleteVisualToken,
+  type SearchPassage,
 } from "@/lib/brandshield/client";
 import type { GuidelineDoc, VisualToken } from "@/lib/brandshield/types";
 import { cn, timeAgo, readableOn } from "@/lib/brandshield/utils";
@@ -127,6 +138,9 @@ export function KnowledgeView() {
   const visualTokens = useVisualTokens();
   const createGuideline = useCreateGuideline();
   const deleteGuideline = useDeleteGuideline();
+  const uploadPdf = useUploadGuidelinePdf();
+  const reindexGuideline = useReindexGuideline();
+  const searchKnowledge = useSearchKnowledge();
   const createToken = useCreateVisualToken();
   const deleteToken = useDeleteVisualToken();
 
@@ -134,12 +148,32 @@ export function KnowledgeView() {
   const tokens = visualTokens.data ?? [];
   const totalChunks = docs.reduce((sum, d) => sum + (d.chunkCount ?? 0), 0);
 
+  // Polling for processing documents
+  const hasProcessingDocs = docs.some((d) => d.status === "processing" || d.status === "uploaded");
+  useEffect(() => {
+    if (!hasProcessingDocs) return;
+    const interval = setInterval(() => {
+      guidelines.refetch();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [hasProcessingDocs, guidelines]);
+
+  // Semantic RAG Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchPassage[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+
   // Add-document dialog state
   const [addDocOpen, setAddDocOpen] = useState(false);
+  const [uploadMode, setUploadMode] = useState<"pdf" | "text">("pdf");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [isDraggingPdf, setIsDraggingPdf] = useState(false);
+  const [reindexingId, setReindexingId] = useState<string | null>(null);
   const [docTitle, setDocTitle] = useState("");
   const [docType, setDocType] = useState("guideline");
   const [docContent, setDocContent] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   // Full-document dialog + delete confirms
   const [fullDoc, setFullDoc] = useState<GuidelineDoc | null>(null);
@@ -175,6 +209,54 @@ export function KnowledgeView() {
   };
 
   // ── Submit handlers ──
+  const submitPdfUpload = async () => {
+    if (!pdfFile) {
+      toast.error("Please select a PDF document to upload.");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", pdfFile);
+    formData.append("docType", docType);
+    if (docTitle.trim()) {
+      formData.append("title", docTitle.trim());
+    }
+
+    try {
+      await uploadPdf.mutateAsync(formData);
+      toast.success(`"${pdfFile.name}" queued for background extraction and vector embeddings!`);
+      setAddDocOpen(false);
+      setPdfFile(null);
+      setDocTitle("");
+      setDocType("guideline");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload guideline PDF");
+    }
+  };
+
+  const handleReindex = async (docId: string, title: string) => {
+    setReindexingId(docId);
+    try {
+      const res = await reindexGuideline.mutateAsync(docId);
+      toast.success(`Successfully reindexed "${title}" (${res.chunkCount} chunks)`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reindex document");
+    } finally {
+      setReindexingId(null);
+    }
+  };
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!searchQuery.trim()) return;
+    try {
+      const res = await searchKnowledge.mutateAsync({ query: searchQuery.trim(), limit: 6 });
+      setSearchResults(res.passages);
+      setHasSearched(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Semantic vector search failed");
+    }
+  };
+
   const submitDoc = async () => {
     if (!docTitle.trim() || !docContent.trim()) {
       toast.error(t("knowledge.toast.docValidation"));
@@ -185,7 +267,7 @@ export function KnowledgeView() {
       toast.success(t("knowledge.toast.docIngested"));
       setAddDocOpen(false);
       setDocTitle("");
-      setDocContent("knowledge.");
+      setDocContent("");
       setDocType("guideline");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("knowledge.toast.docFail"));
@@ -288,6 +370,97 @@ export function KnowledgeView() {
             )}
           </div>
 
+          {/* ── Semantic Vector Search Tester ── */}
+          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-teal-50/20 to-white p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-teal-600" />
+                  Semantic RAG Vector Search Tester
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Verify multi-page vector embeddings (OpenAI 1536-dim) & BM25 hybrid ranking against indexed knowledge.
+                </p>
+              </div>
+              <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700 text-xs w-fit">
+                pgvector + RRF (k=60)
+              </Badge>
+            </div>
+
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Test a semantic query (e.g. 'Can we use the logo on dark backgrounds?', 'patent claims', 'disclaimer requirements')..."
+                  className="pl-9 bg-white border-slate-200 text-sm"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={searchKnowledge.isPending || !searchQuery.trim()}
+                className="bg-teal-700 text-white hover:bg-teal-800 shrink-0"
+              >
+                {searchKnowledge.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                Search
+              </Button>
+            </form>
+
+            {hasSearched && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Found {searchResults.length} matching passage{searchResults.length === 1 ? "" : "s"}</span>
+                  {searchResults.length > 0 && <span className="font-mono text-[10px]">Ranked via Reciprocal Rank Fusion</span>}
+                </div>
+
+                {searchResults.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-200 bg-white p-5 text-center text-xs text-slate-500">
+                    No passages matched &quot;{searchQuery}&quot;. Ingest relevant guidelines or try broader search terms.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {searchResults.map((p, idx) => (
+                      <div key={p.id || idx} className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-2 hover:border-teal-300 transition-colors">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="font-semibold text-xs text-slate-900 truncate max-w-[200px]" title={p.documentTitle}>
+                            {p.documentTitle}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="outline" className="border-teal-200 bg-teal-50 text-[10px] text-teal-800">
+                              Page {p.pageNumber}
+                            </Badge>
+                            {p.ruleTag && (
+                              <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-[10px] text-indigo-800 font-mono">
+                                {p.ruleTag}
+                              </Badge>
+                            )}
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px]",
+                                p.matchType === "hybrid"
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                  : p.matchType === "vector"
+                                    ? "border-cyan-200 bg-cyan-50 text-cyan-800"
+                                    : "border-slate-200 bg-slate-50 text-slate-700"
+                              )}
+                            >
+                              {p.matchType} ({p.score})
+                            </Badge>
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-600 line-clamp-4 leading-relaxed font-sans bg-slate-50/80 p-2.5 rounded-lg border border-slate-100">
+                          {p.text}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {guidelines.isLoading ? (
             <div role="status" aria-label={t("knowledge.docs.loadingAria")} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -327,44 +500,98 @@ export function KnowledgeView() {
                   <motion.div key={doc.id} {...fadeUp(i)}>
                     <Card className="flex h-full flex-col rounded-2xl border-slate-200 shadow-sm transition-shadow hover:shadow-md">
                       <CardContent className="flex h-full flex-col gap-3 p-6">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className={cn("border", meta?.cls ?? DOC_TYPE_DEFAULT_CLS)}>
                             {docTypeLabel(doc.docType)}
                           </Badge>
                           <Badge variant="outline" className="border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-500">
                             v{doc.version}
                           </Badge>
+                          {doc.status === "processing" ? (
+                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
+                              Vectorizing...
+                            </Badge>
+                          ) : doc.status === "uploaded" ? (
+                            <Badge variant="outline" className="border-sky-300 bg-sky-50 text-sky-800 text-[10px] flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-sky-600" />
+                              Queued
+                            </Badge>
+                          ) : doc.status === "failed" ? (
+                            <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800 text-[10px] flex items-center gap-1" title={doc.errorMessage ?? "Failed"}>
+                              <AlertCircle className="h-3 w-3 text-red-600" />
+                              Failed
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-800 text-[10px] flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                              Indexed
+                            </Badge>
+                          )}
+
                           {isAdmin && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={t("knowledge.aria.deleteDoc", { title: doc.title })}
-                              className="ml-auto h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                              onClick={() => setDocToDelete(doc)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="ml-auto flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Re-index document vectors"
+                                aria-label={`Re-index ${doc.title}`}
+                                disabled={reindexingId === doc.id || doc.status === "processing"}
+                                className="h-8 w-8 text-slate-400 hover:bg-teal-50 hover:text-teal-700"
+                                onClick={() => handleReindex(doc.id, doc.title)}
+                              >
+                                <RefreshCw className={cn("h-3.5 w-3.5", reindexingId === doc.id && "animate-spin text-teal-600")} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={t("knowledge.aria.deleteDoc", { title: doc.title })}
+                                className="h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                onClick={() => setDocToDelete(doc)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           )}
                         </div>
 
                         <h3 className="text-sm font-semibold leading-snug text-slate-900">{doc.title}</h3>
 
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                          {doc.pageCount && doc.pageCount > 0 && (
+                            <span className="inline-flex items-center gap-1">
+                              <BookOpen className="h-3.5 w-3.5 text-indigo-600" />
+                              {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}
+                            </span>
+                          )}
                           <span className="inline-flex items-center gap-1">
                             <Layers className="h-3.5 w-3.5 text-teal-600" />
                             {t("knowledge.docs.chunks", { count: doc.chunkCount })}
                           </span>
+                          {doc.fileSize && (
+                            <span className="inline-flex items-center gap-1 font-mono text-[11px]">
+                              {doc.fileSize > 1048576
+                                ? `${(doc.fileSize / 1048576).toFixed(1)} MB`
+                                : `${(doc.fileSize / 1024).toFixed(0)} KB`}
+                            </span>
+                          )}
                           <span className="inline-flex items-center gap-1">
                             <History className="h-3.5 w-3.5" />
                             {t("knowledge.docs.updated", { time: timeAgo(doc.updatedAt ?? doc.createdAt, lang) })}
                           </span>
                           {doc.sourceName && (
                             <span className="inline-flex max-w-full items-center gap-1 truncate">
-                              <BookOpen className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate">{doc.sourceName}</span>
                             </span>
                           )}
                         </div>
+
+                        {doc.status === "failed" && doc.errorMessage && (
+                          <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 flex items-start gap-2">
+                            <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                            <span className="break-words">{doc.errorMessage}</span>
+                          </div>
+                        )}
 
                         <div className="whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 p-3 font-mono text-xs text-slate-600">
                           {doc.content.slice(0, 280)}
@@ -575,75 +802,215 @@ export function KnowledgeView() {
         <DialogContent className="max-h-[92vh] overflow-y-auto rounded-2xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="text-slate-900">{t("knowledge.addDoc.title")}</DialogTitle>
-            <DialogDescription>{t("knowledge.addDoc.description")}</DialogDescription>
+            <DialogDescription>
+              Upload corporate brand guidelines, whitepapers, legal manuals, or paste rule text.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="kb-title" className="text-slate-700">{t("knowledge.addDoc.titleLabel")}</Label>
-              <Input
-                id="kb-title"
-                value={docTitle}
-                onChange={(e) => setDocTitle(e.target.value)}
-                placeholder={t("knowledge.addDoc.titlePlaceholder")}
-                className="border-slate-200"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-slate-700">{t("knowledge.addDoc.typeLabel")}</Label>
-              <Select value={docType} onValueChange={setDocType}>
-                <SelectTrigger className="w-full border-slate-200">
-                  <SelectValue placeholder={t("knowledge.selectType")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(DOC_TYPE_META).map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {docTypeLabel(value)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="kb-content" className="text-slate-700">{t("knowledge.addDoc.contentLabel")}</Label>
-              <Textarea
-                id="kb-content"
-                value={docContent}
-                onChange={(e) => setDocContent(e.target.value)}
-                placeholder={t("knowledge.addDoc.contentPlaceholder")}
-                className="min-h-[220px] border-slate-200 font-mono text-xs"
-              />
-            </div>
-
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-6 text-center transition-colors hover:border-teal-500 hover:bg-teal-50/40">
-              <FileUp className="h-5 w-5 text-slate-400" />
-              <span className="text-xs font-medium text-slate-600">{t("knowledge.addDoc.importLabel")}</span>
-              <span className="text-[11px] text-slate-400">{t("knowledge.addDoc.importHint")}</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt,.md,.markdown,.csv"
-                className="hidden"
-                onChange={handleFileImport}
-              />
-            </label>
+          {/* Mode Switcher */}
+          <div className="flex rounded-lg bg-slate-100 p-1">
+            <button
+              type="button"
+              className={cn(
+                "flex-1 rounded-md py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1.5",
+                uploadMode === "pdf"
+                  ? "bg-white text-teal-800 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+              onClick={() => setUploadMode("pdf")}
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Upload PDF (50+ Pages)
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "flex-1 rounded-md py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1.5",
+                uploadMode === "text"
+                  ? "bg-white text-teal-800 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+              onClick={() => setUploadMode("text")}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Paste Text / Markdown
+            </button>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" className="border-slate-200" onClick={() => setAddDocOpen(false)}>
-              {t("common.action.cancel")}
-            </Button>
-            <Button
-              className="bg-teal-700 text-white hover:bg-teal-800"
-              disabled={createGuideline.isPending}
-              onClick={submitDoc}
-            >
-              {createGuideline.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t("knowledge.addDoc.submit")}
-            </Button>
-          </DialogFooter>
+          {uploadMode === "pdf" ? (
+            <div className="space-y-4">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDraggingPdf(true);
+                }}
+                onDragLeave={() => setIsDraggingPdf(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingPdf(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file && file.type === "application/pdf") {
+                    setPdfFile(file);
+                    if (!docTitle) setDocTitle(file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "));
+                  } else {
+                    toast.error("Please drop a valid PDF document (.pdf)");
+                  }
+                }}
+                onClick={() => pdfInputRef.current?.click()}
+                className={cn(
+                  "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed p-8 text-center transition-all",
+                  isDraggingPdf
+                    ? "border-teal-500 bg-teal-50/50"
+                    : pdfFile
+                      ? "border-emerald-300 bg-emerald-50/20"
+                      : "border-slate-200 bg-slate-50/50 hover:border-teal-400 hover:bg-slate-50"
+                )}
+              >
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPdfFile(file);
+                      if (!docTitle) setDocTitle(file.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "));
+                    }
+                  }}
+                />
+
+                <div className={cn("rounded-full p-3", pdfFile ? "bg-emerald-100 text-emerald-700" : "bg-teal-50 text-teal-700")}>
+                  {pdfFile ? <CheckCircle2 className="h-6 w-6" /> : <UploadCloud className="h-6 w-6" />}
+                </div>
+
+                {pdfFile ? (
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-900">{pdfFile.name}</p>
+                    <p className="text-xs text-slate-500 font-mono">
+                      {(pdfFile.size / (1024 * 1024)).toFixed(2)} MB · Ready for vector ingestion
+                    </p>
+                    <p className="text-[11px] text-teal-700 underline pt-1">Click to replace file</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-900">Drag & drop guideline PDF here, or browse</p>
+                    <p className="text-xs text-slate-500">
+                      Supports large manuals (50+ pages, up to 50 MB). Automatically extracts text & generates 1536-dim embeddings.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="kb-pdf-title" className="text-slate-700">Document Title</Label>
+                <Input
+                  id="kb-pdf-title"
+                  value={docTitle}
+                  onChange={(e) => setDocTitle(e.target.value)}
+                  placeholder="e.g. Global Brand Guidelines 2026, Product Datasheet..."
+                  className="border-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-slate-700">{t("knowledge.addDoc.typeLabel")}</Label>
+                <Select value={docType} onValueChange={setDocType}>
+                  <SelectTrigger className="w-full border-slate-200">
+                    <SelectValue placeholder={t("knowledge.selectType")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(DOC_TYPE_META).map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {docTypeLabel(value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter className="pt-2">
+                <Button variant="outline" className="border-slate-200" onClick={() => setAddDocOpen(false)}>
+                  {t("common.action.cancel")}
+                </Button>
+                <Button
+                  className="bg-teal-700 text-white hover:bg-teal-800"
+                  disabled={uploadPdf.isPending || !pdfFile}
+                  onClick={submitPdfUpload}
+                >
+                  {uploadPdf.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Ingest & Vectorize Document
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="kb-title" className="text-slate-700">{t("knowledge.addDoc.titleLabel")}</Label>
+                <Input
+                  id="kb-title"
+                  value={docTitle}
+                  onChange={(e) => setDocTitle(e.target.value)}
+                  placeholder={t("knowledge.addDoc.titlePlaceholder")}
+                  className="border-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-slate-700">{t("knowledge.addDoc.typeLabel")}</Label>
+                <Select value={docType} onValueChange={setDocType}>
+                  <SelectTrigger className="w-full border-slate-200">
+                    <SelectValue placeholder={t("knowledge.selectType")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(DOC_TYPE_META).map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {docTypeLabel(value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="kb-content" className="text-slate-700">{t("knowledge.addDoc.contentLabel")}</Label>
+                <Textarea
+                  id="kb-content"
+                  value={docContent}
+                  onChange={(e) => setDocContent(e.target.value)}
+                  placeholder={t("knowledge.addDoc.contentPlaceholder")}
+                  className="min-h-[200px] border-slate-200 font-mono text-xs"
+                />
+              </div>
+
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-4 text-center transition-colors hover:border-teal-500 hover:bg-teal-50/40">
+                <FileUp className="h-5 w-5 text-slate-400" />
+                <span className="text-xs font-medium text-slate-600">{t("knowledge.addDoc.importLabel")}</span>
+                <span className="text-[11px] text-slate-400">{t("knowledge.addDoc.importHint")}</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.md,.markdown,.csv"
+                  className="hidden"
+                  onChange={handleFileImport}
+                />
+              </label>
+
+              <DialogFooter className="pt-2">
+                <Button variant="outline" className="border-slate-200" onClick={() => setAddDocOpen(false)}>
+                  {t("common.action.cancel")}
+                </Button>
+                <Button
+                  className="bg-teal-700 text-white hover:bg-teal-800"
+                  disabled={createGuideline.isPending}
+                  onClick={submitDoc}
+                >
+                  {createGuideline.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {t("knowledge.addDoc.submit")}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
