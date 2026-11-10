@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileSearch,
@@ -23,7 +23,10 @@ import {
   MessageSquareQuote,
   Download,
   AlertTriangle,
+  UploadCloud,
+  ImageIcon,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -390,6 +393,39 @@ function BannerAnnotator({
   onSelect: (id: string) => void;
 }) {
   const { t } = useLang();
+  const queryClient = useQueryClient();
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File exceeds 5MB limit");
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/submissions/${sub.id}/image`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update banner image");
+      }
+      toast.success("Banner image updated! Re-scanning recommended.");
+      queryClient.invalidateQueries({ queryKey: ["submissions"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload image");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const colorFindings = findings.filter((f) => /^#[0-9a-fA-F]{3,8}/.test(f.flaggedText));
   const offColors = new Map(colorFindings.map((f) => [f.flaggedText.toUpperCase(), f]));
   const contrastFindings = findings.filter((f) => f.category === "visual" && f.ruleCitation.includes("WCAG"));
@@ -406,6 +442,31 @@ function BannerAnnotator({
     <div className="space-y-4">
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
         <img src={src} alt={t("findings.banner.alt")} className="max-h-72 w-full object-contain" />
+      </div>
+
+      {/* Banner replacement upload bar */}
+      <div className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50/80 p-3">
+        <div className="flex items-center gap-2 text-xs text-slate-600">
+          <ImageIcon className="h-4 w-4 text-teal-700" />
+          <span>{uploading ? "Uploading replacement banner..." : "Upload updated or remediated banner image (PNG, JPG, WEBP, SVG)"}</span>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+          className="min-h-8 gap-1.5 border-teal-200 bg-white text-xs font-medium text-teal-800 hover:bg-teal-50"
+        >
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />}
+          Upload Remediated Banner
+        </Button>
       </div>
 
       {/* Dominant Palette Section */}
@@ -580,8 +641,11 @@ function FindingCard({
   onOverride: (note: string) => void;
 }) {
   const { t } = useLang();
+  const queryClient = useQueryClient();
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [note, setNote] = useState("");
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const findingFileRef = useRef<HTMLInputElement>(null);
   const meta = SEVERITY_META[f.severity];
 
   return (
@@ -658,6 +722,57 @@ function FindingCard({
                 <Button size="sm" variant="outline" className="min-h-9 gap-1.5" disabled={busy} onClick={(e) => { e.stopPropagation(); setOverrideOpen(true); }}>
                   <Flag className="h-3.5 w-3.5" /> {t("findings.action.override")}
                 </Button>
+                {(f.category === "visual" || f.stage === "vision") && (
+                  <>
+                    <input
+                      ref={findingFileRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast.error("Image file must be under 5MB");
+                          return;
+                        }
+                        setUploadingImg(true);
+                        try {
+                          const formData = new FormData();
+                          formData.append("file", file);
+                          const res = await fetch(`/api/findings/${f.id}/image`, {
+                            method: "POST",
+                            body: formData,
+                          });
+                          if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            throw new Error(err.error || "Upload failed");
+                          }
+                          toast.success("Remediated asset image uploaded and finding resolved!");
+                          queryClient.invalidateQueries({ queryKey: ["submissions"] });
+                        } catch (err: any) {
+                          toast.error(err.message || "Failed to upload image");
+                        } finally {
+                          setUploadingImg(false);
+                          if (findingFileRef.current) findingFileRef.current.value = "";
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="min-h-9 gap-1.5 border-teal-200 text-teal-800 hover:bg-teal-50"
+                      disabled={busy || uploadingImg}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        findingFileRef.current?.click();
+                      }}
+                    >
+                      {uploadingImg ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />}
+                      Upload Fixed Image
+                    </Button>
+                  </>
+                )}
               </div>
             )}
           </>

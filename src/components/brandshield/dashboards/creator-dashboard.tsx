@@ -35,6 +35,7 @@ import { useLang } from "@/lib/brandshield/i18n";
 import { useUIStore, type ViewKey } from "@/lib/brandshield/store";
 import { cn, timeAgo } from "@/lib/brandshield/utils";
 import { SEVERITY_META, STATUS_META, type Severity, type SubmissionStatus } from "@/lib/brandshield/types";
+import { WorkflowCard } from "@/components/brandshield/workflow-card";
 
 // ─── Content Studio — creator landing dashboard (teal identity) ──────────────
 // Focus: draft → scan → fix → submit. Structurally distinct from the Review
@@ -170,7 +171,10 @@ export function CreatorDashboard() {
         </Card>
       </motion.div>
 
-      {/* 2 · Draft Composer — signature feature */}
+      {/* 2 · 7-Stage Brand Governance Lifecycle */}
+      <WorkflowCard />
+
+      {/* 3 · Draft Composer — signature feature */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
         <Card data-tour="composer" className="border-teal-100">
           <CardContent className="p-5 sm:p-6">

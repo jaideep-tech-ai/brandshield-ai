@@ -392,6 +392,37 @@ export function useAnalytics() {
   return useQuery<AnalyticsPayload>({ queryKey: ["analytics"], queryFn: () => api.get("/api/analytics") });
 }
 
+export interface WorkflowStageItem {
+  id: number;
+  key: string;
+  name: string;
+  nameHi: string;
+  description: string;
+  descriptionHi: string;
+  completed: boolean;
+  current: boolean;
+  count: number;
+  detail: string;
+  detailHi: string;
+  targetView: string;
+}
+
+export interface WorkflowData {
+  stages: WorkflowStageItem[];
+  completedCount: number;
+  totalStages: number;
+  percentage: number;
+  orgName: string;
+}
+
+export function useWorkflow() {
+  return useQuery<WorkflowData>({
+    queryKey: ["workflow-stages"],
+    queryFn: () => api.get("/api/system/workflow"),
+    staleTime: 10_000,
+  });
+}
+
 // ─── Billing & Org ───────────────────────────────────────────────────────────
 
 export function useSubscription() {

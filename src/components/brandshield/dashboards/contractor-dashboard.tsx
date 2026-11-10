@@ -25,6 +25,7 @@ import { useUIStore } from "@/lib/brandshield/store";
 import { useLang } from "@/lib/brandshield/i18n";
 import { cn, timeAgo, formatDate } from "@/lib/brandshield/utils";
 import { STATUS_META, type Submission } from "@/lib/brandshield/types";
+import { WorkflowCard } from "@/components/brandshield/workflow-card";
 
 import "@/lib/brandshield/i18n/dict-dash-b";
 
@@ -96,7 +97,10 @@ export function ContractorDashboard() {
         </Card>
       </motion.div>
 
-      {/* 2 · Big pre-check CTA */}
+      {/* 2 · 7-Stage Brand Governance Lifecycle */}
+      <WorkflowCard />
+
+      {/* 3 · Big pre-check CTA */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} data-tour="sandbox-hero">
         <Card className="border-orange-200/70 bg-white shadow-sm">
           <CardContent className="grid gap-5 p-6 lg:grid-cols-[1fr_auto] lg:items-center">

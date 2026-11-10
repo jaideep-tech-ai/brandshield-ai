@@ -102,11 +102,23 @@ const SHIELD_LOGO_SVG =
 
 // ─── Seed helper ─────────────────────────────────────────────────────────────
 
-function chain(entries: { action: string; actorId: string; details: Record<string, unknown>; ts: Date }[]) {
-  let prev = "GENESIS";
+function chain(
+  entries: { action: string; actorId: string; details: Record<string, unknown>; ts: Date; submissionId?: string | null }[],
+  initialPrev = "GENESIS"
+) {
+  let prev = initialPrev;
   return entries.map((e) => {
     const contentHash = createHash("sha256")
-      .update(JSON.stringify({ prevHash: prev, ...e, ts: e.ts.getTime() }))
+      .update(
+        JSON.stringify({
+          prevHash: prev,
+          action: e.action,
+          submissionId: e.submissionId ?? null,
+          actorId: e.actorId,
+          details: e.details,
+          ts: e.ts.getTime(),
+        })
+      )
       .digest("hex");
     const row = { ...e, prevHash: prev, contentHash };
     prev = contentHash;
@@ -416,19 +428,6 @@ Merchants using Smart Retries recover 11.4% more failed payments on average. Set
     },
   });
 
-  const day = 24 * 60 * 60 * 1000;
-  const chainRows = chain([
-    { action: "SUBMITTED", actorId: ava.id, details: { submissionId: s4.id, title: "SmartRetries Launch Note", version: 1 }, ts: new Date(Date.now() - 3 * day) },
-    { action: "SCAN", actorId: ava.id, details: { submissionId: s4.id, findings: 1, score: 90 }, ts: new Date(Date.now() - 3 * day + 120000) },
-    { action: "SIGN_OFF", actorId: marcus.id, details: { submissionId: s4.id, note: "Claim verified against FACT PD-09; ® glyph fix requested.", hash: createHash("sha256").update(`${s4.id}|${v1}|${marcus.id}`).digest("hex") }, ts: new Date(Date.now() - 2 * day) },
-    { action: "CHANGES_REQUESTED", actorId: marcus.id, details: { submissionId: s4.id, note: "Please add the ® glyph on first prominent brand use (TM-01)." }, ts: new Date(Date.now() - 2 * day + 60000) },
-    { action: "SCAN", actorId: ava.id, details: { submissionId: s4.id, findings: 0, score: 100 }, ts: new Date(Date.now() - 1 * day) },
-    { action: "APPROVAL", actorId: marcus.id, details: { submissionId: s4.id, note: "All flags resolved. Cleared for publication.", certificate: true }, ts: new Date(Date.now() - 1 * day + 300000) },
-  ]);
-  for (const row of chainRows) {
-    await db.auditLog.create({ data: { orgId: org.id, submissionId: s4.id, actorId: row.actorId, action: row.action, details: JSON.stringify(row.details), contentHash: row.contentHash, prevHash: row.prevHash, createdAt: row.ts } });
-  }
-
   // ── Submission 4: Changes requested (reviewer feedback demo)
   const s5Content = `Growth team webinar promo:
 
@@ -454,14 +453,35 @@ Join our webinar and learn how NimbusPay customers cut failed payments by 40% in
       { submissionId: s5.id, severity: "critical", category: "claim", flaggedText: "Join our webinar and learn how NimbusPay customers cut failed payments by 40% in one week.", ruleCitation: "FACT PD-09: Smart Retries recover 11.4% more failed payments on average. No 40% one-week figure exists.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "The 40% one-week reduction is not in the approved facts and overstates FACT PD-09.", suggestion: "Join our webinar and learn how merchants recover 11.4% more failed payments with Smart Retries.", stage: "ai" },
     ],
   });
-  await db.auditLog.create({
-    data: {
-      orgId: org.id, submissionId: s5.id, actorId: marcus.id, action: "CHANGES_REQUESTED",
-      details: JSON.stringify({ submissionId: s5.id, note: "40% claim is not in the approved facts — please cite FACT PD-09 instead." }),
-      contentHash: createHash("sha256").update(`${s5.id}|changes|${Date.now()}`).digest("hex"), prevHash: chainRows[chainRows.length - 1].contentHash,
-      createdAt: new Date(Date.now() - 0.4 * day),
-    },
-  });
+
+  const day = 24 * 60 * 60 * 1000;
+  const allAuditEntries = chain([
+    { action: "SUBSCRIPTION", actorId: elena.id, details: { event: "subscription.started", tier: "growth", seats: 12 }, ts: new Date(Date.now() - 21 * day), submissionId: null },
+    { action: "SCAN", actorId: priya.id, details: { sandbox: true, tier: "growth" }, ts: new Date(Date.now() - 5 * day), submissionId: null },
+    { action: "SCAN", actorId: ava.id, details: { sandbox: false }, ts: new Date(Date.now() - 4 * day), submissionId: null },
+    { action: "SUBMITTED", actorId: ava.id, details: { submissionId: s4.id, title: "SmartRetries Launch Note", version: 1 }, ts: new Date(Date.now() - 3 * day), submissionId: s4.id },
+    { action: "SCAN", actorId: ava.id, details: { submissionId: s4.id, findings: 1, score: 90 }, ts: new Date(Date.now() - 3 * day + 120000), submissionId: s4.id },
+    { action: "SIGN_OFF", actorId: marcus.id, details: { submissionId: s4.id, note: "Claim verified against FACT PD-09; ® glyph fix requested.", hash: createHash("sha256").update(`${s4.id}|${v1}|${marcus.id}`).digest("hex") }, ts: new Date(Date.now() - 2 * day), submissionId: s4.id },
+    { action: "CHANGES_REQUESTED", actorId: marcus.id, details: { submissionId: s4.id, note: "Please add the ® glyph on first prominent brand use (TM-01)." }, ts: new Date(Date.now() - 2 * day + 60000), submissionId: s4.id },
+    { action: "SCAN", actorId: ava.id, details: { submissionId: s4.id, findings: 0, score: 100 }, ts: new Date(Date.now() - 1 * day), submissionId: s4.id },
+    { action: "APPROVAL", actorId: marcus.id, details: { submissionId: s4.id, note: "All flags resolved. Cleared for publication.", certificate: true }, ts: new Date(Date.now() - 1 * day + 300000), submissionId: s4.id },
+    { action: "CHANGES_REQUESTED", actorId: marcus.id, details: { submissionId: s5.id, note: "40% claim is not in the approved facts — please cite FACT PD-09 instead." }, ts: new Date(Date.now() - 0.4 * day), submissionId: s5.id },
+  ]);
+
+  for (const row of allAuditEntries) {
+    await db.auditLog.create({
+      data: {
+        orgId: org.id,
+        submissionId: row.submissionId ?? null,
+        actorId: row.actorId,
+        action: row.action,
+        details: JSON.stringify(row.details),
+        contentHash: row.contentHash,
+        prevHash: row.prevHash,
+        createdAt: row.ts,
+      },
+    });
+  }
 
   // ── Banner submission with off-brand palette (image generated separately)
   const s2 = await db.submission.create({
@@ -509,15 +529,7 @@ Join our webinar and learn how NimbusPay customers cut failed payments by 40% in
     ],
   });
 
-  // ── A few extra historic audit entries for billing + analytics texture
-  const extra = chain([
-    { action: "SUBSCRIPTION", actorId: elena.id, details: { event: "subscription.started", tier: "growth", seats: 12 }, ts: new Date(Date.now() - 21 * day) },
-    { action: "SCAN", actorId: priya.id, details: { sandbox: true, tier: "growth" }, ts: new Date(Date.now() - 5 * day) },
-    { action: "SCAN", actorId: ava.id, details: { sandbox: false }, ts: new Date(Date.now() - 4 * day) },
-  ]);
-  for (const row of extra) {
-    await db.auditLog.create({ data: { orgId: org.id, submissionId: null, actorId: row.actorId, action: row.action, details: JSON.stringify(row.details), contentHash: row.contentHash, prevHash: row.prevHash, createdAt: row.ts } });
-  }
+
 
   console.log("✅ BrandShield seed complete: Nimbus Labs workspace is ready");
 }

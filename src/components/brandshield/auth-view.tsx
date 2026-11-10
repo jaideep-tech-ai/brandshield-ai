@@ -219,7 +219,26 @@ export function AuthView({ onBack }: { onBack: () => void }) {
       setFirebaseBusy(true);
       firebaseEmailSignIn(email.trim(), password)
         .then(finishFirebaseSession)
-        .catch((err: Error) => toast.error(err.message))
+        .catch((err: Error) => {
+          const code = (err as { code?: string })?.code;
+          // Fall back gracefully to local credentials if Firebase email/pw is not enabled
+          // or user account only exists in the database
+          if (
+            code === "auth/operation-not-allowed" ||
+            code === "auth/user-not-found" ||
+            code === "auth/invalid-credential"
+          ) {
+            login.mutate(
+              { email: email.trim(), password },
+              {
+                onSuccess: finish,
+                onError: (localErr) => toast.error(localErr.message || err.message),
+              }
+            );
+            return;
+          }
+          toast.error(err.message);
+        })
         .finally(() => setFirebaseBusy(false));
       return;
     }
@@ -236,7 +255,14 @@ export function AuthView({ onBack }: { onBack: () => void }) {
     setFirebaseBusy(true);
     firebaseGoogleSignIn()
       .then(finishFirebaseSession)
-      .catch((err: Error) => toast.error(err.message))
+      .catch((err: Error) => {
+        const code = (err as { code?: string })?.code;
+        if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+          toast.info("Google sign-in was cancelled");
+          return;
+        }
+        toast.error(err.message);
+      })
       .finally(() => setFirebaseBusy(false));
   }
 
@@ -247,11 +273,31 @@ export function AuthView({ onBack }: { onBack: () => void }) {
       toast.error(t("auth.toast.passwordMismatch"));
       return;
     }
+    const finish = (user: SessionUser) => {
+      toast.success(t("auth.toast.welcome", { name: user.name.split(" ")[0] }));
+    };
     if (firebaseConnected) {
       setFirebaseBusy(true);
       firebaseEmailSignUp({ email: email.trim(), password, name: name.trim() })
         .then(finishFirebaseSession)
-        .catch((err: Error) => toast.error(err.message))
+        .catch((err: Error) => {
+          const code = (err as { code?: string })?.code;
+          if (code === "auth/operation-not-allowed") {
+            register.mutate(
+              {
+                name: name.trim(),
+                email: email.trim(),
+                password,
+                role,
+                department: department.trim() || undefined,
+                organizationName: organizationName.trim() || undefined,
+              },
+              { onSuccess: finish }
+            );
+            return;
+          }
+          toast.error(err.message);
+        })
         .finally(() => setFirebaseBusy(false));
       return;
     }
@@ -265,9 +311,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
         organizationName: organizationName.trim() || undefined,
       },
       {
-        onSuccess: (user) => {
-          toast.success(t("auth.toast.welcome", { name: user.name.split(" ")[0] }));
-        },
+        onSuccess: finish,
       }
     );
   }

@@ -30,6 +30,7 @@ import { useUIStore } from "@/lib/brandshield/store";
 import { useLang } from "@/lib/brandshield/i18n";
 import { cn, formatDate, initials } from "@/lib/brandshield/utils";
 import type { TeamMember } from "@/lib/brandshield/types";
+import { WorkflowCard } from "@/components/brandshield/workflow-card";
 
 import "@/lib/brandshield/i18n/dict-dash-b";
 
@@ -110,7 +111,10 @@ export function AdminDashboard() {
         </Card>
       </motion.div>
 
-      {/* 2 · KPI row */}
+      {/* 2 · 7-Stage Brand Governance Lifecycle */}
+      <WorkflowCard />
+
+      {/* 3 · KPI row */}
       <div data-tour="kpi" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map((k, i) => (
           <motion.div key={k.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>

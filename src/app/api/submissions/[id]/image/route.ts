@@ -69,3 +69,96 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return jsonError(e);
   }
 }
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+const ALLOWED_MIME = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+]);
+
+/**
+ * POST /api/submissions/[id]/image
+ *
+ * Upload or replace the banner asset image for a submission.
+ */
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await requireUser();
+    const { id } = await params;
+
+    const sub = await db.submission.findUnique({
+      where: { id },
+      select: { id: true, orgId: true, currentVersion: true, content: true },
+    });
+
+    if (!sub || sub.orgId !== user.orgId) {
+      return NextResponse.json({ error: "Submission not found" }, { status: 404 });
+    }
+
+    let dataUrl: string | null = null;
+    const contentType = req.headers.get("content-type") ?? "";
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+      const file = formData.get("file");
+      if (!file || typeof file === "string") {
+        return NextResponse.json({ error: "No image file provided" }, { status: 400 });
+      }
+
+      const blob = file as Blob;
+      if (blob.size > MAX_IMAGE_BYTES) {
+        return NextResponse.json({ error: "Image exceeds 5MB maximum size" }, { status: 400 });
+      }
+
+      const mime = blob.type || "image/png";
+      if (!ALLOWED_MIME.has(mime)) {
+        return NextResponse.json({ error: `Unsupported image format: ${mime}` }, { status: 400 });
+      }
+
+      const arrayBuffer = await blob.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      dataUrl = `data:${mime};base64,${base64}`;
+    } else {
+      const json = await req.json().catch(() => ({}));
+      if (typeof json.imageData === "string" && json.imageData.startsWith("data:image/")) {
+        dataUrl = json.imageData;
+      } else {
+        return NextResponse.json({ error: "A valid image data URL is required" }, { status: 400 });
+      }
+    }
+
+    const nextVersion = sub.currentVersion + 1;
+
+    await db.submission.update({
+      where: { id: sub.id },
+      data: {
+        imageData: dataUrl,
+        contentType: "banner",
+        currentVersion: nextVersion,
+        complianceScore: null,
+      },
+    });
+
+    await db.revision.create({
+      data: {
+        submissionId: sub.id,
+        version: nextVersion,
+        content: sub.content,
+        changeSummary: "Updated banner image",
+        authorId: user.id,
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      version: nextVersion,
+      imageUrl: `/api/submissions/${sub.id}/image`,
+    });
+  } catch (e) {
+    return jsonError(e);
+  }
+}
