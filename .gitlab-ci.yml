@@ -19,10 +19,11 @@ brandshield-governance-audit:
     - if: $CI_PIPELINE_SOURCE == "push"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   script:
-    - echo "=== RUNNING BRANDSHIELD AI PRE-PUBLISHING GOVERNANCE AUDIT ==="
-    - echo "Project: $CI_PROJECT_PATH"
-    - echo "Commit:  $CI_COMMIT_SHA ($CI_COMMIT_REF_NAME)"
-    - echo "Author:  $CI_COMMIT_AUTHOR"
+    - |
+      echo "=== RUNNING BRANDSHIELD AI PRE-PUBLISHING GOVERNANCE AUDIT ==="
+      echo "Project: $CI_PROJECT_PATH"
+      echo "Commit:  $CI_COMMIT_SHA ($CI_COMMIT_REF_NAME)"
+      echo "Author:  $CI_COMMIT_AUTHOR"
     - |
       PAYLOAD=$(cat <<EOF
       {
