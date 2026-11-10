@@ -2,6 +2,8 @@ import { contrastRatio, readableOn } from "../src/lib/brandshield/shared.ts";
 import { computeWcagMatrix } from "../src/lib/brandshield/server/wcag.ts";
 import { deltaE } from "../src/lib/brandshield/server/kmeans.ts";
 import { chunkDocumentPages, cosineSimilarity } from "../src/lib/brandshield/server/vector-rag.ts";
+import { validateSsrfSafeUrl } from "../src/lib/brandshield/server/ssrf.ts";
+import { signWebhookPayload, verifyWebhookSignature } from "../src/lib/brandshield/server/webhooks.ts";
 
 console.log("==================================================");
 console.log("RUNNING BRANDSHIELD AI FEATURE VERIFICATION SUITE");
@@ -97,6 +99,39 @@ const flutterTeal = formatFlutterColor("#0F766E");
 assert(flutterTeal === "0xFF0F766E", `Primary brand teal hex correctly formatted for Flutter Color: ${flutterTeal}`);
 const flutterMint = formatFlutterColor("#14B8A6");
 assert(flutterMint === "0xFF14B8A6", `Accent mint hex correctly formatted for Flutter Color: ${flutterMint}`);
+
+// ── Test 7: SSRF Safety Filter & Metadata Guard
+console.log("\n--- Suite 7: SSRF Protection & Private IP Blocking ---");
+const metadataCheck = await validateSsrfSafeUrl("http://169.254.169.254/latest/meta-data/");
+assert(metadataCheck.valid === false, "SSRF: Blocked cloud metadata IP 169.254.169.254");
+
+const localhostCheck = await validateSsrfSafeUrl("http://127.0.0.1:8080/internal");
+assert(localhostCheck.valid === false, "SSRF: Blocked loopback IP 127.0.0.1");
+
+const rfc1918Check = await validateSsrfSafeUrl("http://10.0.0.5/api/webhook");
+assert(rfc1918Check.valid === false, "SSRF: Blocked RFC-1918 private IP 10.0.0.5");
+
+const validHttpsCheck = await validateSsrfSafeUrl("https://webhook.site/test-endpoint");
+assert(validHttpsCheck.valid === true, "SSRF: Allowed safe external HTTPS destination");
+
+// ── Test 8: HMAC-SHA256 Webhook Signatures & Replay Prevention
+console.log("\n--- Suite 8: Webhook HMAC Signatures & Replay Protection ---");
+const testSecret = "whsec_0123456789abcdef0123456789abcdef";
+const samplePayload = JSON.stringify({ event: "prepublish.check", score: 98 });
+const nowSec = Math.floor(Date.now() / 1000);
+
+const signatureHeader = signWebhookPayload(samplePayload, testSecret, nowSec);
+assert(signatureHeader.startsWith("t=") && signatureHeader.includes(",v1="), "Generated valid HMAC-SHA256 signature header");
+
+const validVerify = verifyWebhookSignature(signatureHeader, samplePayload, testSecret, 300);
+assert(validVerify.valid === true, "Verified signature matches expected HMAC-SHA256 digest");
+
+const expiredHeader = signWebhookPayload(samplePayload, testSecret, nowSec - 600); // 10 mins ago
+const replayVerify = verifyWebhookSignature(expiredHeader, samplePayload, testSecret, 300);
+assert(replayVerify.valid === false, "Rejected replayed/expired webhook (drift > 300s)");
+
+const tamperedVerify = verifyWebhookSignature(signatureHeader, samplePayload + "tampered", testSecret, 300);
+assert(tamperedVerify.valid === false, "Rejected tampered webhook payload content");
 
 console.log("\n==================================================");
 console.log(`VERIFICATION SUMMARY: ${testsPassed} passed, ${testsFailed} failed`);

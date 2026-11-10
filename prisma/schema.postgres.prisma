@@ -30,6 +30,8 @@ model Organization {
   subscription     Subscription?
   visualInspections VisualInspection[]
   chatSessions     GovernanceChatSession[]
+  assetAudits      AssetAudit[]
+  webhooks         WebhookEndpoint[]
 }
 
 model User {
@@ -49,6 +51,7 @@ model User {
   revisions    Revision[]
   visualInspections VisualInspection[]
   chatSessions GovernanceChatSession[]
+  assetAudits  AssetAudit[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -288,3 +291,64 @@ model GovernanceChatMessage {
   @@index([sessionId])
   @@index([orgId])
 }
+
+// ─── Stage 6: Asset Audits & Webhooks (Pre-Publishing & Authoring Extensions) ─
+
+model AssetAudit {
+  id              String       @id @default(cuid())
+  orgId           String
+  userId          String?
+  assetName       String
+  assetType       String       // image | document | figma | webhook
+  status          String       @default("completed") // pending | completed | failed
+  complianceScore Int          @default(0)
+  findingsCount   Int          @default(0)
+  violationsJson  String       @default("[]") // JSON string of violations
+  metadataJson    String       @default("{}") // JSON string of metadata
+  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([orgId, createdAt])
+  @@index([userId])
+}
+
+model WebhookEndpoint {
+  id           String               @id @default(cuid())
+  orgId        String
+  name         String
+  url          String
+  secret       String               // HMAC signing secret (whsec_...)
+  events       String               // JSON string array e.g. ["inspection.completed", "prepublish.check"]
+  active       Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  organization Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  deliveries   WebhookDeliveryLog[]
+
+  @@index([orgId])
+}
+
+model WebhookDeliveryLog {
+  id             String          @id @default(cuid())
+  orgId          String
+  endpointId     String
+  event          String
+  payload        String          // JSON string
+  responseStatus Int?
+  responseBody   String?
+  executionMs    Int?
+  attempt        Int             @default(1)
+  status         String          @default("pending") // pending | success | failed
+  createdAt      DateTime        @default(now())
+  endpoint       WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([endpointId])
+  @@index([orgId, status])
+  @@index([createdAt])
+}
+

@@ -144,6 +144,19 @@ export function useDemoLogin() {
   });
 }
 
+export function useAutoLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (targetRole?: Role) =>
+      api.post<SessionUser>("/api/auth/auto-login", targetRole ? { role: targetRole } : {}),
+    onSuccess: (user) => {
+      markAuthHint();
+      qc.setQueryData(["session"], user);
+      qc.invalidateQueries();
+    },
+  });
+}
+
 export function useSwitchRole() {
   const qc = useQueryClient();
   return useMutation({

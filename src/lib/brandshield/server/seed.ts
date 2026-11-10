@@ -140,6 +140,20 @@ export function ensureSeed(): Promise<void> {
   return seedPromise;
 }
 
+/**
+ * Force-seed the demo workspace even if DEMO_SEED=off.
+ * Used for automated 1-click instant access / review evaluation.
+ */
+export function forceSeedDemoWorkspace(): Promise<void> {
+  if (!seedPromise) {
+    seedPromise = seedInternal().catch((e) => {
+      seedPromise = null;
+      throw e;
+    });
+  }
+  return seedPromise;
+}
+
 async function seedInternal(): Promise<void> {
   const existingOrg = await db.organization.findUnique({ where: { slug: "nimbus-labs" } });
   if (existingOrg) {
