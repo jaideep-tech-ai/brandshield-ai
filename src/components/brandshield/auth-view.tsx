@@ -430,7 +430,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                           id="auth-email"
                           type="email"
                           autoComplete="email"
-                          placeholder="ava@nimbus.demo"
+                          placeholder={demoEnabled ? "ava@nimbus.demo" : "you@company.com"}
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="h-10 rounded-xl pl-9"
@@ -442,19 +442,21 @@ export function AuthView({ onBack }: { onBack: () => void }) {
                       <PasswordInput
                         id="auth-password"
                         autoComplete="current-password"
-                        placeholder="demo1234"
+                        placeholder={demoEnabled ? "demo1234" : "••••••••"}
                         value={password}
                         onChange={setPassword}
                         show={showPassword}
                         onToggle={() => setShowPassword((v) => !v)}
                       />
-                      <p className="text-xs text-slate-400">
-                        {t("auth.signin.helperPrefix")}{" "}
-                        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-600">
-                          demo1234
-                        </code>
-                        {t("auth.signin.helperSuffix")}
-                      </p>
+                      {demoEnabled && (
+                        <p className="text-xs text-slate-400">
+                          {t("auth.signin.helperPrefix")}{" "}
+                          <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-600">
+                            demo1234
+                          </code>
+                          {t("auth.signin.helperSuffix")}
+                        </p>
+                      )}
                     </div>
 
                     {formError && (

@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { parsePdfDocument } from "./pdf-parser";
 import { chunkDocumentPages, generateEmbeddings } from "./vector-rag";
@@ -19,10 +20,17 @@ export async function queueDocumentIngestion(
   documentId: string,
   buffer: Buffer
 ): Promise<void> {
-  // Execute asynchronously in background
-  setImmediate(async () => {
-    await processDocumentJob(documentId, buffer);
-  });
+  // Execute asynchronously in background; use Next.js `after` for serverless lifecycle safety
+  try {
+    after(async () => {
+      await processDocumentJob(documentId, buffer);
+    });
+  } catch {
+    // Fallback if called outside a request context (e.g. testing / scripts)
+    setImmediate(async () => {
+      await processDocumentJob(documentId, buffer);
+    });
+  }
 }
 
 export async function processDocumentJob(

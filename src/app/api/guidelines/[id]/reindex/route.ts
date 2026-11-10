@@ -5,6 +5,8 @@ import { jsonError } from "@/lib/brandshield/server/json";
 import { chunkDocumentPages, generateEmbeddings } from "@/lib/brandshield/server/vector-rag";
 import { appendAuditLog } from "@/lib/brandshield/server/engine";
 
+export const maxDuration = 60;
+
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getSessionUser();

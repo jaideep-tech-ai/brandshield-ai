@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { db } from "@/lib/db";
 import { chunkDocument } from "./engine";
-import { hashPassword } from "./password";
+import { hashPassword, verifyPassword } from "./password";
 
 // ─── Seed content: Nimbus Labs brand governance workspace ────────────────────
 
@@ -141,8 +141,29 @@ export function ensureSeed(): Promise<void> {
 }
 
 async function seedInternal(): Promise<void> {
-  const existing = await db.organization.findUnique({ where: { slug: "nimbus-labs" } });
-  if (existing) return;
+  const existingOrg = await db.organization.findUnique({ where: { slug: "nimbus-labs" } });
+  if (existingOrg) {
+    // Self-healing: verify all 4 demo personas exist and carry valid hashes for demo1234
+    const demoPasswordHash = await hashPassword("demo1234");
+    const demoPersonas = [
+      { email: "ava@nimbus.demo", name: "Ava Chen", role: "creator", department: "Content Studio", avatarColor: "#0F766E" },
+      { email: "marcus@nimbus.demo", name: "Marcus Reed", role: "reviewer", department: "Brand & Legal", avatarColor: "#B45309" },
+      { email: "priya@pixelworks.demo", name: "Priya Sharma", role: "contractor", department: "PixelWorks Agency", avatarColor: "#7C2D12" },
+      { email: "elena@nimbus.demo", name: "Elena Rodriguez", role: "admin", department: "Marketing Leadership", avatarColor: "#4D7C0F" },
+    ];
+    for (const p of demoPersonas) {
+      const existingUser = await db.user.findUnique({ where: { email: p.email } });
+      if (!existingUser) {
+        await db.user.create({ data: { ...p, orgId: existingOrg.id, password: demoPasswordHash } });
+      } else {
+        const { valid } = await verifyPassword("demo1234", existingUser.password);
+        if (!valid) {
+          await db.user.update({ where: { id: existingUser.id }, data: { password: demoPasswordHash } });
+        }
+      }
+    }
+    return;
+  }
 
   // ── Organization + users (demo personas — passwords salted-scrypt hashed) ──
   const org = await db.organization.create({

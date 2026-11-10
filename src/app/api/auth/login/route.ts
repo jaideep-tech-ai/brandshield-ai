@@ -55,14 +55,14 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return firebaseError(
         "auth/user-not-found",
-        "No account found for this email. Create one on the “Create account” tab, or use a one-click demo persona.",
+        "No account found for this email. Please check the address or create an account on the “Create account” tab.",
         401
       );
     }
 
     const { valid, needsUpgrade } = await verifyPassword(password ?? "", user.password);
     if (!valid) {
-      return firebaseError("auth/wrong-password", "Incorrect password. Demo accounts use “demo1234”.", 401);
+      return firebaseError("auth/wrong-password", "Incorrect password. Please verify your credentials and try again.", 401);
     }
 
     // Transparently upgrade legacy plaintext rows to salted scrypt hashes.

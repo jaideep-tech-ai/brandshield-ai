@@ -4,6 +4,8 @@ import { getSessionUser, requireRole } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
 import { queueDocumentIngestion } from "@/lib/brandshield/server/document-queue";
 
+export const maxDuration = 60;
+
 const MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 export async function POST(req: NextRequest) {
