@@ -4,91 +4,142 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "reac
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
+  ArrowLeft,
   BarChart3,
+  Blocks,
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
   ClipboardCheck,
   CreditCard,
   Database,
+  Eye,
+  FileCheck2,
   FileSearch,
   Flag,
+  FolderGit2,
   Gauge,
   GitBranch,
   GraduationCap,
   HeartPulse,
+  Layers,
   ListOrdered,
   Lock,
+  Palette,
   PartyPopper,
+  Pause,
   PenLine,
+  Play,
   Radar,
+  RotateCcw,
   ScanSearch,
   Settings,
+  ShieldAlert,
+  ShieldCheck,
   Sparkles,
+  UserCheck,
+  Users,
+  Wand2,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { useLang } from "@/lib/brandshield/i18n";
 import { useUIStore, type ViewKey } from "@/lib/brandshield/store";
+import { useSession, useTourState, useUpdateTourState } from "@/lib/brandshield/client";
 import type { Role } from "@/lib/brandshield/types";
 import { cn } from "@/lib/brandshield/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
 import "@/lib/brandshield/i18n/dict-tour";
-
-// Per-role storage: switching demo personas replays that role's own tour.
-export function tourKey(role: Role) {
-  return `bs_tour_done_v3_${role}`;
-}
 
 interface TourStep {
   view: ViewKey;
-  target: string | null; // [data-tour=…] selector; null = centered card (intro / completion)
+  target: string | null;
   icon: LucideIcon;
   titleKey: string;
   bodyKey: string;
 }
 
-// ─── Role-specific scripts (copy lives in dict-tour → tour.<role>.s<n>.*) ────
+// ─── Four Detailed Role-Based Tours ──────────────────────────────────────────
 
 function buildSteps(role: Role): TourStep[] {
   switch (role) {
+    case "admin":
+      return [
+        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.admin.s1.title", bodyKey: "tour.admin.s1.body" },
+        { view: "dashboard", target: "[data-tour='kpi']", icon: Gauge, titleKey: "tour.admin.s2.title", bodyKey: "tour.admin.s2.body" },
+        { view: "settings", target: "[data-tour='page-root']", icon: Settings, titleKey: "tour.admin.s3.title", bodyKey: "tour.admin.s3.body" },
+        { view: "settings", target: "[data-tour='page-root']", icon: Users, titleKey: "tour.admin.s4.title", bodyKey: "tour.admin.s4.body" },
+        { view: "settings", target: "[data-tour='page-root']", icon: UserCheck, titleKey: "tour.admin.s5.title", bodyKey: "tour.admin.s5.body" },
+        { view: "settings", target: "[data-tour='page-root']", icon: ShieldCheck, titleKey: "tour.admin.s6.title", bodyKey: "tour.admin.s6.body" },
+        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.admin.s7.title", bodyKey: "tour.admin.s7.body" },
+        { view: "knowledge", target: "[data-tour='page-root']", icon: Palette, titleKey: "tour.admin.s8.title", bodyKey: "tour.admin.s8.body" },
+        { view: "integrations", target: "[data-tour='page-root']", icon: BookOpen, titleKey: "tour.admin.s9.title", bodyKey: "tour.admin.s9.body" },
+        { view: "integrations", target: "[data-tour='page-root']", icon: Layers, titleKey: "tour.admin.s10.title", bodyKey: "tour.admin.s10.body" },
+        { view: "integrations", target: "[data-tour='page-root']", icon: FolderGit2, titleKey: "tour.admin.s11.title", bodyKey: "tour.admin.s11.body" },
+        { view: "scanner", target: "[data-tour='page-root']", icon: ScanSearch, titleKey: "tour.admin.s12.title", bodyKey: "tour.admin.s12.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.admin.s13.title", bodyKey: "tour.admin.s13.body" },
+        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.admin.s14.title", bodyKey: "tour.admin.s14.body" },
+        { view: "analytics", target: "[data-tour='page-root']", icon: BarChart3, titleKey: "tour.admin.s15.title", bodyKey: "tour.admin.s15.body" },
+        { view: "settings", target: "[data-tour='page-root']", icon: HeartPulse, titleKey: "tour.admin.s16.title", bodyKey: "tour.admin.s16.body" },
+        { view: "copilot", target: "[data-tour='page-root']", icon: Sparkles, titleKey: "tour.admin.s17.title", bodyKey: "tour.admin.s17.body" },
+      ];
+
+    case "reviewer":
+      return [
+        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.reviewer.s1.title", bodyKey: "tour.reviewer.s1.body" },
+        { view: "dashboard", target: "[data-tour='queue']", icon: ListOrdered, titleKey: "tour.reviewer.s2.title", bodyKey: "tour.reviewer.s2.body" },
+        { view: "dashboard", target: "[data-tour='risk']", icon: Radar, titleKey: "tour.reviewer.s3.title", bodyKey: "tour.reviewer.s3.body" },
+        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.reviewer.s4.title", bodyKey: "tour.reviewer.s4.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.reviewer.s5.title", bodyKey: "tour.reviewer.s5.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: ShieldAlert, titleKey: "tour.reviewer.s6.title", bodyKey: "tour.reviewer.s6.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: Eye, titleKey: "tour.reviewer.s7.title", bodyKey: "tour.reviewer.s7.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: Flag, titleKey: "tour.reviewer.s8.title", bodyKey: "tour.reviewer.s8.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: BookOpen, titleKey: "tour.reviewer.s9.title", bodyKey: "tour.reviewer.s9.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: Wand2, titleKey: "tour.reviewer.s10.title", bodyKey: "tour.reviewer.s10.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: CheckCircle2, titleKey: "tour.reviewer.s11.title", bodyKey: "tour.reviewer.s11.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: ShieldCheck, titleKey: "tour.reviewer.s12.title", bodyKey: "tour.reviewer.s12.body" },
+        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.reviewer.s13.title", bodyKey: "tour.reviewer.s13.body" },
+        { view: "approvals", target: "[data-tour='page-root']", icon: GitBranch, titleKey: "tour.reviewer.s14.title", bodyKey: "tour.reviewer.s14.body" },
+        { view: "copilot", target: "[data-tour='page-root']", icon: Sparkles, titleKey: "tour.reviewer.s15.title", bodyKey: "tour.reviewer.s15.body" },
+      ];
+
     case "creator":
       return [
         { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.creator.s1.title", bodyKey: "tour.creator.s1.body" },
         { view: "dashboard", target: "[data-tour='composer']", icon: PenLine, titleKey: "tour.creator.s2.title", bodyKey: "tour.creator.s2.body" },
         { view: "dashboard", target: "[data-tour='pipeline']", icon: GitBranch, titleKey: "tour.creator.s3.title", bodyKey: "tour.creator.s3.body" },
         { view: "dashboard", target: "[data-tour='attention']", icon: Flag, titleKey: "tour.creator.s4.title", bodyKey: "tour.creator.s4.body" },
-        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.creator.s5.title", bodyKey: "tour.creator.s5.body" },
-        { view: "scanner", target: "[data-tour='page-root']", icon: ScanSearch, titleKey: "tour.creator.s6.title", bodyKey: "tour.creator.s6.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.creator.s7.title", bodyKey: "tour.creator.s7.body" },
-        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.creator.s8.title", bodyKey: "tour.creator.s8.body" },
+        { view: "dashboard", target: "[data-tour='composer']", icon: Palette, titleKey: "tour.creator.s5.title", bodyKey: "tour.creator.s5.body" },
+        { view: "integrations", target: "[data-tour='page-root']", icon: Blocks, titleKey: "tour.creator.s6.title", bodyKey: "tour.creator.s6.body" },
+        { view: "integrations", target: "[data-tour='page-root']", icon: BookOpen, titleKey: "tour.creator.s7.title", bodyKey: "tour.creator.s7.body" },
+        { view: "integrations", target: "[data-tour='page-root']", icon: Layers, titleKey: "tour.creator.s8.title", bodyKey: "tour.creator.s8.body" },
+        { view: "scanner", target: "[data-tour='page-root']", icon: ScanSearch, titleKey: "tour.creator.s9.title", bodyKey: "tour.creator.s9.body" },
+        { view: "scanner", target: "[data-tour='page-root']", icon: Gauge, titleKey: "tour.creator.s10.title", bodyKey: "tour.creator.s10.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.creator.s11.title", bodyKey: "tour.creator.s11.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: Wand2, titleKey: "tour.creator.s12.title", bodyKey: "tour.creator.s12.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: CheckCircle2, titleKey: "tour.creator.s13.title", bodyKey: "tour.creator.s13.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.creator.s14.title", bodyKey: "tour.creator.s14.body" },
+        { view: "copilot", target: "[data-tour='page-root']", icon: Sparkles, titleKey: "tour.creator.s15.title", bodyKey: "tour.creator.s15.body" },
       ];
-    case "reviewer":
-      return [
-        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.reviewer.s1.title", bodyKey: "tour.reviewer.s1.body" },
-        { view: "dashboard", target: "[data-tour='queue']", icon: ListOrdered, titleKey: "tour.reviewer.s2.title", bodyKey: "tour.reviewer.s2.body" },
-        { view: "dashboard", target: "[data-tour='risk']", icon: Radar, titleKey: "tour.reviewer.s3.title", bodyKey: "tour.reviewer.s3.body" },
-        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.reviewer.s4.title", bodyKey: "tour.reviewer.s4.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.reviewer.s5.title", bodyKey: "tour.reviewer.s5.body" },
-        { view: "analytics", target: "[data-tour='page-root']", icon: BarChart3, titleKey: "tour.reviewer.s6.title", bodyKey: "tour.reviewer.s6.body" },
-      ];
+
     case "contractor":
       return [
         { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.contractor.s1.title", bodyKey: "tour.contractor.s1.body" },
         { view: "dashboard", target: "[data-tour='sandbox-hero']", icon: Lock, titleKey: "tour.contractor.s2.title", bodyKey: "tour.contractor.s2.body" },
-        { view: "dashboard", target: "[data-tour='steps']", icon: ListOrdered, titleKey: "tour.contractor.s3.title", bodyKey: "tour.contractor.s3.body" },
+        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.contractor.s3.title", bodyKey: "tour.contractor.s3.body" },
         { view: "scanner", target: "[data-tour='page-root']", icon: ScanSearch, titleKey: "tour.contractor.s4.title", bodyKey: "tour.contractor.s4.body" },
         { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.contractor.s5.title", bodyKey: "tour.contractor.s5.body" },
-        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.contractor.s6.title", bodyKey: "tour.contractor.s6.body" },
-      ];
-    case "admin":
-      return [
-        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.admin.s1.title", bodyKey: "tour.admin.s1.body" },
-        { view: "dashboard", target: "[data-tour='kpi']", icon: Gauge, titleKey: "tour.admin.s2.title", bodyKey: "tour.admin.s2.body" },
-        { view: "dashboard", target: "[data-tour='health']", icon: HeartPulse, titleKey: "tour.admin.s3.title", bodyKey: "tour.admin.s3.body" },
-        { view: "dashboard", target: "[data-tour='kb']", icon: Database, titleKey: "tour.admin.s4.title", bodyKey: "tour.admin.s4.body" },
-        { view: "dashboard", target: "[data-tour='billing-snap']", icon: CreditCard, titleKey: "tour.admin.s5.title", bodyKey: "tour.admin.s5.body" },
-        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.admin.s6.title", bodyKey: "tour.admin.s6.body" },
-        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.admin.s7.title", bodyKey: "tour.admin.s7.body" },
-        { view: "analytics", target: "[data-tour='page-root']", icon: BarChart3, titleKey: "tour.admin.s8.title", bodyKey: "tour.admin.s8.body" },
-        { view: "settings", target: "[data-tour='page-root']", icon: Settings, titleKey: "tour.admin.s9.title", bodyKey: "tour.admin.s9.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: ShieldAlert, titleKey: "tour.contractor.s6.title", bodyKey: "tour.contractor.s6.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: Palette, titleKey: "tour.contractor.s7.title", bodyKey: "tour.contractor.s7.body" },
+        { view: "findings", target: "[data-tour='page-root']", icon: BookOpen, titleKey: "tour.contractor.s8.title", bodyKey: "tour.contractor.s8.body" },
+        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.contractor.s9.title", bodyKey: "tour.contractor.s9.body" },
+        { view: "approvals", target: "[data-tour='page-root']", icon: ShieldCheck, titleKey: "tour.contractor.s10.title", bodyKey: "tour.contractor.s10.body" },
+        { view: "analytics", target: "[data-tour='page-root']", icon: BarChart3, titleKey: "tour.contractor.s11.title", bodyKey: "tour.contractor.s11.body" },
+        { view: "copilot", target: "[data-tour='page-root']", icon: Sparkles, titleKey: "tour.contractor.s12.title", bodyKey: "tour.contractor.s12.body" },
       ];
   }
 }
@@ -102,63 +153,106 @@ interface Rect {
 
 export function DemoTour({ role }: { role: Role }) {
   const { tourOpen, setTourOpen, view, setView } = useUIStore();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const session = useSession();
+  const tourStateQuery = useTourState();
+  const updateTourState = useUpdateTourState();
+
   const [stepIndex, setStepIndex] = useState(0);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
-  const [lastRole, setLastRole] = useState(role);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // A persona switch mid-tour restarts that role's own script.
-  // (Adjust state during render — the React-endorsed alternative to effects.)
-  if (lastRole !== role) {
-    setLastRole(role);
-    setStepIndex(0);
-  }
+  // Detect mobile viewport
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
-  // Stable identity across renders — otherwise the step effect would
-  // re-fire every render and loop forever.
   const steps = useMemo(() => buildSteps(role), [role]);
-  const step = steps[Math.min(stepIndex, steps.length - 1)];
   const isLast = stepIndex === steps.length;
   const total = steps.length + 1;
+  const step = steps[Math.min(stepIndex, steps.length - 1)];
   const roleLabel = t(`common.role.${role}`);
 
-  const finish = useCallback(() => {
-    try {
-      window.localStorage.setItem(tourKey(role), "1");
-    } catch {
-      /* private mode — ignore */
-    }
-    setTourOpen(false);
-    setView("dashboard");
-  }, [role, setTourOpen, setView]);
+  // Restore step from database on initial load if present
+  useEffect(() => {
+    if (!tourStateQuery.data) return;
+    const s = tourStateQuery.data;
+    const timer = setTimeout(() => {
+      if (!s.completed && !s.dismissed && !s.paused && typeof s.stepIndex === "number") {
+        setStepIndex(s.stepIndex);
+      }
+      // If user never completed or dismissed, show welcome screen on first visit
+      if (!s.completed && !s.dismissed && s.stepIndex === 0 && !tourOpen) {
+        setShowWelcome(true);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [tourStateQuery.data, tourOpen]);
 
-  const start = useCallback(() => {
+  // Save progress to DB when stepIndex changes
+  const saveStepToDb = useCallback(
+    (index: number, completed = false, paused = false, dismissed = false) => {
+      updateTourState.mutate({
+        stepIndex: index,
+        completed,
+        paused,
+        dismissed,
+      });
+    },
+    [updateTourState]
+  );
+
+  const finish = useCallback(() => {
+    saveStepToDb(steps.length, true, false, false);
+    setTourOpen(false);
+    setShowWelcome(false);
+    setView("dashboard");
+    toast.success(t("tour.allSet"));
+  }, [steps.length, saveStepToDb, setTourOpen, setView, t]);
+
+  const pauseTour = useCallback(() => {
+    saveStepToDb(stepIndex, false, true, false);
+    setTourOpen(false);
+    toast.info("Tour paused. Resume anytime from the Tour button in the header.");
+  }, [stepIndex, saveStepToDb, setTourOpen]);
+
+  const skipTour = useCallback(() => {
+    saveStepToDb(stepIndex, false, false, true);
+    setTourOpen(false);
+    setShowWelcome(false);
+  }, [stepIndex, saveStepToDb, setTourOpen]);
+
+  const startTour = useCallback(() => {
+    setShowWelcome(false);
     setStepIndex(0);
     setTourOpen(true);
-  }, [setTourOpen]);
+    saveStepToDb(0, false, false, false);
+  }, [setTourOpen, saveStepToDb]);
 
-  // Expose manual start from shell buttons via a custom event
+  const restartTour = useCallback(() => {
+    setShowWelcome(false);
+    setStepIndex(0);
+    setTourOpen(true);
+    updateTourState.mutate({ restart: true });
+    toast.info("Tour restarted from Step 1.");
+  }, [setTourOpen, updateTourState]);
+
+  // Listen for shell trigger
   useEffect(() => {
-    const handler = () => start();
+    const handler = () => {
+      setStepIndex(0);
+      setShowWelcome(false);
+      setTourOpen(true);
+    };
     window.addEventListener("brandshield:start-tour", handler);
     return () => window.removeEventListener("brandshield:start-tour", handler);
-  }, [start]);
+  }, [setTourOpen]);
 
-  // Auto-start on this role's first ever login
-  useEffect(() => {
-    if (!tourOpen) {
-      try {
-        if (!window.localStorage.getItem(tourKey(role))) {
-          const timer = window.setTimeout(() => start(), 700);
-          return () => window.clearTimeout(timer);
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [tourOpen, start, role]);
-
-  // Navigate to the step's view, then locate the spotlight target
+  // Navigate to step view and spotlight target
   useEffect(() => {
     if (!tourOpen) return;
     if (!isLast && view !== step.view) {
@@ -176,37 +270,36 @@ export function DemoTour({ role }: { role: Role }) {
       const el = step.target ? document.querySelector<HTMLElement>(step.target) : null;
       if (el) {
         const r = el.getBoundingClientRect();
-        const fullyVisible = r.top >= 90 && r.bottom <= window.innerHeight - 90;
-        if (!fullyVisible && !scrolled && tries < 40) {
+        const fullyVisible = r.top >= 80 && r.bottom <= window.innerHeight - 80;
+        if (!fullyVisible && !scrolled && tries < 30) {
           scrolled = true;
           el.scrollIntoView({ block: "center", behavior: "smooth" });
           raf = window.requestAnimationFrame(tick);
           return;
         }
         setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
-      } else if (tries < 60) {
+      } else if (tries < 50) {
         raf = window.requestAnimationFrame(tick);
       } else {
-        setRect(null); // give up: show centered card
+        setRect(null);
       }
     };
-    // Clear the previous spotlight and re-locate asynchronously (avoids
-    // synchronous setState inside the effect body). Target-less intro steps
-    // and the completion card center immediately.
+
     const timeout = window.setTimeout(
       () => {
         setRect(null);
         if (!isLast && step.target) tick();
       },
-      isLast || !step.target ? 0 : 420 // let AnimatePresence switch views
+      isLast || !step.target ? 0 : 380
     );
+
     return () => {
       window.clearTimeout(timeout);
       window.cancelAnimationFrame(raf);
     };
   }, [tourOpen, stepIndex, isLast, step, view, setView]);
 
-  // Keep spotlight glued to the target on resize / scroll
+  // Sticky spotlight on scroll/resize
   useLayoutEffect(() => {
     if (!tourOpen || isLast) return;
     const update = () => {
@@ -224,46 +317,127 @@ export function DemoTour({ role }: { role: Role }) {
     };
   }, [tourOpen, isLast, step]);
 
-  // ESC skips the tour
+  // Keyboard navigation: Escape skips/pauses, ArrowRight goes next, ArrowLeft goes back
   useEffect(() => {
     if (!tourOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") finish();
+      if (e.key === "Escape") pauseTour();
+      else if (e.key === "ArrowRight") {
+        if (!isLast) {
+          setStepIndex((i) => {
+            const next = Math.min(i + 1, total - 1);
+            saveStepToDb(next);
+            return next;
+          });
+        }
+      } else if (e.key === "ArrowLeft") {
+        setStepIndex((i) => {
+          const prev = Math.max(i - 1, 0);
+          saveStepToDb(prev);
+          return prev;
+        });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tourOpen, finish]);
+  }, [tourOpen, isLast, total, pauseTour, saveStepToDb]);
 
-  if (!tourOpen) return null;
+  const next = () => {
+    if (isLast) {
+      finish();
+    } else {
+      setStepIndex((i) => {
+        const n = Math.min(i + 1, total - 1);
+        saveStepToDb(n);
+        return n;
+      });
+    }
+  };
 
-  const next = () => (isLast ? finish() : setStepIndex((i) => Math.min(i + 1, total - 1)));
-  const back = () => setStepIndex((i) => Math.max(i - 1, 0));
+  const back = () => {
+    setStepIndex((i) => {
+      const p = Math.max(i - 1, 0);
+      saveStepToDb(p);
+      return p;
+    });
+  };
 
-  // Card placement: prefer below the target, flip above if not enough room.
-  // Very tall targets (full-page wrappers) get a top-anchored card.
+  // Card positioning logic
   const hugeTarget = rect ? rect.height > window.innerHeight - 260 : false;
-  const cardBelow = rect ? rect.top + rect.height + 16 < window.innerHeight - 230 : true;
-  const cardStyle: React.CSSProperties | undefined = rect
+  const cardBelow = rect ? rect.top + rect.height + 16 < window.innerHeight - 240 : true;
+  const cardStyle: React.CSSProperties | undefined = isMobile
     ? {
-        top: hugeTarget
-          ? Math.max(84, rect.top + 16)
-          : cardBelow
-            ? rect.top + rect.height + 14
-            : undefined,
+        position: "fixed",
+        bottom: 12,
+        left: 12,
+        right: 12,
+        width: "auto",
+        maxWidth: "100%",
+      }
+    : rect
+    ? {
+        top: hugeTarget ? Math.max(84, rect.top + 16) : cardBelow ? rect.top + rect.height + 14 : undefined,
         bottom: !hugeTarget && !cardBelow ? window.innerHeight - rect.top + 14 : undefined,
-        left: Math.max(16, Math.min(rect.left + rect.width / 2 - 175, window.innerWidth - 366)),
+        left: Math.max(16, Math.min(rect.left + rect.width / 2 - 185, window.innerWidth - 386)),
       }
     : undefined;
 
+  // 1. First-Time Welcome Modal
+  if (showWelcome) {
+    return (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 12 }}
+          className="relative w-full max-w-lg rounded-2xl border border-teal-100 bg-white p-6 shadow-2xl"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-700 text-white shadow-md">
+              <ShieldCheck className="size-6" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">{t("tour.welcome.title")}</h2>
+              <p className="text-xs font-medium text-teal-700">
+                {t("tour.welcome.roleLabel")}: <span className="font-bold uppercase tracking-wider">{roleLabel}</span>
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-3.5 text-xs leading-relaxed text-slate-600 sm:text-sm">
+            {t("tour.welcome.tagline")}
+          </p>
+
+          <div className="mt-4 rounded-xl border border-teal-100 bg-teal-50/50 p-3.5">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-teal-800">
+              <Sparkles className="size-3.5" />
+              {t("tour.welcome.permissionsTitle")}
+            </p>
+            <p className="mt-1 text-xs leading-normal text-teal-900/90 font-medium">
+              {t(`tour.perm.${role}`)}
+            </p>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            <Button variant="ghost" size="sm" onClick={skipTour} className="text-slate-500 hover:text-slate-700">
+              {t("tour.welcome.skipCta")}
+            </Button>
+            <Button onClick={startTour} className="gap-2 bg-teal-700 text-white hover:bg-teal-800">
+              <Play className="size-4 fill-white" />
+              {t("tour.welcome.cta")}
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!tourOpen) return null;
+
   return (
-    <div
-      className="fixed inset-0 z-[70]"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("tour.aria.dialog")}
-    >
-      {/* Spotlight + scrim — glides smoothly between steps */}
-      {rect && (
+    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label={t("tour.aria.dialog")}>
+      {/* Spotlight highlight over targeted element */}
+      {rect && !isMobile && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{
@@ -273,97 +447,129 @@ export function DemoTour({ role }: { role: Role }) {
             width: rect.width + 12,
             height: rect.height + 12,
           }}
-          transition={{ type: "spring", stiffness: 320, damping: 32 }}
+          transition={{ type: "spring", stiffness: 340, damping: 32 }}
           className="pointer-events-none absolute rounded-xl border-2 border-teal-400 shadow-[0_0_0_9999px_rgba(15,23,42,0.55)]"
         >
           <motion.span
-            className="absolute -right-1.5 -top-1.5 flex size-6 items-center justify-center rounded-full bg-teal-500 text-white shadow-lg"
+            className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.15, type: "spring", bounce: 0.5 }}
           >
             <GraduationCap className="size-3.5" />
           </motion.span>
         </motion.div>
       )}
 
-      {/* Centered scrim when no target (intro & completion steps) */}
-      {!rect && <div className="absolute inset-0 bg-slate-950/55" />}
+      {/* Dimmed backdrop when centered or on mobile */}
+      {(!rect || isMobile) && <div className="absolute inset-0 bg-slate-950/60" />}
 
-      {/* Tooltip card */}
+      {/* Tour Tooltip Card / Bottom Sheet */}
       <div
         className={cn(
-          "absolute w-[350px] max-w-[calc(100vw-32px)]",
-          !rect && "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          "w-[370px] max-w-[calc(100vw-24px)]",
+          !rect && !isMobile && "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
         )}
-        style={rect ? cardStyle : undefined}
+        style={cardStyle}
       >
         <AnimatePresence mode="wait">
           <motion.div
             key={stepIndex}
-            initial={{ opacity: 0, y: 10, scale: 0.97 }}
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-900/20"
+            transition={{ duration: 0.2 }}
+            className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-2xl shadow-slate-950/20 sm:p-5"
           >
-            <div className="flex items-start justify-between gap-3">
+            {/* Header with Icon, Step Counter, and Close/Pause */}
+            <div className="flex items-start justify-between gap-2.5">
               <div className="flex items-center gap-2.5">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-100">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-200/70">
                   {isLast ? <PartyPopper className="size-4.5" /> : <step.icon className="size-4.5" />}
                 </span>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-teal-600">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">
                     {isLast ? t("tour.allSet") : t("tour.stepCounter", { x: stepIndex + 1, y: total })}
                   </p>
-                  <h2 className="text-sm font-semibold leading-tight text-slate-900">
+                  <h3 className="text-xs font-bold text-slate-900 sm:text-sm">
                     {isLast ? t("tour.complete.title") : t(step.titleKey, { role: roleLabel })}
-                  </h2>
+                  </h3>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={finish}
-                aria-label={t("tour.aria.skip")}
-                className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X className="size-4" />
-              </button>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={pauseTour}
+                  title={t("tour.btn.pause")}
+                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <Pause className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={skipTour}
+                  aria-label={t("tour.aria.skip")}
+                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
             </div>
 
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            {/* Step Body */}
+            <p className="mt-2.5 text-xs leading-relaxed text-slate-600 sm:text-sm">
               {isLast
                 ? t(`tour.${role}.done.body`, { role: roleLabel })
                 : t(step.bodyKey, { role: roleLabel })}
             </p>
 
-            {/* Progress dots */}
-            <div className="mt-4 flex items-center gap-1.5" aria-hidden>
-              {Array.from({ length: total }).map((_, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    "h-1.5 rounded-full transition-all",
-                    i === stepIndex ? "w-5 bg-teal-600" : i < stepIndex ? "w-1.5 bg-teal-300" : "w-1.5 bg-slate-200"
-                  )}
-                />
-              ))}
+            {/* Progress Bar & Dots */}
+            <div className="mt-3.5 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-medium text-slate-400">
+                <span>{roleLabel} Tour</span>
+                <span>{Math.round(((stepIndex + 1) / total) * 100)}%</span>
+              </div>
+              <Progress value={((stepIndex + 1) / total) * 100} className="h-1.5 bg-slate-100" />
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <Button variant="ghost" size="sm" onClick={finish} className="text-slate-500 hover:text-slate-800">
-                {t("tour.btn.skip")}
-              </Button>
+            {/* Action Buttons */}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={pauseTour}
+                  className="h-8 px-2 text-xs text-slate-500 hover:text-slate-800"
+                >
+                  {t("tour.btn.pause")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={restartTour}
+                  className="h-8 px-2 text-xs text-slate-500 hover:text-slate-800"
+                  title="Restart from beginning"
+                >
+                  <RotateCcw className="size-3" />
+                </Button>
+              </div>
+
               <div className="flex items-center gap-2">
                 {stepIndex > 0 && !isLast && (
-                  <Button variant="outline" size="sm" onClick={back} className="rounded-lg">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={back}
+                    className="min-h-8 gap-1 rounded-lg text-xs"
+                  >
+                    <ArrowLeft className="size-3.5" />
                     {t("tour.btn.back")}
                   </Button>
                 )}
                 <Button
                   size="sm"
                   onClick={next}
-                  className="gap-1.5 rounded-lg bg-teal-700 text-white hover:bg-teal-800"
+                  className="min-h-8 gap-1.5 rounded-lg bg-teal-700 text-xs font-semibold text-white hover:bg-teal-800"
                 >
                   {isLast ? t("tour.btn.finish") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}
                   {!isLast && <ArrowRight className="size-3.5" />}
@@ -374,5 +580,121 @@ export function DemoTour({ role }: { role: Role }) {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+// ─── Guided Tasks Checklist Component ────────────────────────────────────────
+
+const ROLE_TASKS: Record<Role, { id: string; targetView: ViewKey }[]> = {
+  admin: [
+    { id: "admin_configure_org", targetView: "knowledge" },
+    { id: "admin_add_team", targetView: "settings" },
+    { id: "admin_review_compliance", targetView: "dashboard" },
+  ],
+  reviewer: [
+    { id: "reviewer_review_critical", targetView: "findings" },
+    { id: "reviewer_inspect_evidence", targetView: "findings" },
+    { id: "reviewer_complete_approval", targetView: "approvals" },
+  ],
+  creator: [
+    { id: "creator_upload_asset", targetView: "scanner" },
+    { id: "creator_run_scan", targetView: "scanner" },
+    { id: "creator_submit_approval", targetView: "findings" },
+  ],
+  contractor: [
+    { id: "contractor_review_audit", targetView: "approvals" },
+    { id: "contractor_inspect_evidence", targetView: "findings" },
+    { id: "contractor_export_report", targetView: "analytics" },
+  ],
+};
+
+export function GuidedTasksCard({ role }: { role: Role }) {
+  const { t } = useLang();
+  const setView = useUIStore((s) => s.setView);
+  const tourStateQuery = useTourState();
+  const tasks = ROLE_TASKS[role] ?? [];
+
+  const liveStatus = tourStateQuery.data?.liveTaskStatus ?? {};
+  const completedCount = tasks.filter((task) => liveStatus[task.id]).length;
+  const allDone = tasks.length > 0 && completedCount === tasks.length;
+
+  return (
+    <Card className="overflow-hidden border-teal-100 bg-gradient-to-br from-teal-50/40 via-white to-white shadow-sm">
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-teal-100/70 text-teal-800">
+                <CheckCircle2 className="size-4" />
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900">{t("tour.tasks.title")}</h3>
+              <Badge variant="outline" className="border-teal-200 bg-teal-50 text-[10px] font-bold text-teal-800">
+                {t("tour.tasks.completed", { done: completedCount, total: tasks.length })}
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">{t("tour.tasks.subtitle")}</p>
+          </div>
+          <Progress value={(completedCount / Math.max(1, tasks.length)) * 100} className="h-2 w-full bg-slate-100 sm:w-48" />
+        </div>
+
+        {allDone ? (
+          <div className="mt-3.5 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs font-semibold text-emerald-800">
+            <Sparkles className="size-4 shrink-0 text-emerald-600" />
+            <span>{t("tour.tasks.allComplete")}</span>
+          </div>
+        ) : (
+          <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            {tasks.map((task) => {
+              const isComplete = !!liveStatus[task.id];
+              return (
+                <div
+                  key={task.id}
+                  className={cn(
+                    "flex flex-col justify-between rounded-xl border p-3 text-left transition",
+                    isComplete
+                      ? "border-emerald-200 bg-emerald-50/40 text-emerald-950"
+                      : "border-slate-200/80 bg-white hover:border-teal-300 hover:shadow-sm"
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {isComplete ? "Completed" : "Action Required"}
+                      </span>
+                      {isComplete ? (
+                        <CheckCircle2 className="size-4 text-emerald-600" />
+                      ) : (
+                        <span className="size-2 rounded-full bg-teal-600" />
+                      )}
+                    </div>
+                    <h4 className="mt-1 text-xs font-semibold text-slate-900">
+                      {t(`tour.task.${task.id}.title`)}
+                    </h4>
+                    <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-500">
+                      {t(`tour.task.${task.id}.desc`)}
+                    </p>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant={isComplete ? "ghost" : "outline"}
+                    onClick={() => setView(task.targetView)}
+                    className={cn(
+                      "mt-2.5 h-7 w-full gap-1 rounded-lg text-[11px] font-medium",
+                      isComplete
+                        ? "text-emerald-700 hover:bg-emerald-100/60"
+                        : "border-teal-200 text-teal-800 hover:bg-teal-50"
+                    )}
+                  >
+                    <span>{isComplete ? "View Result" : "Start Task"}</span>
+                    <ChevronRight className="size-3" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

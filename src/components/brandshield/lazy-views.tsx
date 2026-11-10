@@ -61,6 +61,7 @@ export const BillingView = dynamic(loadBilling, { ssr: false, loading: () => <Ch
 export const SettingsView = dynamic(loadSettings, { ssr: false, loading: () => <ChunkFallback /> });
 // Overlay component — mount silently once the chunk arrives.
 export const DemoTour = dynamic(loadDemoTour, { ssr: false });
+export { GuidedTasksCard } from "@/components/brandshield/demo-tour";
 
 /** Download the signed-in chunks ahead of time (idempotent — import() caches). */
 export function warmSignedInChunks() {

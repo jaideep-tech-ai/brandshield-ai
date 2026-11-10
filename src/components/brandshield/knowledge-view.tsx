@@ -44,6 +44,8 @@ import type { GuidelineDoc, VisualToken } from "@/lib/brandshield/types";
 import { cn, timeAgo, readableOn } from "@/lib/brandshield/utils";
 import { useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-knowledge";
+import "@/lib/brandshield/i18n/dict-help";
+import { ContextualHelpButton } from "@/components/brandshield/help-center";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -319,6 +321,7 @@ export function KnowledgeView() {
           <p className="mt-1 max-w-2xl text-sm text-slate-600">{t("knowledge.subtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ContextualHelpButton guideKey="guidelines" labelKey="help.needHelp.guidelines" />
           <StatChip icon={FileText} label={t("knowledge.stat.documents")} value={guidelines.isLoading ? "…" : docs.length} iconCls="text-teal-700" />
           <StatChip icon={Layers} label={t("knowledge.stat.chunks")} value={guidelines.isLoading ? "…" : totalChunks} iconCls="text-emerald-600" />
           <StatChip icon={Palette} label={t("knowledge.stat.tokens")} value={visualTokens.isLoading ? "…" : tokens.length} iconCls="text-amber-600" />

@@ -26,6 +26,7 @@ import { useUIStore, type ViewKey } from "@/lib/brandshield/store";
 import { cn, shortHash, timeAgo } from "@/lib/brandshield/utils";
 import type { AuditEntry, Submission } from "@/lib/brandshield/types";
 import { WorkflowCard } from "@/components/brandshield/workflow-card";
+import { GuidedTasksCard } from "@/components/brandshield/demo-tour";
 
 // ─── Review Desk — reviewer landing dashboard (amber identity) ───────────────
 // Focus: queue → decide → audit. Structurally distinct from the Content
@@ -145,6 +146,9 @@ export function ReviewerDashboard() {
 
       {/* 2 · 7-Stage Brand Governance Lifecycle */}
       <WorkflowCard />
+
+      {/* 2.5 · Guided First-Time Tasks */}
+      <GuidedTasksCard role="reviewer" />
 
       {/* 3 · Stats row — informational (not clickable) */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

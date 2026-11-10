@@ -26,6 +26,7 @@ import { useLang } from "@/lib/brandshield/i18n";
 import { cn, timeAgo, formatDate } from "@/lib/brandshield/utils";
 import { STATUS_META, type Submission } from "@/lib/brandshield/types";
 import { WorkflowCard } from "@/components/brandshield/workflow-card";
+import { GuidedTasksCard } from "@/components/brandshield/demo-tour";
 
 import "@/lib/brandshield/i18n/dict-dash-b";
 
@@ -99,6 +100,9 @@ export function ContractorDashboard() {
 
       {/* 2 · 7-Stage Brand Governance Lifecycle */}
       <WorkflowCard />
+
+      {/* 2.5 · Guided First-Time Tasks */}
+      <GuidedTasksCard role="contractor" />
 
       {/* 3 · Big pre-check CTA */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} data-tour="sandbox-hero">

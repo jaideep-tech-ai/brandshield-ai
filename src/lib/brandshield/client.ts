@@ -423,6 +423,44 @@ export function useWorkflow() {
   });
 }
 
+// ─── Tour & Onboarding State ────────────────────────────────────────────────
+
+export interface TourStateData {
+  completed: boolean;
+  stepIndex: number;
+  role: Role;
+  dismissed: boolean;
+  paused: boolean;
+  tasksCompleted: string[];
+  liveTaskStatus: Record<string, boolean>;
+  updatedAt?: string;
+}
+
+export function useTourState() {
+  return useQuery<TourStateData>({
+    queryKey: ["user-tour-state"],
+    queryFn: () => api.get("/api/user/tour"),
+    staleTime: 10_000,
+  });
+}
+
+export function useUpdateTourState() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (update: {
+      completed?: boolean;
+      stepIndex?: number;
+      dismissed?: boolean;
+      paused?: boolean;
+      taskCompleted?: string;
+      restart?: boolean;
+    }) => api.post<{ ok: boolean; state: Partial<TourStateData> }>("/api/user/tour", update),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["user-tour-state"] });
+    },
+  });
+}
+
 // ─── Billing & Org ───────────────────────────────────────────────────────────
 
 export function useSubscription() {

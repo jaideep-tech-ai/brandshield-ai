@@ -15,14 +15,19 @@ interface CitationMeta {
 }
 
 /**
- * Generate synthesis from retrieved knowledge when external LLM is absent
+ * Intelligent deterministic & semantic RAG synthesis engine
+ * Used when external LLM credentials are not configured or when offline fallback is needed.
  */
 function synthesizeGovernanceResponse(
   query: string,
   passages: SearchResultPassage[],
-  tokens: { name: string; tokenType: string; value: string; secondary: string | null; usageNotes?: string | null }[]
+  tokens: { name: string; tokenType: string; value: string; secondary: string | null; usageNotes?: string | null }[],
+  userRole: string,
+  lang: string
 ): { reply: string; citations: CitationMeta[] } {
   const cleanQ = query.toLowerCase();
+  const isHindi = lang === "hi" || /[\u0900-\u097F]/.test(query);
+
   const citations: CitationMeta[] = passages.slice(0, 4).map((p) => ({
     documentTitle: p.documentTitle,
     pageNumber: p.pageNumber,
@@ -37,6 +42,34 @@ function synthesizeGovernanceResponse(
     const ratio = contrastRatio(c1, c2);
     const passAA = ratio >= 4.5;
     const passAAA = ratio >= 7.0;
+
+    if (isHindi) {
+      const reply = `### \`${c1}\` और \`${c2}\` के लिए WCAG 2.1 कंट्रास्ट विश्लेषण
+
+- **गणना किया गया कंट्रास्ट अनुपात**: **${ratio.toFixed(2)}:1**
+- **WCAG 2.1 लेवल AA (सामान्य टेक्स्ट $\\ge 4.5:1$)**: ${passAA ? "✅ **उत्तीर्ण (PASSED)**" : "❌ **विफल (उल्लंघन)**"}
+- **WCAG 2.1 लेवल AAA (संवर्धित $\\ge 7.0:1$)**: ${passAAA ? "✅ **उत्तीर्ण (PASSED)**" : "⚠️ **AAA में विफल**"}
+- **बड़ा टेक्स्ट ($\\ge 18\\text{pt}$ / $14\\text{pt}$ बोल्ड $\\ge 3.0:1$)**: ${ratio >= 3.0 ? "✅ **उत्तीर्ण**" : "❌ **विफल**"}
+
+${
+  passAA
+    ? `यह रंग संयोजन डिजिटल ब्रांड टचपॉइंट्स के आधिकारिक पहुंच मानकों को पूरा करता है।`
+    : `**सिफारिश**: अग्रभूमि की चमक को समायोजित करें या सफेद पृष्ठभूमि पर अनुपालन की गारंटी देने के लिए अनुमोदित उच्च-कंट्रास्ट टोकन जैसे \`#0F766E\` (शील्ड टील) का उपयोग करें।`
+}
+
+${
+  citations.length > 0
+    ? `\n#### संबंधित ब्रांड नीति उद्धरण:\n` +
+      citations
+        .map(
+          (c) =>
+            `- **${c.documentTitle}** (पृष्ठ ${c.pageNumber}${c.ruleTag ? ` · नियम \`${c.ruleTag}\`` : ""}): "${c.textSnippet}..."`
+        )
+        .join("\n")
+    : ""
+}`;
+      return { reply, citations };
+    }
 
     const reply = `### WCAG 2.1 Contrast Analysis for \`${c1}\` on \`${c2}\`
 
@@ -65,11 +98,75 @@ ${
     return { reply, citations };
   }
 
-  // 2. Logo / Trademark inquiry
-  if (cleanQ.includes("logo") || cleanQ.includes("trademark") || cleanQ.includes("glyph")) {
-    const tmPassage = passages.find((p) => p.ruleTag?.startsWith("TM") || p.text.toLowerCase().includes("trademark"));
-    const logoToken = tokens.find((t) => t.tokenType === "logo");
-    const reply = `### Brand Trademark & Logo Governance Rules
+  // 2. Navigation / "How do I" assistance
+  if (cleanQ.includes("how do i") || cleanQ.includes("how to") || cleanQ.includes("kaise") || cleanQ.includes("कैसे")) {
+    if (cleanQ.includes("upload") || cleanQ.includes("image") || cleanQ.includes("banner") || cleanQ.includes("अपलोड")) {
+      const reply = isHindi
+        ? `### ब्रांडशील्ड AI में चित्र या बैनर अपलोड करने के चरण:
+
+1. शीर्ष नेविगेशन में **Pre-Flight Scanner** (या **Findings**) पेज पर जाएँ।
+2. **Upload Creative Banner** बटन पर क्लिक करें या समर्थित फ़ाइल (PNG, JPG, WEBP, SVG - अधिकतम 5MB) ड्रैग और ड्रॉप करें।
+3. अपलोड होते ही डिटरमिनिस्टिक नियम और मल्टीमॉडल विज़न इंजन स्वचालित रूप से रंग पैलेट और कंट्रास्ट की जाँच करते हैं।
+4. यदि कोई फ़ाइंडिंग मिलती है, तो आप **Upload Fixed Image** बटन से सुधारा हुआ बैनर सीधे अपडेट कर सकते हैं।`
+        : `### Step-by-Step: Uploading an Image or Creative Banner:
+
+1. Navigate to the **Pre-Flight Scanner** (or **Findings**) view from the navigation menu.
+2. Click **Upload Creative Banner** or drag-and-drop a supported image file (PNG, JPG, WEBP, SVG - max 5MB).
+3. The automated engine immediately extracts dominant colors, calculates WCAG 2.1 contrast ratios, and inspects logo marks.
+4. If contrast or color issues arise, use the **Upload Fixed Image** button directly in the Findings view to replace it.`;
+      return { reply, citations };
+    }
+
+    if (cleanQ.includes("gitlab") || cleanQ.includes("git") || cleanQ.includes("गिटलैब")) {
+      const reply = isHindi
+        ? `### GitLab एकीकरण कनेक्ट करने के चरण:
+
+1. बाएँ मेनू से **Integrations & Extensions** पर जाएँ।
+2. **GitLab Self-Service Onboarding** कार्ड ढूंढें और **Connect GitLab** पर क्लिक करें।
+3. GitLab पर ऑथराइज़ करें (सुरक्षित OAuth और एंटी-CSRF नॉनस सत्यापन)।
+4. अपनी रिपॉज़िटरी चुनें — ब्रांडशील्ड AI स्वचालित रूप से वेबहुक को पुश और मर्ज अनुरोधों हेतु कॉन्फ़िगर कर देगा।`
+        : `### Step-by-Step: Connecting GitLab Integration:
+
+1. Open **Integrations & Extensions** from the navigation.
+2. Locate the **GitLab Self-Service Customer Onboarding** card and click **Connect GitLab**.
+3. Authorize via GitLab OAuth (protected by server-side anti-CSRF nonce validation).
+4. Select your target project from the accessible repositories list.
+5. The system automatically provisions the webhook with a cryptographically unique secret.`;
+      return { reply, citations };
+    }
+
+    if (cleanQ.includes("approve") || cleanQ.includes("approval") || cleanQ.includes("अनुमोदन")) {
+      const reply = isHindi
+        ? `### संपत्ति अनुमोदन प्रक्रिया:
+
+1. **क्रिएटर के लिए**: सभी गंभीर (Critical) फ़ाइंडिंग्स को हल करें या औचित्य दें, फिर **Submit for Review** पर क्लिक करें।
+2. **समीक्षक/एडमिन के लिए**: **Approval Board** पर जाएँ, वर्ज़न 1 और वर्ज़न 2 की साइड-बाय-साइड तुलना करें, और **Approve** या **Request Changes** चुनें।
+3. प्रत्येक अनुमोदन SHA-256 अपरिवर्तनीय ऑडिट शृंखला में दर्ज होता है।`
+        : `### Step-by-Step: Asset Approval Workflow:
+
+1. **For Creators**: Resolve all critical findings or record justified overrides in the **Findings** view, then click **Submit for Review**.
+2. **For Reviewers & Admins**: Open the **Approval Board**, review side-by-side text and banner diffs, then click **Approve Release** or **Request Changes**.
+3. Every decision is cryptographically chained into the immutable SHA-256 audit trail.`;
+      return { reply, citations };
+    }
+  }
+
+  // 3. Logo / Trademark inquiry
+  if (cleanQ.includes("logo") || cleanQ.includes("trademark") || cleanQ.includes("glyph") || cleanQ.includes("ट्रेडमार्क")) {
+    const reply = isHindi
+      ? `### ब्रांड ट्रेडमार्क और लोगो शासन नियम
+
+सत्यापित ब्रांड नीति रिपॉज़िटरी के अनुसार:
+
+1. **पंजीकृत ट्रेडमार्क का उपयोग**:
+   - मास्टर ब्रांड नाम **NimbusPay** हमेशा एकल camelCase शब्द के रूप में लिखा जाना चाहिए (कभी "Nimbus Pay" या "NIMBUSPAY" नहीं)।
+   - प्राथमिक ट्रेडमार्क ग्लिफ़ **®** चलने वाली कॉपी में पहले प्रमुख उपयोग पर जुड़ा होना चाहिए [RULE TM-01]।
+2. **स्पष्ट स्थान और प्लेसमेंट**:
+   - शील्ड लोगो मार्क के चारों ओर न्यूनतम स्पष्ट स्थान कम से कम आधे लोगो मार्क की ऊंचाई के बराबर होना चाहिए।
+   - लोगो को कभी भी अप्रूव्ड या कम-कंट्रास्ट वाले बैकग्राउंड पर न रखें।
+3. **उत्पाद उप-ब्रांड**:
+   - **PayLinks™**, **SmartRetries™**, और **CheckoutOS™** जैसे नामों में पहले उपयोग पर **™** चिह्न होना चाहिए [RULE TM-03]।`
+      : `### Brand Trademark & Logo Governance Rules
 
 Based on the indexed Brand Policy & Legal repository:
 
@@ -80,122 +177,41 @@ Based on the indexed Brand Policy & Legal repository:
    - Minimum clear space surrounding the shield mark must equal at least half of the logo mark height.
    - Never place the logo mark against unapproved or low-contrast backgrounds.
 3. **Product Sub-Brands**:
-   - Names like **PayLinks™**, **SmartRetries™**, and **CheckoutOS™** must carry the **™** mark on first occurrence [RULE TM-03].
+   - Names like **PayLinks™**, **SmartRetries™**, and **CheckoutOS™** must carry the **™** mark on first occurrence [RULE TM-03].`;
 
-${
-  citations.length > 0
-    ? `\n#### Verified Policy Sources:\n` +
-      citations
-        .map(
-          (c) =>
-            `- **${c.documentTitle}** (Page ${c.pageNumber}${c.ruleTag ? ` · \`${c.ruleTag}\`` : ""}): "${c.textSnippet}..."`
-        )
-        .join("\n")
-    : ""
-}`;
     return { reply, citations };
   }
 
-  // 3. Typography & Font inquiry
-  if (cleanQ.includes("font") || cleanQ.includes("typography") || cleanQ.includes("type")) {
-    const typoTokens = tokens.filter((t) => t.tokenType === "typography");
-    const reply = `### Approved Brand Typography Standards
+  // 4. Default synthesized response using passages and tokens
+  const tokenSummary = tokens.map((t) => `- **${t.name}** (\`${t.value}\`): ${t.usageNotes || t.tokenType}`).join("\n");
+  const passageSummary = passages
+    .slice(0, 3)
+    .map((p) => `- **${p.documentTitle}** (Page ${p.pageNumber}${p.ruleTag ? ` · \`${p.ruleTag}\`` : ""}): "${p.text.slice(0, 200).trim()}..."`)
+    .join("\n");
 
-Here are the registered typography standards for external and product touchpoints:
+  const reply = isHindi
+    ? `### ब्रांड शासन विश्लेषण (${userRole.toUpperCase()} संदर्भ)
 
-${
-  typoTokens.length > 0
-    ? typoTokens.map((t) => `- **${t.name}**: \`${t.value}\`${t.usageNotes ? ` — ${t.usageNotes}` : ""}`).join("\n")
-    : `- **Headings**: Geist Sans SemiBold (600 weight), -0.02em tracking, sentence case per STYLE-02.\n- **Body Text**: Geist Sans Regular (400 weight), 16–18px, 1.6 line-height, max 70ch measure.`
+आपकी क्वेरी के आधार पर ब्रांड दिशानिर्देशों और नीति रिपॉज़िटरी से निकाला गया सत्यापन:
+
+${passageSummary ? `#### संबंधित दिशानिर्देश उद्धरण:\n${passageSummary}\n` : ""}
+${tokenSummary ? `#### अधिकृत ब्रांड टोकन:\n${tokenSummary}\n` : ""}
+
+**सिफारिश**: सामग्री को प्रकाशित करने से पहले प्री-फ़्लाइट स्कैनर में चलाएँ ताकि यह सुनिश्चित हो सके कि कोई अप्रमाणित दावा या ट्रेडमार्क उल्लंघन मौजूद नहीं है।`
+    : `### Brand Governance Guidance (${userRole.toUpperCase()} Context)
+
+Based on your query and the verified brand guidelines repository:
+
+${passageSummary ? `#### Associated Policy Citations:\n${passageSummary}\n` : ""}
+${tokenSummary ? `#### Approved Visual Tokens:\n${tokenSummary}\n` : ""}
+
+**Governance Summary**: Ensure all promotional claims trace to approved product datasheets (e.g. FACT PD-09) and that color combinations strictly adhere to WCAG 2.1 AA thresholds before submitting for formal reviewer approval.`;
+
+  return { reply, citations };
 }
 
-- **Headline Capitalization**: Headlines must use **Sentence case**, never Title Case or ALL-CAPS shouting [RULE STYLE-02].
-- **Punctuation**: Maximum one exclamation mark per paragraph. Combined exclamation/question marks ("?!", "!!") are strictly banned [RULE STYLE-01].
+// ─── POST /api/copilot/chat ──────────────────────────────────────────────────
 
-${
-  citations.length > 0
-    ? `\n#### Official Guideline Citations:\n` +
-      citations
-        .map(
-          (c) =>
-            `- **${c.documentTitle}** (Page ${c.pageNumber}${c.ruleTag ? ` · \`${c.ruleTag}\`` : ""}): "${c.textSnippet}..."`
-        )
-        .join("\n")
-    : ""
-}`;
-    return { reply, citations };
-  }
-
-  // 4. Claims / Guarantees inquiry
-  if (
-    cleanQ.includes("guarantee") ||
-    cleanQ.includes("promise") ||
-    cleanQ.includes("100%") ||
-    cleanQ.includes("instant") ||
-    cleanQ.includes("roi") ||
-    cleanQ.includes("claim")
-  ) {
-    const reply = `### Pre-Publishing Compliance Policy: Factual Claims & Guarantees
-
-⚠️ **Policy Restriction Alert**:
-Under **RULE VOICE-04** and Legal Compliance v7:
-
-- **Absolute Guarantees are Banned**: Words like *"guaranteed"*, *"risk-free"*, *"100% safe"*, and *"cannot fail"* are classified as **Critical Blocking Violations**.
-- **Financial Phrasing Requirements**: All marketing copy must use hedged, verified terminology such as *"designed to"*, *"typically"*, or *"on average"*.
-- **Substantiated Metrics**: Any ROI or uptime statistic must link directly to the approved Product Facts Datasheet (Q3 2025). Internal ROI multipliers cannot be published externally [FACT PD-10].
-
-${
-  citations.length > 0
-    ? `\n#### Verified Policy References:\n` +
-      citations
-        .map(
-          (c) =>
-            `- **${c.documentTitle}** (Page ${c.pageNumber}${c.ruleTag ? ` · \`${c.ruleTag}\`` : ""}): "${c.textSnippet}..."`
-        )
-        .join("\n")
-    : ""
-}`;
-    return { reply, citations };
-  }
-
-  // General guideline fallback with retrieved passages
-  if (passages.length > 0) {
-    const reply = `### Brand Governance Guidance for: *"${query}"*
-
-Based on your organization's indexed guideline rulebooks and brand repository:
-
-${passages
-  .slice(0, 3)
-  .map(
-    (p, idx) =>
-      `${idx + 1}. **${p.documentTitle}** (Page ${p.pageNumber}${p.ruleTag ? ` · Rule \`${p.ruleTag}\`` : ""}):\n   > "${p.text.trim()}"`
-  )
-  .join("\n\n")}
-
-**Key Compliance Advice**:
-Ensure all campaign creatives adhere to the verified standards cited above before submitting for review board approval.`;
-    return { reply, citations };
-  }
-
-  const reply = `### Brand Governance Copilot Guidance
-
-I queried your organization's brand repository for *"${query}"*, but no high-confidence matching rule passages were found.
-
-**Next Steps**:
-1. Check the [Knowledge Base](/knowledge) to ensure relevant policy PDFs or brand guidelines are indexed.
-2. Rephrase your query specifying a brand topic (e.g. *"What are our primary brand colors?"*, *"Check contrast for #0F766E on #FFFFFF"*, or *"What words are banned in copy?"*).`;
-  return { reply, citations: [] };
-}
-
-/**
- * POST /api/copilot/chat
- *
- * Interactive AI Brand Governance Copilot:
- * - Hybrid semantic search across indexed guideline documents.
- * - Extracts color and typography brand tokens.
- * - Generates structured governance response with verified rule/page citations.
- * - Persists session and message history to the database.
- */
 export async function POST(req: NextRequest) {
   try {
     const user = await getSessionUser();
@@ -206,6 +222,8 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       message?: string;
       sessionId?: string;
+      lang?: string;
+      stream?: boolean;
     };
 
     const message = body.message?.trim();
@@ -213,7 +231,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Message content cannot be empty." }, { status: 400 });
     }
 
-    // 1. Hybrid semantic search across organization knowledge chunks
+    const lang = body.lang || "en";
+
+    // 1. Hybrid semantic RAG search across organization knowledge chunks
     const passages = await searchKnowledgeHybrid({
       orgId: user.orgId,
       query: message,
@@ -227,28 +247,76 @@ export async function POST(req: NextRequest) {
       select: { name: true, tokenType: true, value: true, secondary: true, usageNotes: true },
     });
 
-    // 3. Check for external OpenAI-compatible API key or use deterministic synthesis
-    const apiKey = process.env.OPENAI_API_KEY?.trim() || process.env.ZAI_API_KEY?.trim();
-    const baseUrl = process.env.OPENAI_BASE_URL?.trim() || process.env.ZAI_BASE_URL?.trim() || "https://api.openai.com/v1";
+    // 3. Fetch past conversation history if sessionId is provided
+    let conversationHistory: { role: "user" | "assistant"; content: string }[] = [];
+    if (body.sessionId) {
+      const pastMessages = await db.governanceChatMessage.findMany({
+        where: { sessionId: body.sessionId },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        select: { role: true, content: true },
+      });
+      conversationHistory = pastMessages.reverse().map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+    }
+
+    // 4. Resolve multi-provider AI credentials
+    // Supported: OpenAI, Google Gemini (via OpenAI-compatible endpoint), Groq, ZAI
+    let apiKey = process.env.OPENAI_API_KEY?.trim();
+    let baseUrl = process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1";
+    let model = process.env.CHAT_MODEL?.trim() || "gpt-4o-mini";
+
+    if (!apiKey && process.env.GEMINI_API_KEY?.trim()) {
+      apiKey = process.env.GEMINI_API_KEY.trim();
+      baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai";
+      model = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+    } else if (!apiKey && process.env.GROQ_API_KEY?.trim()) {
+      apiKey = process.env.GROQ_API_KEY.trim();
+      baseUrl = "https://api.groq.com/openai/v1";
+      model = "llama-3.3-70b-versatile";
+    } else if (!apiKey && process.env.ZAI_API_KEY?.trim()) {
+      apiKey = process.env.ZAI_API_KEY.trim();
+      baseUrl = process.env.ZAI_BASE_URL?.trim() || "https://api.openai.com/v1";
+    }
 
     let finalReply = "";
     let finalCitations: CitationMeta[] = [];
 
+    // Role-specific guidance injection
+    const roleInstructions: Record<string, string> = {
+      admin: "You are speaking with the Brand Director / Super Admin. Focus on organization-wide governance, compliance health, integration status, and team management.",
+      reviewer: "You are speaking with a Compliance Officer. Focus on policy violations, WCAG standards, findings analysis, evidence verification, and defensible sign-offs.",
+      creator: "You are speaking with a Content Creator. Focus on creative asset improvements, brand voice & tone, one-click rewrites, and draft submissions.",
+      contractor: "You are speaking with an Agency Contractor / Auditor in the Client Sandbox. Focus on read-only policy clarifications, pre-check guidance, and compliance verification.",
+    };
+
     if (apiKey) {
       try {
         const systemPrompt = `You are BrandShield AI Copilot, an enterprise brand governance, legal compliance, and WCAG accessibility assistant.
-Your job is to answer queries strictly based on the following verified brand knowledge passages and tokens:
+Target User: ${user.name} (Role: ${user.role}, Organization: ${user.orgName}).
+${roleInstructions[user.role] || roleInstructions.creator}
 
-BRAND TOKENS:
+VERIFIED BRAND TOKENS:
 ${tokens.map((t) => `- ${t.name} (${t.tokenType}): ${t.value}`).join("\n")}
 
 INDEXED GUIDELINE PASSAGES:
 ${passages.map((p) => `[Doc: ${p.documentTitle}, Page: ${p.pageNumber}, Rule: ${p.ruleTag || "N/A"}]:\n${p.text}`).join("\n\n")}
 
 CRITICAL INSTRUCTIONS:
-- Always cite the exact source document, page number, and rule tag (e.g. [RULE CLAIM-01: Page 1]).
-- If discussing colors, verify contrast against WCAG 2.1 AA (4.5:1 for normal text).
-- Be authoritative, concise, and helpful.`;
+- Cite exact source documents, page numbers, and rule tags (e.g. [RULE CLAIM-01: Page 1]).
+- If discussing colors, verify contrast against WCAG 2.1 AA (4.5:1 for normal text) and AAA (7.0:1).
+- Provide clear numbered steps and identify the specific application page when asked how to perform actions.
+- Never claim an action is completed unless the user performs it in the application.
+- Never expose internal API keys, tokens, or other organizations' data.
+- Respond in ${lang === "hi" ? "Hindi (Devanagari)" : "English"} naturally unless requested otherwise.`;
+
+        const messagesPayload = [
+          { role: "system", content: systemPrompt },
+          ...conversationHistory,
+          { role: "user", content: message },
+        ];
 
         const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
           method: "POST",
@@ -257,11 +325,8 @@ CRITICAL INSTRUCTIONS:
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: process.env.CHAT_MODEL?.trim() || "gpt-4o-mini",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: message },
-            ],
+            model,
+            messages: messagesPayload,
             temperature: 0.2,
           }),
         });
@@ -277,22 +342,24 @@ CRITICAL INSTRUCTIONS:
             ruleTag: p.ruleTag,
             textSnippet: p.text.slice(0, 240).trim(),
           }));
+        } else {
+          console.warn("[Copilot API] External LLM returned status:", res.status);
         }
       } catch (err) {
-        console.warn("External LLM completion failed, falling back to deterministic synthesis:", err);
+        console.warn("[Copilot API] External LLM call error, using deterministic synthesis:", err);
       }
     }
 
     if (!finalReply) {
-      const synthesized = synthesizeGovernanceResponse(message, passages, tokens);
+      const synthesized = synthesizeGovernanceResponse(message, passages, tokens, user.role, lang);
       finalReply = synthesized.reply;
       finalCitations = synthesized.citations;
     }
 
-    // 4. Persist to GovernanceChatSession and GovernanceChatMessage in Database
+    // 5. Persist to GovernanceChatSession and GovernanceChatMessage
     let sessionId = body.sessionId;
     if (!sessionId) {
-      const titleSummary = message.slice(0, 40) + (message.length > 40 ? "..." : "");
+      const titleSummary = message.slice(0, 38) + (message.length > 38 ? "..." : "");
       const newSession = await db.governanceChatSession.create({
         data: {
           orgId: user.orgId,
@@ -313,7 +380,7 @@ CRITICAL INSTRUCTIONS:
       },
     });
 
-    // Record assistant reply with serialized citations
+    // Record assistant message
     const assistantMsg = await db.governanceChatMessage.create({
       data: {
         sessionId,
@@ -336,11 +403,8 @@ CRITICAL INSTRUCTIONS:
   }
 }
 
-/**
- * GET /api/copilot/chat?sessionId=...
- *
- * Retrieves session message history
- */
+// ─── GET /api/copilot/chat?sessionId=... ─────────────────────────────────────
+
 export async function GET(req: NextRequest) {
   try {
     const user = await getSessionUser();
@@ -350,11 +414,10 @@ export async function GET(req: NextRequest) {
     const sessionId = searchParams.get("sessionId");
 
     if (!sessionId) {
-      // List recent chat sessions for this organization
       const sessions = await db.governanceChatSession.findMany({
-        where: { orgId: user.orgId },
+        where: { orgId: user.orgId, userId: user.id },
         orderBy: { updatedAt: "desc" },
-        take: 10,
+        take: 20,
         include: {
           _count: { select: { messages: true } },
         },
@@ -384,6 +447,73 @@ export async function GET(req: NextRequest) {
         createdAt: m.createdAt,
       })),
     });
+  } catch (e) {
+    return jsonError(e);
+  }
+}
+
+// ─── DELETE /api/copilot/chat?sessionId=... ──────────────────────────────────
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+    const { searchParams } = new URL(req.url);
+    const sessionId = searchParams.get("sessionId");
+
+    if (!sessionId) {
+      return NextResponse.json({ error: "Missing sessionId parameter" }, { status: 400 });
+    }
+
+    const session = await db.governanceChatSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session || session.orgId !== user.orgId) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    // Cascade deletes linked messages
+    await db.governanceChatMessage.deleteMany({ where: { sessionId } });
+    await db.governanceChatSession.delete({ where: { id: sessionId } });
+
+    return NextResponse.json({ ok: true, deleted: sessionId });
+  } catch (e) {
+    return jsonError(e);
+  }
+}
+
+// ─── PATCH /api/copilot/chat ─────────────────────────────────────────────────
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+    const { sessionId, title } = (await req.json().catch(() => ({}))) as {
+      sessionId?: string;
+      title?: string;
+    };
+
+    if (!sessionId || !title?.trim()) {
+      return NextResponse.json({ error: "Missing sessionId or title" }, { status: 400 });
+    }
+
+    const session = await db.governanceChatSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session || session.orgId !== user.orgId) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    const updated = await db.governanceChatSession.update({
+      where: { id: sessionId },
+      data: { title: title.trim() },
+    });
+
+    return NextResponse.json({ ok: true, session: updated });
   } catch (e) {
     return jsonError(e);
   }

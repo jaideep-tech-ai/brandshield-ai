@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Sparkles,
   GraduationCap,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
 import { useLogout, useSession } from "@/lib/brandshield/client";
@@ -49,7 +50,9 @@ import {
 } from "@/components/ui/sheet";
 import { LangToggle, useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-shell";
+import "@/lib/brandshield/i18n/dict-help";
 import { RoleSwitcher } from "@/components/brandshield/role-switcher";
+import { HelpCenterModal, openHelpCenter } from "@/components/brandshield/help-center";
 
 // ─── Navigation model (role-gated) ───────────────────────────────────────────
 
@@ -327,7 +330,7 @@ export function Shell({ children }: { children: ReactNode }) {
                       type="button"
                       onClick={() => goTo(item.key)}
                       className={cn(
-                        "relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors min-h-[44px]",
                         active
                           ? "bg-teal-50 text-teal-700"
                           : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -342,6 +345,30 @@ export function Shell({ children }: { children: ReactNode }) {
                   );
                 })}
               </nav>
+              <div className="border-t border-slate-100 p-3 space-y-1 bg-slate-50/40">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    startTour();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-teal-50 hover:text-teal-700 transition min-h-[44px]"
+                >
+                  <GraduationCap className="size-4 text-teal-600 shrink-0" />
+                  <span>{t("shell.header.tour")}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    openHelpCenter();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-teal-50 hover:text-teal-700 transition min-h-[44px]"
+                >
+                  <HelpCircle className="size-4 text-teal-600 shrink-0" />
+                  <span>{t("help.modal.title")}</span>
+                </button>
+              </div>
             </SheetContent>
           </Sheet>
 
@@ -387,6 +414,17 @@ export function Shell({ children }: { children: ReactNode }) {
               <span className="hidden sm:inline">{t("shell.header.tour")}</span>
             </Button>
 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openHelpCenter()}
+              className="gap-1.5 rounded-lg text-slate-500 hover:bg-teal-50 hover:text-teal-700"
+              aria-label={t("help.trigger.aria")}
+            >
+              <HelpCircle className="size-4" />
+              <span className="hidden sm:inline">{t("help.trigger.btn")}</span>
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -419,6 +457,10 @@ export function Shell({ children }: { children: ReactNode }) {
                 <DropdownMenuItem onClick={startTour} className="gap-2">
                   <GraduationCap className="size-4 text-teal-600" />
                   {t("shell.account.tour")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openHelpCenter()} className="gap-2">
+                  <HelpCircle className="size-4 text-teal-600" />
+                  {t("help.trigger.btn")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -485,7 +527,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 onClick={() => goTo(item.key)}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+                  "flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 min-h-[48px] text-[10px] font-medium transition-colors",
                   active ? "text-teal-700" : "text-slate-500"
                 )}
               >
@@ -500,7 +542,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <SheetTrigger asChild>
                 <button
                   type="button"
-                  className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-slate-500 transition-colors"
+                  className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 min-h-[48px] text-[10px] font-medium text-slate-500 transition-colors"
                   aria-label={t("shell.mobile.moreAria")}
                 >
                   <MoreHorizontal className="size-5" />
@@ -539,6 +581,9 @@ export function Shell({ children }: { children: ReactNode }) {
           )}
         </div>
       </nav>
+
+      {/* Global bilingual Help Center with 10 comprehensive guides */}
+      <HelpCenterModal onNavigate={(v) => goTo(v as ViewKey)} />
     </div>
   );
 }

@@ -38,6 +38,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { toast } from "sonner";
 import { useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-findings";
+import "@/lib/brandshield/i18n/dict-help";
+import { ContextualHelpButton } from "@/components/brandshield/help-center";
 import {
   useSession,
   useSubmissions,
@@ -150,25 +152,28 @@ export function FindingsView() {
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
       {/* Submission selector strip */}
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-        {(submissions.data ?? []).map((s) => (
-          <button
-            key={s.id}
-            onClick={() => { useUIStore.getState().setView("findings", s.id); setSelectedFindingId(null); }}
-            className={cn(
-              "flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
-              s.id === selectedId ? "border-teal-600 bg-teal-700 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:bg-teal-50"
-            )}
-          >
-            {s.title}
-            <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", s.id === selectedId ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500")}>
-              {s.findings?.filter((f) => f.status === "open").length ?? 0}
-            </span>
-          </button>
-        ))}
-        {(submissions.data ?? []).length === 0 && (
-          <p className="text-sm text-slate-400">{t("findings.submissions.empty")}</p>
-        )}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
+          {(submissions.data ?? []).map((s) => (
+            <button
+              key={s.id}
+              onClick={() => { useUIStore.getState().setView("findings", s.id); setSelectedFindingId(null); }}
+              className={cn(
+                "flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
+                s.id === selectedId ? "border-teal-600 bg-teal-700 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:bg-teal-50"
+              )}
+            >
+              {s.title}
+              <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", s.id === selectedId ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500")}>
+                {s.findings?.filter((f) => f.status === "open").length ?? 0}
+              </span>
+            </button>
+          ))}
+          {(submissions.data ?? []).length === 0 && (
+            <p className="text-sm text-slate-400">{t("findings.submissions.empty")}</p>
+          )}
+        </div>
+        <ContextualHelpButton guideKey="findings" labelKey="help.needHelp.findings" className="hidden sm:inline-flex shrink-0" />
       </div>
 
       {isLoading || !sub ? (
@@ -453,7 +458,7 @@ function BannerAnnotator({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+          accept="image/*"
           className="hidden"
           onChange={handleFileChange}
         />
@@ -727,7 +732,7 @@ function FindingCard({
                     <input
                       ref={findingFileRef}
                       type="file"
-                      accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                      accept="image/*"
                       className="hidden"
                       onChange={async (e) => {
                         const file = e.target.files?.[0];

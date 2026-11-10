@@ -4,245 +4,414 @@ import { registerDict } from "@/lib/brandshield/i18n";
 
 // ─── Role-specific guided tours (creator / reviewer / contractor / admin) ────
 //
-// Key shape: tour.<role>.s<n>.title | .body — one scripted walkthrough per role.
-// Shared chrome (counter, buttons, completion card) lives under tour.* directly.
-// Intro bodies use the {role} placeholder, filled from common.role.<role>.
+// Key shape: tour.<role>.s<n>.title | .body — comprehensive scripted walkthrough per role.
+// Shared chrome (counter, buttons, completion card, tasks) lives under tour.* directly.
 
 const dict = {
   en: {
-    "stepCounter": "Step {x} of {y}",
-    "allSet": "You're all set",
+    stepCounter: "Step {x} of {y}",
+    allSet: "You're all set",
     "complete.title": "Tour complete — you're ready to ship on-brand",
 
+    // Controls
     "btn.go": "Let's go",
+    "btn.start": "Start Interactive Tour",
     "btn.next": "Next",
     "btn.back": "Back",
     "btn.finish": "Finish",
     "btn.skip": "Skip tour",
+    "btn.pause": "Pause",
+    "btn.resume": "Resume Tour",
+    "btn.restart": "Restart Tour",
 
     "aria.skip": "Skip tour",
     "aria.dialog": "Guided product tour",
 
-    // ── Creator · Content Studio (Ava) ──
-    "creator.s1.title": "Welcome to your Content Studio",
-    "creator.s1.body":
-      "Hi {role} — this workspace takes your drafts from first paste to approved, on-brand publish. Four stages, one guided loop. Let's go.",
-    "creator.s2.title": "Draft Composer",
-    "creator.s2.body":
-      "Paste a draft and scan it in seconds. Write or drop in copy right here, then send it through the pre-flight pipeline without changing pages.",
-    "creator.s3.title": "Your pipeline",
-    "creator.s3.body":
-      "Drafts move left to right, from first version toward approved. Each card's column tells you exactly where the piece stands and what happens next.",
-    "creator.s4.title": "Needs your attention",
-    "creator.s4.body":
-      "Open flags land here with one-click rewrites. Fix the highest-impact issues first — every rewrite preserves your original intent.",
-    "creator.s5.title": "Stage 1 · Ground-truth repository",
-    "creator.s5.body":
-      "Upload brand guidelines, product facts and visual tokens. Documents are chunked and indexed so every future finding can cite a verbatim rule — that's why citations matter.",
-    "creator.s6.title": "Stage 2 · Pre-flight scanner",
-    "creator.s6.body":
-      "Paste copy or drop a banner. A deterministic pre-filter runs first (<100 ms, no AI cost), then the RAG + vision pipeline verifies claims, tone and color contrast.",
-    "creator.s7.title": "Stage 3 · Explainable findings",
-    "creator.s7.body":
-      "Each flag shows the exact phrase, the rule it broke and why it matters — plus a one-click rewrite that fixes intent, not just words.",
-    "creator.s8.title": "Stage 4 · Sign-off & audit trail",
-    "creator.s8.body":
-      "Submit the finished piece for sign-off. Reviewers compare versions side-by-side and every decision is hashed into a tamper-evident SHA-256 audit chain.",
-    "creator.done.body":
-      "Your Content Studio is ready. Jump in with the demo personas on the sign-in screen to see other roles' workspaces — and replay this tour anytime from the 🎓 button in the header.",
+    // Welcome Screen
+    "welcome.title": "Welcome to BrandShield AI",
+    "welcome.tagline":
+      "The unified, autonomous brand governance platform that keeps copy, design assets, and marketing campaigns 100% compliant with brand guidelines and WCAG 2.1 accessibility.",
+    "welcome.roleLabel": "Your Role",
+    "welcome.permissionsTitle": "Your Permissions & Capabilities",
+    "welcome.cta": "Start Guided Walkthrough",
+    "welcome.skipCta": "Explore on my own",
 
-    // ── Reviewer · Review Desk (Marcus) ──
-    "reviewer.s1.title": "Welcome to your Review Desk",
-    "reviewer.s1.body":
-      "Hi {role} — this desk is built for fast, defensible decisions. Here's where to focus first.",
-    "reviewer.s2.title": "Priority queue",
-    "reviewer.s2.body":
-      "Longest-waiting submissions rise to the top, so nothing stalls and every author gets a timely decision.",
-    "reviewer.s3.title": "Risk radar",
-    "reviewer.s3.body":
-      "Critical flags surface here — claim mismatches and trademark issues jump the queue so risky copy never ships.",
-    "reviewer.s4.title": "Stage 4 · Side-by-side sign-off",
-    "reviewer.s4.body":
-      "Compare versions with a side-by-side diff, then approve or request changes. Every decision is hash-chained (SHA-256) into a tamper-evident audit trail.",
-    "reviewer.s5.title": "Verify against ground truth",
-    "reviewer.s5.body":
-      "Every flag cites the exact rule it broke — verify each citation against the knowledge base before you sign off.",
-    "reviewer.s6.title": "Stage 5 · Drift analytics",
-    "reviewer.s6.body":
-      "Spot where brand drift happens and which rules keep triggering — repeated friction is a signal that a rule is ambiguous or too strict.",
-    "reviewer.done.body":
-      "Your Review Desk is ready. Try the other demo personas to see their workspaces — and replay this tour anytime from the 🎓 button in the header.",
+    // Role permissions summaries
+    "perm.admin": "Full Organization Governance · Team & Role Admin · Integrations · Database Health · Approvals & Overrides",
+    "perm.reviewer": "Compliance Review Desk · Findings Triage · Evidence Verification · Apply & Override Fixes · Formal Sign-Off",
+    "perm.creator": "Content Studio · Draft Composer · Asset & Banner Uploads · Pre-Flight Scanner · One-Click AI Rewrites · Submit for Review",
+    "perm.contractor": "Client Sandbox · Read-Only Governance Overview · Asset Pre-Checks · Evidence & Citation Inspection · Audit Verification",
 
-    // ── Contractor · Client Sandbox (Priya) ──
-    "contractor.s1.title": "Welcome to your Client Sandbox",
-    "contractor.s1.body":
-      "Hi {role} — a private workspace for pre-checking work against client guidelines before anything is shared.",
-    "contractor.s2.title": "Your private sandbox",
-    "contractor.s2.body":
-      "Pre-check drafts against the client's guidelines right here. Nothing leaves this sandbox until formal submission.",
-    "contractor.s3.title": "Three steps to on-brand",
-    "contractor.s3.body":
-      "Paste → pre-check → fix & share. That's the whole loop — most drafts clear it in minutes.",
-    "contractor.s4.title": "Run your pre-check",
-    "contractor.s4.body":
-      "Paste copy or drop a banner and run the scan — keep an eye on your monthly quota. The deterministic pre-filter is instant and costs nothing.",
-    "contractor.s5.title": "Fix flags, then share",
-    "contractor.s5.body":
-      "One-click rewrites resolve flags while keeping your intent — share only once the score is clean.",
-    "contractor.s6.title": "Client-approved guidelines",
-    "contractor.s6.body":
-      "Browse exactly what you're checked against — the same ground truth your client's reviewers see.",
-    "contractor.done.body":
-      "Your Client Sandbox is ready. Explore the other demo personas' workspaces — and replay this tour anytime from the 🎓 button in the header.",
+    // Guided Tasks
+    "tasks.title": "First-Time Guided Tasks",
+    "tasks.subtitle": "Hands-on milestones tracked against real database activity",
+    "tasks.completed": "{done} of {total} completed",
+    "tasks.allComplete": "🎉 All guided tasks completed for your role!",
 
-    // ── Admin · Governance HQ (Elena) ──
-    "admin.s1.title": "Welcome to your Governance HQ",
-    "admin.s1.body":
-      "Hi {role} — an org-wide control room. Let's look at the signals that matter most.",
-    "admin.s2.title": "Org KPIs at a glance",
-    "admin.s2.body":
-      "Live counters for submissions, open findings, average compliance score and review load — across every team.",
-    "admin.s3.title": "Brand health gauge",
-    "admin.s3.body":
-      "Your drift early-warning. When the needle moves, a guideline needs attention before drift becomes the new normal.",
-    "admin.s4.title": "Knowledge base health",
-    "admin.s4.body":
-      "Freshness matters — stale guidelines produce noisy findings. Keep sources current and every citation stays trustworthy.",
-    "admin.s5.title": "Usage & plan snapshot",
-    "admin.s5.body":
-      "Scans, seats and plan limits in one view — spot the moment it's time to scale up.",
-    "admin.s6.title": "Manage guidelines & tokens",
-    "admin.s6.body":
-      "Upload and version brand guidelines and visual tokens — the ground truth every scan and finding cites.",
-    "admin.s7.title": "Oversight of the sign-off chain",
-    "admin.s7.body":
-      "The full approval chain in one place — who approved what and when, with every decision hash-chained for audit.",
-    "admin.s8.title": "Drift + rule friction",
-    "admin.s8.body":
-      "Where brand drift happens and which rules keep triggering — ambiguous rules surface here so you can sharpen them.",
-    "admin.s9.title": "Team, security & language",
-    "admin.s9.body":
-      "Manage team seats, org security and language preferences for the whole workspace — English and हिन्दी included.",
-    "admin.done.body":
-      "Your Governance HQ is ready. Switch demo personas to see each role's workspace — and replay this tour anytime from the 🎓 button in the header.",
+    // Admin Tasks
+    "task.admin_configure_org.title": "Configure Guidelines & Tokens",
+    "task.admin_configure_org.desc": "Upload or verify indexed brand voice playbooks, product facts, and visual tokens in Knowledge Base.",
+    "task.admin_add_team.title": "Team & Member Onboarding",
+    "task.admin_add_team.desc": "Review team seats and invite colleagues with appropriate role-based access.",
+    "task.admin_review_compliance.title": "Review Governance Health",
+    "task.admin_review_compliance.desc": "Inspect org-wide compliance scores, active submissions, and rule friction radar.",
+
+    // Reviewer Tasks
+    "task.reviewer_review_critical.title": "Inspect Critical Findings",
+    "task.reviewer_review_critical.desc": "Examine blocked claims and trademark violations against ground-truth citations.",
+    "task.reviewer_inspect_evidence.title": "Verify Ground-Truth Evidence",
+    "task.reviewer_inspect_evidence.desc": "Check verbatim citations and WCAG 2.1 color contrast calculations.",
+    "task.reviewer_complete_approval.title": "Sign-Off or Request Changes",
+    "task.reviewer_complete_approval.desc": "Complete an authorized approval or approve a resolved finding in the queue.",
+
+    // Creator Tasks
+    "task.creator_upload_asset.title": "Create or Upload an Asset",
+    "task.creator_upload_asset.desc": "Compose a draft in the Studio, upload a creative banner, or ingest via integrations.",
+    "task.creator_run_scan.title": "Run Pre-Flight Brand Scan",
+    "task.creator_run_scan.desc": "Execute deterministic rules and multimodal AI vision inspection on your asset.",
+    "task.creator_submit_approval.title": "Submit Asset for Approval",
+    "task.creator_submit_approval.desc": "Resolve high-priority findings and submit your cleaned draft to the Review Desk.",
+
+    // Contractor / Auditor Tasks
+    "task.contractor_review_audit.title": "Inspect Cryptographic Audit Log",
+    "task.contractor_review_audit.desc": "Review the immutable SHA-256 hash-chain of governance decisions.",
+    "task.contractor_inspect_evidence.title": "Review Policy Citations",
+    "task.contractor_inspect_evidence.desc": "Inspect rule citations and color palette clusters on reviewed assets.",
+    "task.contractor_export_report.title": "Verify Compliance History",
+    "task.contractor_export_report.desc": "Examine compliance certificates and department audit records.",
+
+    // ── Admin · Governance HQ (Elena) — 17 Steps ──
+    "admin.s1.title": "1 · Governance Overview & Control Room",
+    "admin.s1.body": "Welcome {role}. Governance HQ provides complete oversight over every draft, campaign, team member, and brand compliance decision across your organization.",
+    "admin.s2.title": "2 · Organization KPIs at a Glance",
+    "admin.s2.body": "Real-time counters track active submissions, open findings, average compliance score, and approved assets computed live from PostgreSQL.",
+    "admin.s3.title": "3 · Organization Setup & Brand Identity",
+    "admin.s3.body": "Manage your organization name, slug, zero-data retention policies, and enterprise brand boundaries with complete multi-tenant isolation.",
+    "admin.s4.title": "4 · Team Management & Permissions",
+    "admin.s4.body": "Review all active members, departmental assignments, and role allocations across Admin, Reviewer, Creator, and Auditor tiers.",
+    "admin.s5.title": "5 · User Invitations & Enterprise Access",
+    "admin.s5.body": "Seamlessly onboard new colleagues or agency contractors. Each user lands in a role-tailored dashboard matching their permissions.",
+    "admin.s6.title": "6 · Role & Permission Enforcement",
+    "admin.s6.body": "Enforce strict RBAC: Creators cannot self-approve, Contractors work in read-only sandbox, and only Reviewers & Admins can sign off on external assets.",
+    "admin.s7.title": "7 · Brand Guidelines & Knowledge Base",
+    "admin.s7.body": "Upload Voice & Tone Playbooks, Product Datasheets, and Trademark rules. Documents are semantically chunked and indexed for verbatim citations.",
+    "admin.s8.title": "8 · Visual Tokens & Accessibility Specs",
+    "admin.s8.body": "Define approved brand hex colors, typography scales, and SVG logo marks. The system automatically enforces WCAG 2.1 AA/AAA contrast ratios.",
+    "admin.s9.title": "9 · Google Docs Integration",
+    "admin.s9.body": "Connect corporate Google Workspace accounts with anti-CSRF state validation to audit live docs and campaign briefs before publication.",
+    "admin.s10.title": "10 · Figma Design Inspection",
+    "admin.s10.body": "Connect Figma OAuth to extract design canvases, calculate color Delta-E deviations from approved tokens, and audit UI components.",
+    "admin.s11.title": "11 · GitLab CI/CD & Webhook Onboarding",
+    "admin.s11.body": "Self-service GitLab OAuth allows one-click webhook provisioning to intercept Merge Requests and Pushes with automated pre-publish audits.",
+    "admin.s12.title": "12 · Pre-Flight Scanner",
+    "admin.s12.body": "Test copy or banner creatives through deterministic pre-filtering (<100ms) followed by deep vector-RAG and computer vision inspection.",
+    "admin.s13.title": "13 · Findings & Remediation Desk",
+    "admin.s13.body": "Review explainable brand violations. Creators can apply one-click tone-preserving rewrites or upload replacement images to resolve flags.",
+    "admin.s14.title": "14 · Approval Board & Decision Chains",
+    "admin.s14.body": "Track all sign-offs, version diffs, and reviewer justifications. Every approval is mathematically linked into a SHA-256 audit log.",
+    "admin.s15.title": "15 · Analytics & Rule Friction Radar",
+    "admin.s15.body": "Detect policy friction: bi-directional feedback identifies rules that trigger repeated overrides so you can refine ambiguous guidelines.",
+    "admin.s16.title": "16 · Database Health & Hash-Chain Integrity",
+    "admin.s16.body": "Verify live database integrity: zero orphan rows, zero duplicate emails, and self-healing cryptographic audit log continuity.",
+    "admin.s17.title": "17 · AI Brand Governance Copilot",
+    "admin.s17.body": "Consult the real-time AI Copilot with vector RAG search, WCAG contrast math, and step-by-step navigation help in English & Hindi.",
+    "admin.done.body": "Your Governance HQ is configured and ready. Complete your guided tasks below or replay this tour anytime from the 🎓 button in the top header.",
+
+    // ── Reviewer · Compliance Desk (Marcus) — 15 Steps ──
+    "reviewer.s1.title": "1 · Review Desk & Compliance Queue",
+    "reviewer.s1.body": "Welcome {role}. Your Review Desk is engineered for fast, defensible, and legally sound brand decisions before assets reach production.",
+    "reviewer.s2.title": "2 · Priority Review Queue",
+    "reviewer.s2.body": "Submissions are queued by wait time and severity so critical marketing campaigns never stall and urgent drafts get prompt sign-off.",
+    "reviewer.s3.title": "3 · Risk Radar & High-Impact Flags",
+    "reviewer.s3.body": "High-risk items such as unverified financial claims, missing trademark glyphs, or banned terms are prioritized for immediate review.",
+    "reviewer.s4.title": "4 · Brand Policy & Ground-Truth Rules",
+    "reviewer.s4.body": "Access all indexed brand guidelines, approved product datasheets, and legal restricted terms directly from your desk.",
+    "reviewer.s5.title": "5 · Reviewing Findings & Issue Triage",
+    "reviewer.s5.body": "Each finding highlights the offending phrase, cites the exact source document, and explains the regulatory or brand rationale.",
+    "reviewer.s6.title": "6 · Understanding Severity Levels",
+    "reviewer.s6.body": "Critical flags block publication until resolved or justified. Warnings highlight brand drift, and Minor flags suggest style polish.",
+    "reviewer.s7.title": "7 · WCAG 2.1 Contrast & Accessibility",
+    "reviewer.s7.body": "Visual inspections measure text-to-background contrast ratios against WCAG 2.1 AA (4.5:1) and AAA (7.0:1) accessibility standards.",
+    "reviewer.s8.title": "8 · Claim & Trademark Verification",
+    "reviewer.s8.body": "Verify claims against approved datasheets (e.g. FACT PD-09). Spot lowercase trademarks or missing ® and ™ glyphs instantly.",
+    "reviewer.s9.title": "9 · Verbatim Citations & Evidence",
+    "reviewer.s9.body": "Every flag carries strict citations referencing the exact policy document and rule tag (e.g. RULE TM-01, FACT PD-05).",
+    "reviewer.s10.title": "10 · Recommended Corrections & AI Rewrites",
+    "reviewer.s10.body": "Review AI-generated suggestions engineered to fix compliance violations while preserving the creator's nuanced creative tone.",
+    "reviewer.s11.title": "11 · Applying Approved Fixes",
+    "reviewer.s11.body": "Accepting a recommended rewrite automatically updates the draft copy, increments the revision version, and records the resolution.",
+    "reviewer.s12.title": "12 · Overriding with Audit Justification",
+    "reviewer.s12.body": "If an asset has an authorized exception (e.g. special partner contract), record an override note which is permanently stored in the audit trail.",
+    "reviewer.s13.title": "13 · Approval Board & Side-by-Side Diffs",
+    "reviewer.s13.body": "Inspect version-by-version text and banner changes side-by-side, then approve the release or request creator revisions.",
+    "reviewer.s14.title": "14 · Cryptographic Audit Chain",
+    "reviewer.s14.body": "Every sign-off and rejection is hashed into an immutable SHA-256 chain, providing a tamper-evident record for enterprise compliance.",
+    "reviewer.s15.title": "15 · AI Copilot for Policy Consultation",
+    "reviewer.s15.body": "Use the AI Copilot to ask complex questions like 'Can we say 100% safe in this webinar title?' and receive instant cited answers.",
+    "reviewer.done.body": "Your Review Desk is fully operational. Review pending submissions in the queue or start the guided tasks below.",
+
+    // ── Creator · Content Studio (Ava) — 15 Steps ──
+    "creator.s1.title": "1 · Content Studio & Creator Pipeline",
+    "creator.s1.body": "Welcome {role}. The Content Studio gives creators instant, self-service brand feedback so you can publish on-brand work without waiting for legal.",
+    "creator.s2.title": "2 · Draft Composer",
+    "creator.s2.body": "Write or paste headline copy, social posts, or newsletter drafts directly into the inline composer to test brand alignment in seconds.",
+    "creator.s3.title": "3 · Creative Campaigns & Asset Management",
+    "creator.s3.body": "Organize your marketing drafts into structured assets with clear department tags and version tracking.",
+    "creator.s4.title": "4 · Uploading Creative Copy",
+    "creator.s4.body": "Submit promotional copy for instant scanning. The deterministic engine verifies banned terms and trademark rules in under 100ms.",
+    "creator.s5.title": "5 · Banner & Visual Image Uploads",
+    "creator.s5.body": "Upload creative banners (PNG, JPG, WEBP, SVG). The visual engine extracts dominant palettes, audits contrast, and checks logo usage.",
+    "creator.s6.title": "6 · Connecting Creative Sources",
+    "creator.s6.body": "Connect your external tools like Google Docs and Figma through one-click OAuth to pre-check assets right where you design.",
+    "creator.s7.title": "7 · Google Docs Auditing",
+    "creator.s7.body": "Audit collaborative Google Docs files before sharing with leadership. Brand violations are flagged directly from the document.",
+    "creator.s8.title": "8 · Figma Design Tokens",
+    "creator.s8.body": "Inspect design components in Figma and verify that buttons, typography, and card accents strictly follow approved design tokens.",
+    "creator.s9.title": "9 · Pre-Flight Scanner",
+    "creator.s9.body": "The Pre-Flight Scanner combines deterministic token matching with vector RAG claims-checking and computer vision contrast analysis.",
+    "creator.s10.title": "10 · Understanding Compliance Scores",
+    "creator.s10.body": "Assets receive an explainable score from 0 to 100. Scores >= 85 are compliant, while lower scores clearly show which issues to fix.",
+    "creator.s11.title": "11 · Reviewing Explainable Findings",
+    "creator.s11.body": "Click on any flag to inspect the exact violation, read the verbatim policy citation, and understand the rationale.",
+    "creator.s12.title": "12 · Tone-Preserving AI Recommendations",
+    "creator.s12.body": "BrandShield AI provides intelligent rewrite suggestions that resolve the policy issue without flattening your punchy creative voice.",
+    "creator.s13.title": "13 · Applying Fixes & Image Replacement",
+    "creator.s13.body": "Click 'Apply fix' for copy updates or use 'Upload Fixed Image' to replace banner graphics directly from the findings view.",
+    "creator.s14.title": "14 · Submitting Assets for Approval",
+    "creator.s14.body": "Once critical findings are resolved, submit your draft to the Review Desk for formal sign-off with side-by-side diffing.",
+    "creator.s15.title": "15 · AI Copilot for Creative Guidance",
+    "creator.s15.body": "Ask the AI Copilot 'How do I rephrase this claim?' or 'What are the approved tagline options?' for instant on-brand inspiration.",
+    "creator.done.body": "Your Content Studio is ready. Try composing a draft, uploading an image, and submitting for approval using the guided tasks below.",
+
+    // ── Contractor · Client Sandbox (Priya) — 12 Steps ──
+    "contractor.s1.title": "1 · Client Sandbox Overview",
+    "contractor.s1.body": "Welcome {role}. The Client Sandbox is a safe, private pre-flight environment for agency contractors to verify work against client guidelines.",
+    "contractor.s2.title": "2 · Read-Only Safety Guarantees",
+    "contractor.s2.body": "Your sandbox is non-destructive: drafts and pre-checks remain private to your workspace and cannot alter client production guidelines.",
+    "contractor.s3.title": "3 · Client-Approved Guidelines Repository",
+    "contractor.s3.body": "Inspect the exact source-of-truth documents, brand voice rules, and visual tokens your work will be measured against.",
+    "contractor.s4.title": "4 · Reviewing Submitted Assets",
+    "contractor.s4.body": "Review creative copy and graphic banners currently undergoing pre-flight evaluation across active client campaigns.",
+    "contractor.s5.title": "5 · Findings & Category Breakdown",
+    "contractor.s5.body": "Inspect categorized findings: Claim accuracy, Tone alignment, Visual contrast, Style conventions, and Trademark compliance.",
+    "contractor.s6.title": "6 · Understanding Severity Thresholds",
+    "contractor.s6.body": "Learn which issues are blocking (Critical violations) versus recommendations (Warning and Minor polish).",
+    "contractor.s7.title": "7 · Supporting Evidence & Palette Extraction",
+    "contractor.s7.body": "Examine extracted color palettes, dominant clusters, and WCAG contrast ratios measured on creative banner submissions.",
+    "contractor.s8.title": "8 · Verbatim Ground-Truth Citations",
+    "contractor.s8.body": "Every flag references the exact policy document and section, providing transparent proof of client compliance requirements.",
+    "contractor.s9.title": "9 · Cryptographic Audit Trail",
+    "contractor.s9.body": "Review the immutable SHA-256 audit log that records every submission, scan, and approval decision with complete tamper evidence.",
+    "contractor.s10.title": "10 · Compliance History & Audit Logs",
+    "contractor.s10.body": "Inspect historical compliance scores, inspection durations, and verification records across client deliverables.",
+    "contractor.s11.title": "11 · Governance Analytics & Reports",
+    "contractor.s11.body": "Review department compliance benchmarks and scan trends to ensure deliverables consistently meet client standards.",
+    "contractor.s12.title": "12 · AI Copilot for Audit Explanations",
+    "contractor.s12.body": "Consult the AI Copilot for read-only inquiries regarding client brand rules, trademark usage, or WCAG accessibility standards.",
+    "contractor.done.body": "Your Client Sandbox is ready. Pre-check your work, fix any flags, and verify your deliverables with total confidence.",
   },
 
   hi: {
-    "stepCounter": "स्टेप {x} / {y}",
-    "allSet": "आप तैयार हैं",
-    "complete.title": "टूर पूरा हुआ — अब आप ब्रांड के अनुरूप शिप करने को तैयार हैं",
+    stepCounter: "स्टेप {x} / {y}",
+    allSet: "आप तैयार हैं",
+    "complete.title": "टूर पूरा हुआ — अब आप ब्रांड के अनुरूप कार्य करने को तैयार हैं",
 
+    // Controls
     "btn.go": "चलिए शुरू करें",
+    "btn.start": "इंटरैक्टिव टूर शुरू करें",
     "btn.next": "आगे",
     "btn.back": "वापस",
     "btn.finish": "समाप्त",
     "btn.skip": "टूर छोड़ें",
+    "btn.pause": "रोकें",
+    "btn.resume": "टूर जारी रखें",
+    "btn.restart": "टूर दोबारा शुरू करें",
 
     "aria.skip": "टूर छोड़ें",
     "aria.dialog": "गाइडेड प्रोडक्ट टूर",
 
-    // ── क्रिएटर · कंटेंट स्टूडियो (आवा) ──
-    "creator.s1.title": "आपके कंटेंट स्टूडियो में स्वागत है",
-    "creator.s1.body":
-      "नमस्ते {role} — यह वर्कस्पेस आपके ड्राफ़्ट को पहली पेस्ट से लेकर स्वीकृत, ब्रांड-अनुरूप प्रकाशन तक ले जाता है। चार चरण, एक गाइडेड लूप। चलिए शुरू करें।",
-    "creator.s2.title": "ड्राफ़्ट कंपोज़र",
-    "creator.s2.body":
-      "ड्राफ़्ट पेस्ट करें और सेकंडों में स्कैन पाएँ। कॉपी यहीं लिखें या पेस्ट करें, फिर पेज बदले बिना इसे प्री-फ़्लाइट पाइपलाइन से गुज़ारें।",
-    "creator.s3.title": "आपकी पाइपलाइन",
-    "creator.s3.body":
-      "ड्राफ़्ट बाएँ से दाएँ बढ़ते हैं — पहले वर्ज़न से स्वीकृति की ओर। हर कार्ड का कॉलम बताता है कि पीस अभी किस स्थिति में है और आगे क्या होगा।",
-    "creator.s4.title": "ध्यान देने की ज़रूरत",
-    "creator.s4.body":
-      "खुले फ़्लैग वन-क्लिक रीराइट के साथ यहाँ पहुँचते हैं। सबसे ज़्यादा असर वाले मुद्दे पहले सुलझाएँ — हर रीराइट आपका मूल इंटेंट बरकरार रखती है।",
-    "creator.s5.title": "चरण 1 · ग्राउंड-ट्रुथ रिपॉज़िटरी",
-    "creator.s5.body":
-      "ब्रांड गाइडलाइन, प्रोडक्ट फ़ैक्ट और विज़ुअल टोकन अपलोड करें। डॉक्यूमेंट चंक और इंडेक्स होते हैं ताकि हर आने वाली फाइंडिंग शब्दशः नियम का साइटेशन दे सके — इसीलिए साइटेशन ज़रूरी हैं।",
-    "creator.s6.title": "चरण 2 · प्री-फ़्लाइट स्कैनर",
-    "creator.s6.body":
-      "कॉपी पेस्ट करें या बैनर ड्रॉप करें। पहले डिटरमिनिस्टिक प्री-फ़िल्टर चलता है (<100 ms, कोई AI लागत नहीं), फिर RAG + विज़न पाइपलाइन दावों, टोन और कलर कंट्रास्ट को सत्यापित करती है।",
-    "creator.s7.title": "चरण 3 · व्याख्या-योग्य फाइंडिंग्स",
-    "creator.s7.body":
-      "हर फ़्लैग सटीक वाक्यांश, टूटा नियम और उसका महत्व दिखाता है — साथ में वन-क्लिक रीराइट, जो सिर्फ़ शब्द नहीं, इंटेंट भी ठीक करती है।",
-    "creator.s8.title": "चरण 4 · साइन-ऑफ़ और ऑडिट ट्रेल",
-    "creator.s8.body":
-      "तैयार पीस को साइन-ऑफ़ के लिए सबमिट करें। रिव्यूअर साइड-बाय-साइड वर्ज़न मिलाते हैं और हर फ़ैसला छेड़छाड़ का पता देने वाली SHA-256 ऑडिट चेन में हैश हो जाता है।",
-    "creator.done.body":
-      "आपका कंटेंट स्टूडियो तैयार है। साइन-इन स्क्रीन पर डेमो पर्सोना आज़माएँ और दूसरी भूमिकाओं के वर्कस्पेस देखें — यह टूर आप हेडर के 🎓 बटन से कभी भी दोबारा चला सकते हैं।",
+    // Welcome Screen
+    "welcome.title": "ब्रांडशील्ड AI में आपका स्वागत है",
+    "welcome.tagline":
+      "एकीकृत, स्वायत्त ब्रांड शासन मंच जो कॉपी, डिज़ाइन संपत्तियों और अभियानों को ब्रांड दिशानिर्देशों और WCAG 2.1 पहुंच मानकों के 100% अनुरूप रखता है।",
+    "welcome.roleLabel": "आपकी भूमिका",
+    "welcome.permissionsTitle": "आपकी अनुमतियाँ और क्षमताएँ",
+    "welcome.cta": "निर्देशित वॉकथ्रू शुरू करें",
+    "welcome.skipCta": "स्वयं एक्सप्लोर करें",
 
-    // ── रिव्यूअर · रिव्यू डेस्क (मार्कस) ──
-    "reviewer.s1.title": "आपके रिव्यू डेस्क में स्वागत है",
-    "reviewer.s1.body":
-      "नमस्ते {role} — यह डेस्क तेज़ और हर स्तर पर सही ठहराने योग्य फ़ैसलों के लिए बना है। आइए देखें सबसे पहले कहाँ ध्यान देना है।",
-    "reviewer.s2.title": "प्रायोरिटी क्यू",
-    "reviewer.s2.body":
-      "सबसे लंबे समय से इंतज़ार कर रहे सबमिशन सबसे ऊपर आते हैं, ताकि कुछ भी अटके नहीं और हर लेखक को समय पर फ़ैसला मिले।",
-    "reviewer.s3.title": "रिस्क रडार",
-    "reviewer.s3.body":
-      "गंभीर फ़्लैग यहीं सामने आते हैं — दावा बेमेल और ट्रेडमार्क मुद्दे कतार में सबसे आगे आ जाते हैं, ताकि जोखिम भरी कॉपी कभी प्रकाशित न हो।",
-    "reviewer.s4.title": "चरण 4 · साइड-बाय-साइड साइन-ऑफ़",
-    "reviewer.s4.body":
-      "साइड-बाय-साइड डिफ़ से वर्ज़न मिलाएँ, फिर स्वीकृत करें या बदलाव माँगें। हर फ़ैसला हैश-चेन (SHA-256) के ज़रिए छेड़छाड़ का पता देने वाली ऑडिट ट्रेल में दर्ज होता है।",
-    "reviewer.s5.title": "ग्राउंड ट्रुथ से सत्यापन करें",
-    "reviewer.s5.body":
-      "हर फ़्लैग बताता है कि वह किस सटीक नियम को तोड़ता है — साइन-ऑफ़ से पहले हर साइटेशन को नॉलेज बेस से मिलाकर जाँचें।",
-    "reviewer.s6.title": "चरण 5 · ड्रिफ़्ट एनालिटिक्स",
-    "reviewer.s6.body":
-      "देखें ब्रांड ड्रिफ़्ट कहाँ होता है और कौन से नियम बार-बार ट्रिगर होते हैं — बार-बार की रगड़ यह संकेत है कि नियम अस्पष्ट या बहुत सख़्त है।",
-    "reviewer.done.body":
-      "आपका रिव्यू डेस्क तैयार है। दूसरे डेमो पर्सोना आज़माकर उनके वर्कस्पेस देखें — यह टूर आप हेडर के 🎓 बटन से कभी भी दोबारा चला सकते हैं।",
+    // Role permissions summaries
+    "perm.admin": "पूर्ण संगठन शासन · टीम और भूमिका प्रशासन · एकीकरण · डेटाबेस स्वास्थ्य · अनुमोदन और ओवरराइड",
+    "perm.reviewer": "अनुपालन समीक्षा डेस्क · निष्कर्ष वर्गीकरण · साक्ष्य सत्यापन · सुधार लागू और ओवरराइड · औपचारिक अनुमोदन",
+    "perm.creator": "सामग्री स्टूडियो · ड्राफ्ट कंपोज़र · संपत्ति और बैनर अपलोड · प्री-फ़्लाइट स्कैनर · वन-क्लिक AI पुनर्लेखन · समीक्षा हेतु सबमिशन",
+    "perm.contractor": "क्लाइंट सैंडबॉक्स · केवल-पढ़ने योग्य शासन अवलोकन · संपत्ति प्री-चेक · साक्ष्य और उद्धरण निरीक्षण · ऑडिट सत्यापन",
 
-    // ── कॉन्ट्रैक्टर · क्लाइंट सैंडबॉक्स (प्रिया) ──
-    "contractor.s1.title": "आपके क्लाइंट सैंडबॉक्स में स्वागत है",
-    "contractor.s1.body":
-      "नमस्ते {role} — एक निजी वर्कस्पेस, जहाँ कुछ भी शेयर होने से पहले काम को क्लाइंट गाइडलाइन के हिसाब से प्री-चेक किया जाता है।",
-    "contractor.s2.title": "आपका निजी सैंडबॉक्स",
-    "contractor.s2.body":
-      "ड्राफ़्ट को यहीं क्लाइंट की गाइडलाइन के हिसाब से प्री-चेक करें। औपचारिक सबमिशन तक इस सैंडबॉक्स से कुछ भी बाहर नहीं जाता।",
-    "contractor.s3.title": "तीन आसान चरण",
-    "contractor.s3.body":
-      "पेस्ट → प्री-चेक → ठीक करें और शेयर करें। पूरा लूप बस इतना है — ज़्यादातर ड्राफ़्ट मिनटों में क्लियर हो जाते हैं।",
-    "contractor.s4.title": "अपना प्री-चेक चलाएँ",
-    "contractor.s4.body":
-      "कॉपी पेस्ट करें या बैनर ड्रॉप करें और स्कैन चलाएँ — साथ ही अपने मासिक कोटे पर नज़र रखें। डिटरमिनिस्टिक प्री-फ़िल्टर तुरंत और मुफ़्त है।",
-    "contractor.s5.title": "फ़्लैग ठीक करें, फिर शेयर करें",
-    "contractor.s5.body":
-      "वन-क्लिक रीराइट फ़्लैग हल करती है और आपका इंटेंट बरकरार रखती है — स्कोर साफ़ होने पर ही शेयर करें।",
-    "contractor.s6.title": "क्लाइंट-स्वीकृत गाइडलाइन",
-    "contractor.s6.body":
-      "ब्राउज़ करें कि आपकी जाँच किसके आधार पर होती है — वही ग्राउंड ट्रुथ जिसे आपके क्लाइंट के रिव्यूअर देखते हैं।",
-    "contractor.done.body":
-      "आपका क्लाइंट सैंडबॉक्स तैयार है। दूसरे डेमो पर्सोना आज़माकर उनके वर्कस्पेस देखें — यह टूर आप हेडर के 🎓 बटन से कभी भी दोबारा चला सकते हैं।",
+    // Guided Tasks
+    "tasks.title": "प्रथम-उपयोग निर्देशित कार्य",
+    "tasks.subtitle": "वास्तविक डेटाबेस गतिविधि के आधार पर ट्रैक किए गए व्यावहारिक मील के पत्थर",
+    "tasks.completed": "{total} में से {done} पूर्ण",
+    "tasks.allComplete": "🎉 आपकी भूमिका के सभी निर्देशित कार्य सफलतापूर्वक पूर्ण हुए!",
 
-    // ── एडमिन · गवर्नेंस HQ (एलेना) ──
-    "admin.s1.title": "आपके गवर्नेंस HQ में स्वागत है",
-    "admin.s1.body":
-      "नमस्ते {role} — पूरे संगठन का कंट्रोल रूम। आइए सबसे मायने रखने वाले संकेत देखें।",
-    "admin.s2.title": "संगठन के KPI एक नज़र में",
-    "admin.s2.body":
-      "सबमिशन, खुली फाइंडिंग्स, औसत कंप्लायंस स्कोर और रिव्यू लोड के लाइव काउंटर — हर टीम के लिए।",
-    "admin.s3.title": "ब्रांड हेल्थ गेज",
-    "admin.s3.body":
-      "आपका ड्रिफ़्ट अर्ली-वार्निंग। जब सुई हिलती है, तब किसी गाइडलाइन को ध्यान चाहिए — इससे पहले कि ड्रिफ़्ट नया सामान्य बन जाए।",
-    "admin.s4.title": "नॉलेज बेस हेल्थ",
-    "admin.s4.body":
-      "ताज़गी मायने रखती है — पुरानी गाइडलाइन शोर भरी फाइंडिंग्स पैदा करती हैं। स्रोत अपडेट रखें और हर साइटेशन भरोसेमंद रहेगा।",
-    "admin.s5.title": "उपयोग और प्लान स्नैपशॉट",
-    "admin.s5.body":
-      "स्कैन, सीट और प्लान लिमिट एक ही नज़र में — पता चल जाएगा कि स्केल बढ़ाने का समय कब है।",
-    "admin.s6.title": "गाइडलाइन और टोकन प्रबंधित करें",
-    "admin.s6.body":
-      "ब्रांड गाइडलाइन और विज़ुअल टोकन अपलोड और वर्ज़न करें — यही ग्राउंड ट्रुथ है जिसे हर स्कैन और फाइंडिंग साइट करती है।",
-    "admin.s7.title": "साइन-ऑफ़ चेन पर निगरानी",
-    "admin.s7.body":
-      "पूरी अप्रूवल चेन एक जगह — किसने, कब क्या स्वीकृत किया, और हर फ़ैसला ऑडिट के लिए हैश-चेन से जुड़ा।",
-    "admin.s8.title": "ड्रिफ़्ट + नियम-फ़्रिक्शन",
-    "admin.s8.body":
-      "ब्रांड ड्रिफ़्ट कहाँ होता है और कौन से नियम बार-बार ट्रिगर होते हैं — अस्पष्ट नियम यहीं सामने आते हैं ताकि उन्हें और सटीक बनाया जा सके।",
-    "admin.s9.title": "टीम, सुरक्षा और भाषा",
-    "admin.s9.body":
-      "पूरे वर्कस्पेस के लिए टीम सीट, संगठन की सुरक्षा और भाषा प्राथमिकताएँ प्रबंधित करें — अंग्रेज़ी और हिन्दी दोनों शामिल हैं।",
-    "admin.done.body":
-      "आपका गवर्नेंस HQ तैयार है। डेमो पर्सोना बदलकर हर भूमिका का वर्कस्पेस देखें — यह टूर आप हेडर के 🎓 बटन से कभी भी दोबारा चला सकते हैं।",
+    // Admin Tasks
+    "task.admin_configure_org.title": "दिशानिर्देश और टोकन कॉन्फ़िगर करें",
+    "task.admin_configure_org.desc": "नॉलेज बेस में ब्रांड आवाज़, उत्पाद तथ्य और दृश्य टोकन अपलोड या सत्यापित करें।",
+    "task.admin_add_team.title": "टीम और सदस्य ऑनबोर्डिंग",
+    "task.admin_add_team.desc": "टीम सीटों की समीक्षा करें और उचित भूमिका-आधारित पहुँच के साथ सहयोगियों को आमंत्रित करें।",
+    "task.admin_review_compliance.title": "शासन स्वास्थ्य की समीक्षा करें",
+    "task.admin_review_compliance.desc": "संगठन-व्यापी अनुपालन स्कोर, सक्रिय सबमिशन और नियम घर्षण रडार का निरीक्षण करें।",
+
+    // Reviewer Tasks
+    "task.reviewer_review_critical.title": "गंभीर निष्कर्षों का निरीक्षण करें",
+    "task.reviewer_review_critical.desc": "मूल स्रोतों के विरुद्ध अवरुद्ध दावों और ट्रेडमार्क उल्लंघनों की जाँच करें।",
+    "task.reviewer_inspect_evidence.title": "सत्य साक्ष्य का सत्यापन करें",
+    "task.reviewer_inspect_evidence.desc": "दस्तावेज़ उद्धरणों और WCAG 2.1 रंग कंट्रास्ट गणनाओं की पुष्टि करें।",
+    "task.reviewer_complete_approval.title": "अनुमोदित करें या बदलाव माँगें",
+    "task.reviewer_complete_approval.desc": "एक अधिकृत अनुमोदन पूरा करें या कतार में हल किए गए निष्कर्ष को स्वीकृत करें।",
+
+    // Creator Tasks
+    "task.creator_upload_asset.title": "सामग्री बनाएँ या अपलोड करें",
+    "task.creator_upload_asset.desc": "स्टूडियो में ड्राफ्ट लिखें, प्रचार बैनर अपलोड करें, या एकीकरण से सामग्री प्राप्त करें।",
+    "task.creator_run_scan.title": "प्री-फ़्लाइट ब्रांड स्कैन चलाएँ",
+    "task.creator_run_scan.desc": "अपनी सामग्री पर डिटरमिनिस्टिक नियम और मल्टीमॉडल AI दृष्टि निरीक्षण निष्पादित करें।",
+    "task.creator_submit_approval.title": "अनुमोदन हेतु सबमिट करें",
+    "task.creator_submit_approval.desc": "उच्च-प्राथमिकता वाले मुद्दों को हल करें और परिष्कृत ड्राफ्ट समीक्षा डेस्क को भेजें।",
+
+    // Contractor / Auditor Tasks
+    "task.contractor_review_audit.title": "क्रिप्टोग्राफिक ऑडिट लॉग देखें",
+    "task.contractor_review_audit.desc": "शासन निर्णयों की अपरिवर्तनीय SHA-256 हैश-चेन का निरीक्षण करें।",
+    "task.contractor_inspect_evidence.title": "नीति उद्धरणों की समीक्षा करें",
+    "task.contractor_inspect_evidence.desc": "समीक्षित संपत्तियों पर नियम उद्धरणों और रंग पैलेट क्लस्टर की जाँच करें।",
+    "task.contractor_export_report.title": "अनुपालन इतिहास सत्यापित करें",
+    "task.contractor_export_report.desc": "अनुपालन प्रमाणपत्रों और विभाग ऑडिट रिकॉर्ड की जाँच करें।",
+
+    // ── एडमिन · गवर्नेंस HQ (एलेना) — 17 Steps ──
+    "admin.s1.title": "1 · शासन अवलोकन और नियंत्रण कक्ष",
+    "admin.s1.body": "स्वागत है {role}। गवर्नेंस HQ आपके संगठन में हर ड्राफ्ट, अभियान, टीम सदस्य और ब्रांड अनुपालन निर्णय की पूर्ण निगरानी प्रदान करता है।",
+    "admin.s2.title": "2 · संगठन के KPI एक नज़र में",
+    "admin.s2.body": "सक्रिय सबमिशन, खुले निष्कर्ष, औसत अनुपालन स्कोर और स्वीकृत संपत्तियों के लाइव काउंटर सीधे PostgreSQL से प्राप्त होते हैं।",
+    "admin.s3.title": "3 · संगठन सेटअप और ब्रांड पहचान",
+    "admin.s3.body": "पूर्ण बहु-किरायेदार अलगाव के साथ अपना संगठन नाम, स्लग और ज़ीरो-डेटा प्रतिधारण नीतियां प्रबंधित करें।",
+    "admin.s4.title": "4 · टीम प्रबंधन और अनुमतियाँ",
+    "admin.s4.body": "एडमिन, रिव्यूअर, क्रिएटर और ऑडिटर स्तरों पर सभी सक्रिय सदस्यों, विभागीय जिम्मेदारियों और भूमिकाओं की समीक्षा करें।",
+    "admin.s5.title": "5 · उपयोगकर्ता आमंत्रण और एंटरप्राइज़ एक्सेस",
+    "admin.s5.body": "नए सहयोगियों या एजेंसी अनुबंधकर्ताओं को आसानी से ऑनबोर्ड करें। प्रत्येक उपयोगकर्ता अपनी अनुमति के अनुसार डैशबोर्ड में पहुँचता है।",
+    "admin.s6.title": "6 · भूमिका और अनुमति नियंत्रण (RBAC)",
+    "admin.s6.body": "सख्त नियंत्रण: क्रिएटर स्वयं स्वीकृत नहीं कर सकते, कॉन्ट्रैक्टर सैंडबॉक्स में कार्य करते हैं, और केवल रिव्यूअर और एडमिन साइन-ऑफ कर सकते हैं।",
+    "admin.s7.title": "7 · ब्रांड दिशानिर्देश और नॉलेज बेस",
+    "admin.s7.body": "ब्रांड आवाज़ नियम, उत्पाद तथ्य और ट्रेडमार्क नीतियां अपलोड करें। दस्तावेज़ शब्दशः उद्धरणों के लिए इंडेक्स किए जाते हैं।",
+    "admin.s8.title": "8 · दृश्य टोकन और पहुंच मानक",
+    "admin.s8.body": "स्वीकृत ब्रांड हेक्स रंग, टाइपोग्राफी और SVG लोगो चिह्न परिभाषित करें। सिस्टम स्वचालित रूप से WCAG 2.1 कंट्रास्ट लागू करता है।",
+    "admin.s9.title": "9 · Google Docs एकीकरण",
+    "admin.s9.body": "प्रकाशन से पहले लाइव दस्तावेज़ों और अभियान विवरणों का ऑडिट करने के लिए सुरक्षित OAuth के साथ Google खाता कनेक्ट करें।",
+    "admin.s10.title": "10 · Figma डिज़ाइन निरीक्षण",
+    "admin.s10.body": "Figma डिज़ाइन कैनवास से रंग निकालें, अनुमोदित टोकन से डेल्टा-E विचलन की गणना करें और UI घटकों का ऑडिट करें।",
+    "admin.s11.title": "11 · GitLab CI/CD और वेबहुक ऑनबोर्डिंग",
+    "admin.s11.body": "सेल्फ-सर्विस GitLab OAuth स्वचालित रूप से वेबहुक कॉन्फ़िगर करता है ताकि मर्ज अनुरोधों और पुश पर प्री-पब्लिश ऑडिट हो सके।",
+    "admin.s12.title": "12 · प्री-फ़्लाइट स्कैनर",
+    "admin.s12.body": "डिटरमिनिस्टिक प्री-फ़िल्टरिंग (<100ms) और डीप वेक्टर-RAG व कंप्यूटर विज़न निरीक्षण के माध्यम से सामग्री की त्वरित जाँच करें।",
+    "admin.s13.title": "13 · निष्कर्ष और सुधार डेस्क",
+    "admin.s13.body": "स्पष्टीकरणीय उल्लंघनों की समीक्षा करें। क्रिएटर एक-क्लिक टोन-संरक्षी पुनर्लेखन लागू कर सकते हैं या नया बैनर अपलोड कर सकते हैं।",
+    "admin.s14.title": "14 · अनुमोदन बोर्ड और निर्णय शृंखला",
+    "admin.s14.body": "सभी अनुमोदनों, वर्ज़न अंतरों और समीक्षक औचित्यों को ट्रैक करें। प्रत्येक निर्णय गणितीय रूप से SHA-256 ऑडिट लॉग से जुड़ा होता है।",
+    "admin.s15.title": "15 · एनालिटिक्स और नियम घर्षण रडार",
+    "admin.s15.body": "द्वि-दिशात्मक फीडबैक उन नियमों की पहचान करता है जो बार-बार ओवरराइड होते हैं, जिससे आप अस्पष्ट नीतियों को सुधार सकें।",
+    "admin.s16.title": "16 · डेटाबेस स्वास्थ्य और अखंडता",
+    "admin.s16.body": "लाइव डेटाबेस अखंडता सत्यापित करें: शून्य अनाथ पंक्तियां, शून्य डुप्लिकेट ईमेल और स्वतः-सुधारने वाली क्रिप्टोग्राफिक ऑडिट चेन।",
+    "admin.s17.title": "17 · AI ब्रांड शासन कोपायलट",
+    "admin.s17.body": "वेक्टर RAG खोज, WCAG कंट्रास्ट गणित और अंग्रेज़ी व हिन्दी में चरण-दर-चरण सहायता के साथ वास्तविक समय AI कोपायलट से परामर्श लें।",
+    "admin.done.body": "आपका गवर्नेंस HQ कॉन्फ़िगर और तैयार है। नीचे दिए गए निर्देशित कार्य पूरे करें या हेडर के 🎓 बटन से कभी भी यह टूर दोबारा देखें।",
+
+    // ── रिव्यूअर · समीक्षा डेस्क (मार्कस) — 15 Steps ──
+    "reviewer.s1.title": "1 · समीक्षा डेस्क और अनुपालन कतार",
+    "reviewer.s1.body": "स्वागत है {role}। आपका समीक्षा डेस्क सामग्री के प्रकाशन से पहले त्वरित, कानूनी रूप से सुदृढ़ और रक्षात्मक निर्णयों के लिए निर्मित है।",
+    "reviewer.s2.title": "2 · प्राथमिकता समीक्षा कतार",
+    "reviewer.s2.body": "सबमिशन को प्रतीक्षा समय और गंभीरता के अनुसार क्रमबद्ध किया जाता है ताकि महत्वपूर्ण अभियान कभी न रुकें।",
+    "reviewer.s3.title": "3 · जोखिम रडार और उच्च-प्रभाव फ़्लैग",
+    "reviewer.s3.body": "अपुष्ट वित्तीय दावे, लापता ट्रेडमार्क चिह्न या प्रतिबंधित शब्द तत्काल ध्यान के लिए सबसे ऊपर आते हैं।",
+    "reviewer.s4.title": "4 · ब्रांड नीति और मूल नियम",
+    "reviewer.s4.body": "अपने डेस्क से सीधे सभी इंडेक्स किए गए ब्रांड दिशानिर्देशों, स्वीकृत उत्पाद विवरणों और प्रतिबंधित शब्दों तक पहुँचें।",
+    "reviewer.s5.title": "5 · निष्कर्ष समीक्षा और छँटाई",
+    "reviewer.s5.body": "प्रत्येक निष्कर्ष आपत्तिजनक वाक्यांश को हाइलाइट करता है, सटीक स्रोत दस्तावेज़ का उद्धरण देता है और नियामक औचित्य समझाता है।",
+    "reviewer.s6.title": "6 · गंभीरता स्तरों को समझना",
+    "reviewer.s6.body": "गंभीर फ़्लैग समाधान तक प्रकाशन रोकते हैं। चेतावनी ब्रांड विचलन दर्शाती है, और मामूली फ़्लैग शैली सुधार सुझाते हैं।",
+    "reviewer.s7.title": "7 · WCAG 2.1 कंट्रास्ट और पहुंच",
+    "reviewer.s7.body": "दृश्य निरीक्षण WCAG 2.1 AA (4.5:1) और AAA (7.0:1) मानकों के विरुद्ध टेक्स्ट और बैकग्राउंड कंट्रास्ट अनुपात मापता है।",
+    "reviewer.s8.title": "8 · दावा और ट्रेडमार्क सत्यापन",
+    "reviewer.s8.body": "स्वीकृत तथ्यों के विरुद्ध दावों की जाँच करें। छोटे अक्षरों में ब्रांड नाम या लापता ® और ™ चिह्नों को तुरंत पहचानें।",
+    "reviewer.s9.title": "9 · शब्दशः उद्धरण और साक्ष्य",
+    "reviewer.s9.body": "प्रत्येक फ़्लैग सटीक नीति दस्तावेज़ और नियम टैग (जैसे RULE TM-01, FACT PD-05) का संदर्भ देता है।",
+    "reviewer.s10.title": "10 · अनुशंसित सुधार और AI पुनर्लेखन",
+    "reviewer.s10.body": "AI-जनित सुझावों की समीक्षा करें जो क्रिएटर के मूल रचनात्मक स्वर को सुरक्षित रखते हुए अनुपालन सुनिश्चित करते हैं।",
+    "reviewer.s11.title": "11 · स्वीकृत सुधार लागू करना",
+    "reviewer.s11.body": "सुझाए गए पुनर्लेखन को स्वीकार करने पर ड्राफ्ट कॉपी स्वतः अपडेट होती है, नया वर्ज़न दर्ज होता है और स्थिति हल होती है।",
+    "reviewer.s12.title": "12 · औचित्य के साथ ओवरराइड",
+    "reviewer.s12.body": "विशेष अनुबंधों जैसी अधिकृत छूट के लिए ओवरराइड नोट दर्ज करें, जो ऑडिट ट्रेल में स्थायी रूप से सुरक्षित रहता है।",
+    "reviewer.s13.title": "13 · अनुमोदन बोर्ड और वर्ज़न डिफ़",
+    "reviewer.s13.body": "वर्ज़न-दर-वर्ज़न बदलावों की साथ-साथ तुलना करें, फिर सामग्री को स्वीकृत करें या क्रिएटर से संशोधन का अनुरोध करें।",
+    "reviewer.s14.title": "14 · क्रिप्टोग्राफिक ऑडिट शृंखला",
+    "reviewer.s14.body": "प्रत्येक निर्णय अपरिवर्तनीय SHA-256 चेन में हैश होता है, जो एंटरप्राइज़ अनुपालन हेतु छेड़छाड़-मुक्त प्रमाण प्रदान करता है।",
+    "reviewer.s15.title": "15 · नीति परामर्श हेतु AI कोपायलट",
+    "reviewer.s15.body": "कोपायलट से जटिल प्रश्न पूछें जैसे 'क्या हम इस शीर्षक में गारंटीड शब्द का उपयोग कर सकते हैं?' और उद्धृत उत्तर पाएँ।",
+    "reviewer.done.body": "आपका समीक्षा डेस्क पूर्ण रूप से सक्रिय है। कतार में लंबित सबमिशन की समीक्षा करें या नीचे दिए गए कार्य शुरू करें।",
+
+    // ── क्रिएटर · सामग्री स्टूडियो (आवा) — 15 Steps ──
+    "creator.s1.title": "1 · सामग्री स्टूडियो और पाइपलाइन",
+    "creator.s1.body": "स्वागत है {role}। सामग्री स्टूडियो क्रिएटरों को तत्काल ब्रांड फीडबैक देता है ताकि आप बिना विलंभ के ऑन-ब्रांड काम प्रकाशित कर सकें।",
+    "creator.s2.title": "2 · ड्राफ्ट कंपोज़र",
+    "creator.s2.body": "हेडलाइन, सोशल पोस्ट या ईमेल ड्राफ्ट सीधे इनलाइन कंपोज़र में लिखें या पेस्ट करें और सेकंडों में ब्रांड संरेखण जाँचें।",
+    "creator.s3.title": "3 · अभियान और संपत्ति प्रबंधन",
+    "creator.s3.body": "अपने मार्केटिंग ड्राफ्ट को विभागीय टैग और स्पष्ट वर्ज़न ट्रैकिंग के साथ संरचित अभियानों में व्यवस्थित करें।",
+    "creator.s4.title": "4 · प्रचार कॉपी अपलोड करना",
+    "creator.s4.body": "त्वरित स्कैन हेतु कॉपी सबमिट करें। डिटरमिनिस्टिक इंजन 100ms से कम समय में प्रतिबंधित शब्दों और ट्रेडमार्क की जाँच करता है।",
+    "creator.s5.title": "5 · बैनर और दृश्य चित्र अपलोड",
+    "creator.s5.body": "प्रचार बैनर (PNG, JPG, WEBP, SVG) अपलोड करें। विज़न इंजन रंगों का विश्लेषण करता है, कंट्रास्ट मापता है और लोगो जाँचता है।",
+    "creator.s6.title": "6 · रचनात्मक स्रोत कनेक्ट करना",
+    "creator.s6.body": "Google Docs और Figma को एक-क्लिक OAuth से जोड़ें ताकि आप अपने डिज़ाइन सॉफ़्टवेयर में ही संपत्तियों की जाँच कर सकें।",
+    "creator.s7.title": "7 · Google Docs ऑडिट",
+    "creator.s7.body": "सहयोगी Google Docs दस्तावेज़ों को नेतृत्व के साथ साझा करने से पहले सीधे दस्तावेज़ से ब्रांड उल्लंघन जाँचें।",
+    "creator.s8.title": "8 · Figma डिज़ाइन टोकन",
+    "creator.s8.body": "Figma डिज़ाइन कैनवास का निरीक्षण करें और सुनिश्चित करें कि बटन और रंग स्वीकृत डिज़ाइन टोकन का पालन करते हैं।",
+    "creator.s9.title": "9 · प्री-फ़्लाइट स्कैनर",
+    "creator.s9.body": "प्री-फ़्लाइट स्कैनर डिटरमिनिस्टिक मिलान, वेक्टर RAG दावा सत्यापन और कंप्यूटर विज़न कंट्रास्ट विश्लेषण को जोड़ता है।",
+    "creator.s10.title": "10 · अनुपालन स्कोर को समझना",
+    "creator.s10.body": "सामग्रियों को 0 से 100 तक का स्पष्ट स्कोर मिलता है। 85 से अधिक स्कोर अनुपालक हैं, और कम स्कोर बताते हैं कि क्या सुधारना है।",
+    "creator.s11.title": "11 · स्पष्टीकरणीय निष्कर्ष देखना",
+    "creator.s11.body": "सटीक उल्लंघन देखने, नीति उद्धरण पढ़ने और उसके पीछे का कारण समझने के लिए किसी भी फ़्लैग पर क्लिक करें।",
+    "creator.s12.title": "12 · टोन-संरक्षी AI अनुशंसाएँ",
+    "creator.s12.body": "ब्रांडशील्ड AI ऐसे पुनर्लेखन सुझाव देता है जो आपकी रचनात्मक आवाज़ को बदले बिना नीतिगत मुद्दों को हल करते हैं।",
+    "creator.s13.title": "13 · सुधार लागू करना और चित्र बदलना",
+    "creator.s13.body": "कॉपी सुधारने हेतु 'सुधार लागू करें' पर क्लिक करें या निष्कर्ष दृश्य से सीधे नया बैनर चित्र अपलोड करें।",
+    "creator.s14.title": "14 · अनुमोदन हेतु सबमिट करना",
+    "creator.s14.body": "गंभीर निष्कर्ष हल होने के बाद, औपचारिक अनुमोदन हेतु अपना ड्राफ्ट समीक्षा डेस्क पर भेजें।",
+    "creator.s15.title": "15 · रचनात्मक मार्गदर्शन हेतु AI कोपायलट",
+    "creator.s15.body": "AI कोपायलट से पूछें 'इस दावे को कैसे बदलें?' या 'स्वीकृत टैगलाइन विकल्प क्या हैं?' और ऑन-ब्रांड प्रेरणा पाएँ।",
+    "creator.done.body": "आपका सामग्री स्टूडियो तैयार है। ड्राफ्ट लिखें, चित्र अपलोड करें और नीचे दिए गए निर्देशित कार्यों से शुरुआत करें।",
+
+    // ── कॉन्ट्रैक्टर · क्लाइंट सैंडबॉक्स (प्रिया) — 12 Steps ──
+    "contractor.s1.title": "1 · क्लाइंट सैंडबॉक्स अवलोकन",
+    "contractor.s1.body": "स्वागत है {role}। क्लाइंट सैंडबॉक्स एजेंसी अनुबंधकर्ताओं हेतु क्लाइंट दिशानिर्देशों के विरुद्ध काम जाँचने का एक सुरक्षित वातावरण है।",
+    "contractor.s2.title": "2 · केवल-पढ़ने योग्य सुरक्षा गारंटी",
+    "contractor.s2.body": "आपका सैंडबॉक्स गैर-विनाशकारी है: ड्राफ्ट और प्री-चेक आपके वर्कस्पेस तक निजी रहते हैं और क्लाइंट नीतियों को नहीं बदल सकते।",
+    "contractor.s3.title": "3 · क्लाइंट-स्वीकृत दिशानिर्देश",
+    "contractor.s3.body": "सटीक स्रोत दस्तावेज़ों, ब्रांड आवाज़ नियमों और दृश्य टोकन का निरीक्षण करें जिनके आधार पर आपके काम का मूल्यांकन होगा।",
+    "contractor.s4.title": "4 · सबमिट की गई संपत्तियों की समीक्षा",
+    "contractor.s4.body": "सक्रिय अभियानों में प्री-फ़्लाइट मूल्यांकन से गुज़र रही प्रचार कॉपी और बैनर संपत्तियों का निरीक्षण करें।",
+    "contractor.s5.title": "5 · निष्कर्ष और श्रेणी विश्लेषण",
+    "contractor.s5.body": "श्रेणीबद्ध निष्कर्ष देखें: दावा सटीकता, टोन संरेखण, दृश्य कंट्रास्ट, शैली परंपराएँ और ट्रेडमार्क अनुपालन।",
+    "contractor.s6.title": "6 · गंभीरता स्तरों को समझना",
+    "contractor.s6.body": "जानें कौन से मुद्दे अवरुद्ध करने वाले हैं (गंभीर उल्लंघन) और कौन से केवल सुझाव हैं (चेतावनी और मामूली सुधार)।",
+    "contractor.s7.title": "7 · साक्ष्य और पैलेट विश्लेषण",
+    "contractor.s7.body": "निकाले गए रंग पैलेट, प्रमुख क्लस्टर और बैनर सबमिशन पर मापे गए WCAG कंट्रास्ट अनुपात का निरीक्षण करें।",
+    "contractor.s8.title": "8 · शब्दशः नीति उद्धरण",
+    "contractor.s8.body": "प्रत्येक फ़्लैग सटीक नीति दस्तावेज़ और अनुभाग का संदर्भ देता है, जो क्लाइंट आवश्यकताओं का पारदर्शी प्रमाण देता है।",
+    "contractor.s9.title": "9 · क्रिप्टोग्राफिक ऑडिट ट्रेल",
+    "contractor.s9.body": "अपरिवर्तनीय SHA-256 ऑडिट लॉग की समीक्षा करें जो हर सबमिशन, स्कैन और अनुमोदन निर्णय को छेड़छाड़-मुक्त रखता है।",
+    "contractor.s10.title": "10 · अनुपालन इतिहास और रिकॉर्ड",
+    "contractor.s10.body": "क्लाइंट डिलिवरेबल्स में ऐतिहासिक अनुपालन स्कोर, निरीक्षण अवधि और सत्यापन रिकॉर्ड की जाँच करें।",
+    "contractor.s11.title": "11 · शासन एनालिटिक्स और रिपोर्ट",
+    "contractor.s11.body": "विभाग अनुपालन मानकों और रुझानों की समीक्षा करें ताकि सुनिश्चित हो सके कि काम हमेशा क्लाइंट मानकों पर खरा उतरे।",
+    "contractor.s12.title": "12 · ऑडिट स्पष्टीकरण हेतु AI कोपायलट",
+    "contractor.s12.body": "क्लाइंट ब्रांड नियमों, ट्रेडमार्क उपयोग या WCAG मानकों से जुड़े केवल-पढ़ने योग्य प्रश्नों हेतु AI कोपायलट से परामर्श लें।",
+    "contractor.done.body": "आपका क्लाइंट सैंडबॉक्स तैयार है। अपने काम की पहले से जाँच करें, त्रुटियाँ सुधारें और पूर्ण आत्मविश्वास के साथ प्रस्तुत करें।",
   },
 } as const;
 

@@ -31,6 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GitLabIntegrationCard } from "./gitlab-integration-card";
+import { ContextualHelpButton } from "@/components/brandshield/help-center";
 
 interface GoogleInspectResult {
   document: {
@@ -276,6 +277,9 @@ export function IntegrationsView() {
           <p className="mt-1 text-xs text-slate-500 sm:text-sm">
             Pre-publishing governance connectors for Google Docs, Figma Design Systems, and CI/CD Webhooks
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ContextualHelpButton guideKey="gitlab" labelKey="help.needHelp.gitlab" />
         </div>
       </div>
 

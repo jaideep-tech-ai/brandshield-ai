@@ -32,6 +32,8 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-scanner";
+import "@/lib/brandshield/i18n/dict-help";
+import { ContextualHelpButton } from "@/components/brandshield/help-center";
 import {
   useCreateSubmission,
   useScanSubmission,
@@ -190,11 +192,14 @@ export function ScannerView() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">{t("scanner.subtitle")}</p>
         </div>
-        {session.data?.zeroDataRetention && (
-          <Badge variant="outline" className="gap-1 border-emerald-200 bg-emerald-50 text-emerald-700">
-            <ShieldCheck className="h-3.5 w-3.5" /> {t("scanner.zdr")}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          <ContextualHelpButton guideKey="scanner" labelKey="help.needHelp.scanner" />
+          {session.data?.zeroDataRetention && (
+            <Badge variant="outline" className="gap-1 border-emerald-200 bg-emerald-50 text-emerald-700">
+              <ShieldCheck className="h-3.5 w-3.5" /> {t("scanner.zdr")}
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
@@ -235,7 +240,7 @@ export function ScannerView() {
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/webp"
+                  accept="image/*"
                   className="hidden"
                   aria-label={t("scanner.aria.uploadBanner")}
                   onChange={(e) => {

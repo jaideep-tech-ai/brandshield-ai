@@ -51,6 +51,7 @@ model User {
   googleConnection GoogleOAuthConnection?
   figmaConnection  FigmaOAuthConnection?
   gitlabConnections GitLabConnection[]
+  tourState    String?  // JSON serialized tour progress & task completions
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

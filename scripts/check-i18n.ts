@@ -21,6 +21,7 @@ import "../src/lib/brandshield/i18n/dict-billing";
 import "../src/lib/brandshield/i18n/dict-settings";
 import "../src/lib/brandshield/i18n/dict-shell";
 import "../src/lib/brandshield/i18n/dict-tour";
+import "../src/lib/brandshield/i18n/dict-help";
 import "../src/lib/brandshield/i18n/dict-dash-a";
 import "../src/lib/brandshield/i18n/dict-dash-b";
 

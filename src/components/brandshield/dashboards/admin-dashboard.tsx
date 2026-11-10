@@ -31,6 +31,7 @@ import { useLang } from "@/lib/brandshield/i18n";
 import { cn, formatDate, initials } from "@/lib/brandshield/utils";
 import type { TeamMember } from "@/lib/brandshield/types";
 import { WorkflowCard } from "@/components/brandshield/workflow-card";
+import { GuidedTasksCard } from "@/components/brandshield/demo-tour";
 
 import "@/lib/brandshield/i18n/dict-dash-b";
 
@@ -113,6 +114,9 @@ export function AdminDashboard() {
 
       {/* 2 · 7-Stage Brand Governance Lifecycle */}
       <WorkflowCard />
+
+      {/* 2.5 · Guided First-Time Tasks */}
+      <GuidedTasksCard role="admin" />
 
       {/* 3 · KPI row */}
       <div data-tour="kpi" className="grid grid-cols-2 gap-3 lg:grid-cols-4">

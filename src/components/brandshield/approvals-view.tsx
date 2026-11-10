@@ -40,6 +40,8 @@ import { cn, lineDiff, timeAgo, formatDate, shortHash } from "@/lib/brandshield/
 import { STATUS_META, SEVERITY_META, type Submission, type SubmissionStatus } from "@/lib/brandshield/types";
 import { useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-approvals";
+import "@/lib/brandshield/i18n/dict-help";
+import { ContextualHelpButton } from "@/components/brandshield/help-center";
 
 const COLUMNS: { status: SubmissionStatus; accent: string }[] = [
   { status: "draft", accent: "bg-slate-400" },
@@ -76,11 +78,14 @@ export function ApprovalsView() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">{t("approvals.subtitle")}</p>
         </div>
-        {isReviewer && (
-          <Badge variant="outline" className="gap-1 border-teal-200 bg-teal-50 text-teal-700">
-            <BadgeCheck className="h-3.5 w-3.5" /> {t("approvals.reviewerBadge", { count: inReviewCount })}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          <ContextualHelpButton guideKey="approvals" labelKey="help.needHelp.approvals" />
+          {isReviewer && (
+            <Badge variant="outline" className="gap-1 border-teal-200 bg-teal-50 text-teal-700">
+              <BadgeCheck className="h-3.5 w-3.5" /> {t("approvals.reviewerBadge", { count: inReviewCount })}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {submissions.isLoading ? (
