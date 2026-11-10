@@ -10,6 +10,63 @@ import {
   type NormalizedGitLabEvent,
 } from "@/lib/brandshield/server/gitlab";
 
+/**
+ * Robustly extracts the organization identifier (slug or id) from all possible sources:
+ * 1. Payload body fields (`orgSlug`, `orgId`)
+ * 2. Next.js `req.nextUrl.searchParams`
+ * 3. Native `new URL(req.url).searchParams`
+ * 4. Raw URL string regex (protects against reverse-proxy URLSearchParams stripping)
+ */
+export function extractOrgIdentifier(
+  req: { url: string; nextUrl?: { searchParams: URLSearchParams } },
+  payload?: Record<string, unknown>
+): string | null {
+  // 1. Explicit body payload properties
+  if (payload && typeof payload.orgSlug === "string" && payload.orgSlug.trim()) {
+    return payload.orgSlug.trim();
+  }
+  if (payload && typeof payload.orgId === "string" && payload.orgId.trim()) {
+    return payload.orgId.trim();
+  }
+
+  // 2. NextRequest nextUrl searchParams
+  try {
+    const slug = req.nextUrl?.searchParams?.get("orgSlug")?.trim();
+    if (slug) return slug;
+    const id = req.nextUrl?.searchParams?.get("orgId")?.trim();
+    if (id) return id;
+  } catch {
+    // ignore
+  }
+
+  // 3. Native URL parsing of req.url
+  try {
+    const parsed = new URL(req.url, "https://brandshield-ai-five.vercel.app");
+    const slug = parsed.searchParams.get("orgSlug")?.trim();
+    if (slug) return slug;
+    const id = parsed.searchParams.get("orgId")?.trim();
+    if (id) return id;
+  } catch {
+    // ignore
+  }
+
+  // 4. Raw URL string regex fallback (ensures query params are parsed even if headers/proxy altered URL object)
+  try {
+    const slugMatch = req.url.match(/[?&]orgSlug=([^&#]+)/i);
+    if (slugMatch && slugMatch[1]) {
+      return decodeURIComponent(slugMatch[1]).trim();
+    }
+    const idMatch = req.url.match(/[?&]orgId=([^&#]+)/i);
+    if (idMatch && idMatch[1]) {
+      return decodeURIComponent(idMatch[1]).trim();
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -25,43 +82,68 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Detect if this is a GitLab Webhook request
-    const gitlabEvent = req.headers.get("x-gitlab-event");
-    const gitlabToken = req.headers.get("x-gitlab-token");
-    const gitlabSignature =
+    const gitlabEvent = req.headers.get("x-gitlab-event")?.trim();
+    const gitlabToken = req.headers.get("x-gitlab-token")?.trim();
+    const gitlabSignature = (
       req.headers.get("x-gitlab-signature") ||
       req.headers.get("x-brandshield-signature") ||
-      req.headers.get("x-hub-signature-256");
+      req.headers.get("x-hub-signature-256")
+    )?.trim();
 
     const isGitLab = Boolean(
       gitlabEvent ||
-        payload.object_kind === "push" ||
-        payload.object_kind === "merge_request"
+        gitlabToken ||
+        (payload &&
+          typeof payload === "object" &&
+          ("object_kind" in payload || "event_name" in payload || "project" in payload || "commits" in payload))
     );
 
-    let orgId: string;
-    let assetName = "Pre-publishing Content Payload";
-    let textToScan = "";
-    let headingsCount = 0;
-    let parsedGitLab: NormalizedGitLabEvent | null = null;
-    let fetchedFiles: { path: string; content: string }[] = [];
+    // 2. Extract organization identifier (supports both URL searchParams and payload body)
+    let orgIdentifier = extractOrgIdentifier(req, payload);
 
+    if (!orgIdentifier && isGitLab) {
+      orgIdentifier = process.env.GITLAB_ORG_SLUG || "nimbus-labs";
+    }
+
+    if (!orgIdentifier) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing organization identifier. Provide ?orgSlug=<slug> in the webhook URL or in the payload body.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // 3. Resolve Organization from Database
+    const org = await db.organization.findFirst({
+      where: {
+        OR: [{ slug: orgIdentifier }, { id: orgIdentifier }],
+      },
+      include: {
+        webhooks: { where: { active: true } },
+      },
+    });
+
+    if (!org) {
+      return NextResponse.json(
+        { error: `Organization '${orgIdentifier}' not found.` },
+        { status: 404 }
+      );
+    }
+
+    const orgId = org.id;
+
+    // 4. Authenticate & Verify Organization Ownership
+    // Never trust an arbitrary orgSlug as authorization. The secret token or signature must match the organization.
     if (isGitLab) {
-      // Security: Do not trust orgSlug from query parameters without verifying project-to-organization mapping
-      const orgIdentifier =
-        req.nextUrl.searchParams.get("orgSlug") ||
-        req.nextUrl.searchParams.get("orgId") ||
-        (payload.orgSlug as string) ||
-        (payload.orgId as string) ||
-        process.env.GITLAB_ORG_SLUG ||
-        "nimbus-labs";
-
       const projectMapping = await verifyGitLabProjectMapping(
-        orgIdentifier,
+        orgId,
         gitlabToken || gitlabSignature,
         rawBody
       );
 
-      if (!projectMapping.verified || !projectMapping.org) {
+      if (!projectMapping.verified) {
         return NextResponse.json(
           {
             error: `Unauthorized GitLab Webhook: ${projectMapping.reason || "Project not mapped to organization"}`,
@@ -69,8 +151,27 @@ export async function POST(req: NextRequest) {
           { status: 401 }
         );
       }
+    } else {
+      // Standard custom webhook HMAC verification if endpoints are registered
+      const signatureHeader = req.headers.get("x-brandshield-signature");
+      if (org.webhooks.length > 0 && signatureHeader) {
+        const anyValid = org.webhooks.some((wh) =>
+          verifyWebhookSignature(signatureHeader, rawBody, wh.secret).valid
+        );
+        if (!anyValid) {
+          return NextResponse.json({ error: "Webhook signature verification failed." }, { status: 401 });
+        }
+      }
+    }
 
-      orgId = projectMapping.org.id;
+    // 5. Extract Content for Brand Governance Audit
+    let assetName = "Pre-publishing Content Payload";
+    let textToScan = "";
+    let headingsCount = 0;
+    let parsedGitLab: NormalizedGitLabEvent | null = null;
+    let fetchedFiles: { path: string; content: string }[] = [];
+
+    if (isGitLab) {
       parsedGitLab = parseGitLabWebhookPayload(payload);
 
       if (!parsedGitLab) {
@@ -83,14 +184,14 @@ export async function POST(req: NextRequest) {
       assetName = parsedGitLab.summary;
 
       // Inspect actual changed file contents:
-      // 1. Check if files were supplied directly in request payload (e.g. from CI script)
+      // A. Check if files were supplied directly in request payload (e.g. from CI runner script)
       if (Array.isArray(payload.files)) {
         fetchedFiles = (payload.files as { path?: string; content?: string }[])
           .filter((f) => f && typeof f.path === "string" && typeof f.content === "string")
           .map((f) => ({ path: f.path as string, content: f.content as string }));
       }
 
-      // 2. If not in body, fetch changed files from GitLab Repository API
+      // B. If not in body, fetch changed files from GitLab Repository API
       if (fetchedFiles.length === 0 && parsedGitLab.filesChanged.length > 0) {
         fetchedFiles = await fetchGitLabChangedFiles(
           parsedGitLab.projectPath || parsedGitLab.projectId,
@@ -105,41 +206,6 @@ export async function POST(req: NextRequest) {
 
       textToScan = `${parsedGitLab.contentToAudit}\n\n${fileContentStr}`.trim();
     } else {
-      // ── Standard Custom Webhook (Backward-Compatible) ──
-      const orgIdentifier = (payload.orgSlug as string) || (payload.orgId as string);
-      if (!orgIdentifier) {
-        return NextResponse.json(
-          { error: "Missing organization identifier (orgSlug or orgId)." },
-          { status: 400 }
-        );
-      }
-
-      const org = await db.organization.findFirst({
-        where: {
-          OR: [{ slug: orgIdentifier }, { id: orgIdentifier }],
-        },
-        include: {
-          webhooks: { where: { active: true } },
-        },
-      });
-
-      if (!org) {
-        return NextResponse.json({ error: "Organization not found." }, { status: 404 });
-      }
-
-      orgId = org.id;
-
-      // If webhook signing is configured for this organization, verify the signature header
-      const signatureHeader = req.headers.get("x-brandshield-signature");
-      if (org.webhooks.length > 0 && signatureHeader) {
-        const anyValid = org.webhooks.some((wh) =>
-          verifyWebhookSignature(signatureHeader, rawBody, wh.secret).valid
-        );
-        if (!anyValid) {
-          return NextResponse.json({ error: "Webhook signature verification failed." }, { status: 401 });
-        }
-      }
-
       const content = (payload.content as string) || "";
       const headings = Array.isArray(payload.headings) ? (payload.headings as string[]) : [];
       headingsCount = headings.length;
@@ -147,6 +213,7 @@ export async function POST(req: NextRequest) {
       textToScan = `${content} ${headings.join(" ")}`.trim();
     }
 
+    // 6. Run Brand Governance Audit
     const findings: {
       category: string;
       severity: "critical" | "warning" | "minor";
@@ -155,7 +222,7 @@ export async function POST(req: NextRequest) {
       suggestion: string;
     }[] = [];
 
-    // 1. Check for banned marketing terms
+    // Check for banned marketing terms
     const BANNED = [
       { word: "guaranteed", rule: "VOICE-04", rep: "designed to deliver" },
       { word: "risk-free", rule: "VOICE-04", rep: "hedged risk profile" },
@@ -176,7 +243,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Check for headline / title punctuation violations
+    // Check for headline / title punctuation violations
     if (payload.headings && Array.isArray(payload.headings)) {
       for (const h of payload.headings as string[]) {
         if (typeof h === "string" && (h.includes("?!") || h.includes("!!"))) {
@@ -191,7 +258,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Check for trademarks
+    // Check for trademarks
     if (textToScan.includes("NimbusPay") && !textToScan.includes("NimbusPay®")) {
       findings.push({
         category: "trademark",
@@ -208,7 +275,7 @@ export async function POST(req: NextRequest) {
     const complianceScore = Math.max(0, 100 - criticalCount * 30 - warningCount * 10);
     const allowed = criticalCount === 0;
 
-    // Log the pre-publishing asset audit
+    // 7. Log Pre-publishing Asset Audit
     const assetAudit = await db.assetAudit.create({
       data: {
         orgId,
@@ -233,7 +300,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // ── Outbound GitLab Commit Status Update ──
+    // 8. Outbound GitLab Commit Status Update (Awaited to avoid serverless termination)
     let gitlabStatusResult: { success: boolean; status?: number; error?: string } | null = null;
 
     if (
@@ -241,16 +308,16 @@ export async function POST(req: NextRequest) {
       parsedGitLab &&
       parsedGitLab.commitSha &&
       parsedGitLab.commitSha !== "unknown_sha" &&
-      parsedGitLab.commitSha !== "mr_head_sha"
+      parsedGitLab.commitSha !== "mr_head_sha" &&
+      parsedGitLab.commitSha !== "gitlab_test_sha"
     ) {
       const origin =
         process.env.VERCEL_PROJECT_PRODUCTION_URL
           ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-          : req.nextUrl.origin || "https://brandshield-ai-five.vercel.app";
+          : req.nextUrl?.origin || "https://brandshield-ai-five.vercel.app";
 
       const targetUrl = `${origin}/?tab=webhooks&auditId=${assetAudit.id}`;
 
-      // Await directly to guarantee execution before serverless response finishes
       gitlabStatusResult = await updateGitLabCommitStatus({
         projectIdOrPath: parsedGitLab.projectPath || parsedGitLab.projectId,
         commitSha: parsedGitLab.commitSha,

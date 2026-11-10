@@ -285,6 +285,11 @@ export function parseGitLabWebhookPayload(rawPayload: Record<string, unknown>): 
       new Set(commits.flatMap((c) => [...(c.added || []), ...(c.modified || [])]))
     );
 
+    let contentToAudit = commitTexts;
+    if (!contentToAudit) {
+      contentToAudit = p.after ? `GitLab Push event ${p.after}` : "GitLab Webhook Push Test Event";
+    }
+
     return {
       eventType: "push",
       projectId,
@@ -296,7 +301,7 @@ export function parseGitLabWebhookPayload(rawPayload: Record<string, unknown>): 
       authorName,
       authorEmail,
       summary: `GitLab Push to ${branch} (${commits.length} commit${commits.length === 1 ? "" : "s"})`,
-      contentToAudit: commitTexts,
+      contentToAudit,
       filesChanged,
     };
   }
@@ -323,12 +328,39 @@ export function parseGitLabWebhookPayload(rawPayload: Record<string, unknown>): 
       authorName,
       authorEmail,
       summary: `GitLab MR #${attrs.id}: ${attrs.title || "Merge Request"}`,
-      contentToAudit: mrText,
+      contentToAudit: mrText || "GitLab Merge Request Test Event",
       filesChanged: [],
     };
   }
 
-  return null;
+  // 3. Fallback for general GitLab webhook events (e.g. UI Test Ping, tag_push, issue, note)
+  const ref = (rawPayload.ref as string) || "refs/heads/main";
+  const branch = ref.replace(/^refs\/heads\//, "");
+  const commitSha =
+    (rawPayload.checkout_sha as string) ||
+    (rawPayload.after as string) ||
+    (rawPayload.before as string) ||
+    "gitlab_test_sha";
+
+  const message =
+    (rawPayload.message as string) ||
+    (rawPayload.event_name as string) ||
+    `GitLab ${kind || "Webhook"} Verification Test Event`;
+
+  return {
+    eventType: "push",
+    projectId,
+    projectPath,
+    projectUrl,
+    ref,
+    branch,
+    commitSha,
+    authorName: (rawPayload.user_name as string) || "GitLab User",
+    authorEmail: (rawPayload.user_email as string) || "",
+    summary: `GitLab ${kind || "Webhook"} on ${branch}`,
+    contentToAudit: message,
+    filesChanged: [],
+  };
 }
 
 const AUDITABLE_EXTENSIONS = new Set([

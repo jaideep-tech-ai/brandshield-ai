@@ -27,6 +27,7 @@ import {
   markGitLabSignatureConsumed,
   isGitLabSignatureConsumed,
 } from "../src/lib/brandshield/server/gitlab.ts";
+import { extractOrgIdentifier } from "../src/app/api/webhooks/incoming/prepublish/route.ts";
 
 console.log("==================================================");
 console.log("RUNNING BRANDSHIELD AI FEATURE VERIFICATION SUITE");
@@ -588,6 +589,58 @@ assert(officialGitLabStates.includes(compliantAudit.allowed ? "success" : "faile
 const rawProjectPath = "jaideep-tech-ai/brandshield-ai-webhooks";
 const encodedPath = encodeURIComponent(rawProjectPath);
 assert(encodedPath === "jaideep-tech-ai%2Fbrandshield-ai-webhooks", "GitLab project path URL-encoded correctly for REST API calls");
+
+// 7. Organization Query Parameter Extraction from GitLab Webhook Requests
+const mockReqUrlOnly = {
+  url: "https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish?orgSlug=nimbus-labs",
+};
+assert(
+  extractOrgIdentifier(mockReqUrlOnly) === "nimbus-labs",
+  "extractOrgIdentifier accurately extracts orgSlug from raw webhook request URL"
+);
+
+const mockReqWithNextUrl = {
+  url: "https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish?orgSlug=nimbus-labs",
+  nextUrl: {
+    searchParams: new URLSearchParams("orgSlug=nimbus-labs"),
+  },
+};
+assert(
+  extractOrgIdentifier(mockReqWithNextUrl) === "nimbus-labs",
+  "extractOrgIdentifier accurately extracts orgSlug from nextUrl.searchParams"
+);
+
+const mockReqMultiParams = {
+  url: "https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish?event=push&orgSlug=nimbus-labs&token=test",
+};
+assert(
+  extractOrgIdentifier(mockReqMultiParams) === "nimbus-labs",
+  "extractOrgIdentifier extracts orgSlug when multiple query parameters exist"
+);
+
+const mockReqOrgId = {
+  url: "https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish?orgId=cmwah834a0000jp08cgpbnog6",
+};
+assert(
+  extractOrgIdentifier(mockReqOrgId) === "cmwah834a0000jp08cgpbnog6",
+  "extractOrgIdentifier extracts orgId from query parameter"
+);
+
+const mockReqBodyPayload = {
+  url: "https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish",
+};
+assert(
+  extractOrgIdentifier(mockReqBodyPayload, { orgSlug: "nimbus-labs" }) === "nimbus-labs",
+  "extractOrgIdentifier extracts orgSlug when provided in body payload"
+);
+
+const mockReqEmpty = {
+  url: "https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish",
+};
+assert(
+  extractOrgIdentifier(mockReqEmpty, {}) === null,
+  "extractOrgIdentifier returns null when no organization parameter is present"
+);
 
 console.log("\n==================================================");
 console.log(`VERIFICATION SUMMARY: ${testsPassed} passed, ${testsFailed} failed`);
