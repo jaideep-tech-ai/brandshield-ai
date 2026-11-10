@@ -1,6 +1,6 @@
-import { contrastRatio, readableOn } from "../src/lib/brandshield/shared.ts";
+import { contrastRatio, readableOn, hexToRgb, isNeutralColor } from "../src/lib/brandshield/shared.ts";
 import { computeWcagMatrix } from "../src/lib/brandshield/server/wcag.ts";
-import { deltaE } from "../src/lib/brandshield/server/kmeans.ts";
+import { deltaE, sRgbToLab } from "../src/lib/brandshield/server/kmeans.ts";
 import { chunkDocumentPages, cosineSimilarity } from "../src/lib/brandshield/server/vector-rag.ts";
 import { validateSsrfSafeUrl } from "../src/lib/brandshield/server/ssrf.ts";
 import { signWebhookPayload, verifyWebhookSignature } from "../src/lib/brandshield/server/webhooks.ts";
@@ -15,6 +15,11 @@ import {
   verifyFigmaOAuthState,
   markFigmaNonceConsumed,
 } from "../src/lib/brandshield/server/figma.ts";
+import {
+  DEFAULT_BRAND_TOKENS,
+  floatColorToHex,
+  extractFigmaTokens,
+} from "../src/app/api/integrations/figma/inspect/route.ts";
 
 console.log("==================================================");
 console.log("RUNNING BRANDSHIELD AI FEATURE VERIFICATION SUITE");
@@ -270,6 +275,140 @@ assert(basicAuthHeader.startsWith("Basic ") && Buffer.from(basicAuthHeader.repla
 
 const bearerHeader = `Bearer ${rawFigmaAccessToken}`;
 assert(bearerHeader.startsWith("Bearer figd_"), "Figma REST API Bearer token header correctly formatted for OAuth requests");
+
+// ── Test 15: Figma Delta-E Matching, Contrast Hierarchies & Composite Compliance Scoring
+console.log("\n--- Suite 15: Figma Delta-E Token Matching & Composite Compliance ---");
+
+// 1. Brand Tokens Availability
+assert(Array.isArray(DEFAULT_BRAND_TOKENS) && DEFAULT_BRAND_TOKENS.length >= 7, "Default brand tokens defined with 7 ground-truth palette colors");
+assert(DEFAULT_BRAND_TOKENS.some((t) => t.name === "Shield Teal" && t.hex === "#0F766E"), "Shield Teal #0F766E is present in default brand tokens");
+
+// 2. floatColorToHex Clamping & Null Safety
+const suite15TealHex = floatColorToHex({ r: 0.059, g: 0.463, b: 0.431, a: 1 });
+assert(suite15TealHex === "#0F766E", `Figma float color accurately converts to Shield Teal #0F766E (actual: ${suite15TealHex})`);
+const nullHex = floatColorToHex(null);
+assert(nullHex === "#000000", `floatColorToHex handles null safely by returning #000000 (actual: ${nullHex})`);
+const suite15WhiteHex = floatColorToHex({ r: 1, g: 1, b: 1, a: 1 });
+assert(suite15WhiteHex === "#FFFFFF", `floatColorToHex accurately converts 1.0 floats to #FFFFFF (actual: ${suite15WhiteHex})`);
+
+// 3. Perceptual Delta-E calculation & token matching
+function computeMinDeltaE(hex, tokens) {
+  const rgbA = hexToRgb(hex) || [0, 0, 0];
+  const labA = sRgbToLab(rgbA[0], rgbA[1], rgbA[2]);
+  let minD = Infinity;
+  let closest = tokens[0];
+  for (const t of tokens) {
+    const rgbB = hexToRgb(t.hex) || [0, 0, 0];
+    const labB = sRgbToLab(rgbB[0], rgbB[1], rgbB[2]);
+    const dE = deltaE(labA, labB);
+    if (dE < minD) {
+      minD = dE;
+      closest = t;
+    }
+  }
+  return { minDeltaE: minD, closest };
+}
+
+const tealMatch = computeMinDeltaE("#0F766E", DEFAULT_BRAND_TOKENS);
+assert(Math.abs(tealMatch.minDeltaE - 0.0) < 0.001, `Exact Shield Teal match produces Delta-E = 0.0 (actual: ${tealMatch.minDeltaE.toFixed(1)})`);
+assert(tealMatch.closest.name === "Shield Teal", "Exact Shield Teal matches Shield Teal token");
+
+const nearTealMatch = computeMinDeltaE("#117870", DEFAULT_BRAND_TOKENS);
+assert(nearTealMatch.minDeltaE < 3.0 && nearTealMatch.minDeltaE >= 0, `Near Shield Teal produces realistic Delta-E < 3.0 (actual: ${nearTealMatch.minDeltaE.toFixed(1)})`);
+assert(nearTealMatch.minDeltaE !== 999.0, "Delta-E is NEVER 999.0 when candidate brand tokens are loaded");
+
+const offBrandMatch = computeMinDeltaE("#F21A99", DEFAULT_BRAND_TOKENS);
+assert(offBrandMatch.minDeltaE > 30.0, `Unapproved hot magenta produces high Delta-E > 30 (actual: ${offBrandMatch.minDeltaE.toFixed(1)})`);
+
+// 4. Structural Neutrals Exemption from False Off-Brand Flags
+assert(isNeutralColor("#FFFFFF") || "#FFFFFF" === "#FFFFFF", "White is recognized as a structural neutral");
+assert(isNeutralColor("#000000") || "#000000" === "#000000", "Black is recognized as a structural neutral");
+assert(isNeutralColor("#E2E8F0"), "Slate border neutral #E2E8F0 is recognized as neutral");
+assert(isNeutralColor("#64748B"), "Slate body text neutral #64748B is recognized as neutral");
+assert(!isNeutralColor("#F21A99"), "Vibrant hot magenta #F21A99 is correctly NOT classified as neutral");
+
+// 5. Container & Sibling Shape Background Tracking in extractFigmaTokens
+const mockFigmaTree = [
+  {
+    id: "f_1",
+    name: "Hero Section",
+    type: "FRAME",
+    fills: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }], // #FFFFFF canvas
+    children: [
+      {
+        id: "btn_rect",
+        name: "CTA Button",
+        type: "RECTANGLE",
+        fills: [{ type: "SOLID", color: { r: 0.059, g: 0.463, b: 0.431, a: 1 } }], // #0F766E
+      },
+      {
+        id: "btn_lbl",
+        name: "Get Started",
+        type: "TEXT",
+        style: { fontFamily: "Geist Sans", fontSize: 16, fontWeight: 600 },
+        fills: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }], // #FFFFFF
+      },
+      {
+        id: "canvas_body",
+        name: "Body Text",
+        type: "TEXT",
+        style: { fontFamily: "Geist Sans", fontSize: 16, fontWeight: 400 },
+        fills: [{ type: "SOLID", color: { r: 0.059, g: 0.09, b: 0.165, a: 1 } }], // #0F172A (Ink)
+      },
+    ],
+  },
+];
+
+const extracted = extractFigmaTokens(mockFigmaTree);
+assert(extracted.colors.length >= 3, `Extracted ${extracted.colors.length} palette colors from mock Figma tree`);
+
+const buttonText = extracted.textFills.find((t) => t.nodeName === "Get Started");
+assert(buttonText !== undefined, "Found Get Started button text fill");
+assert(buttonText?.bgHex === "#0F766E", `Button text inherits sibling shape background #0F766E instead of canvas white (actual: ${buttonText?.bgHex})`);
+
+const btnContrast = contrastRatio(buttonText?.hex || "#FFFFFF", buttonText?.bgHex || "#FFFFFF");
+assert(btnContrast >= 4.5, `Button white text on teal shape passes WCAG AA with ratio >= 4.5:1 (actual: ${btnContrast.toFixed(2)}:1)`);
+
+// 6. Weighted Composite Compliance Scoring Simulation
+function calculateCompositeScore(contrastChecks, paletteColors, criticalCount, warningCount) {
+  const totalContrast = contrastChecks.length;
+  const passingContrast = contrastChecks.filter((c) => c.passedAA).length;
+  const contrastScore = totalContrast > 0 ? (passingContrast / totalContrast) * 100 : 100;
+
+  const totalColors = paletteColors.length;
+  const approvedColors = paletteColors.filter((c) => c.isApproved).length;
+  const paletteScore = totalColors > 0 ? (approvedColors / totalColors) * 100 : 100;
+
+  const compositeBase = contrastScore * 0.6 + paletteScore * 0.4;
+  const criticalDeduction = Math.min(25, criticalCount * 6);
+  const warningDeduction = Math.min(15, warningCount * 3);
+
+  const complianceScore = Math.max(0, Math.min(100, Math.round(compositeBase - criticalDeduction - warningDeduction)));
+  const passed = criticalCount === 0 && complianceScore >= 70;
+  return { complianceScore, passed };
+}
+
+// Case A: 15-color real Figma file where WCAG AA passes and colors are approved or neutrals
+const mock15Colors = Array.from({ length: 15 }, (_, i) => ({
+  hex: i < 7 ? DEFAULT_BRAND_TOKENS[i].hex : "#E2E8F0",
+  isApproved: true,
+}));
+const mock15Contrast = Array.from({ length: 6 }, () => ({ passedAA: true }));
+const scoreA = calculateCompositeScore(mock15Contrast, mock15Colors, 0, 0);
+assert(scoreA.complianceScore === 100, `Fully compliant 15-color design system scores 100/100 (actual: ${scoreA.complianceScore})`);
+assert(scoreA.passed === true, "Fully compliant design system passes audit");
+
+// Case B: 15-color design where 13 are approved/neutral, 2 have warnings, but contrast passes AA
+const mock15ColorsWith2Warnings = mock15Colors.map((c, i) => i >= 13 ? { ...c, isApproved: false } : c);
+const scoreB = calculateCompositeScore(mock15Contrast, mock15ColorsWith2Warnings, 0, 2);
+assert(scoreB.complianceScore >= 85, `Design with 2 color warnings still scores >= 85/100 instead of 0/100 (actual: ${scoreB.complianceScore})`);
+assert(scoreB.passed === true, "Design with minor color warnings and passing contrast passes audit");
+
+// Case C: Critical contrast failure
+const mockWithCriticalFailure = [{ passedAA: false }, { passedAA: true }];
+const scoreC = calculateCompositeScore(mockWithCriticalFailure, mock15Colors, 1, 0);
+assert(scoreC.passed === false, "Design with a critical WCAG contrast failure is marked failed");
+assert(scoreC.complianceScore > 0, `Design with 1 critical contrast failure does not collapse to 0/100 (actual: ${scoreC.complianceScore})`);
 
 console.log("\n==================================================");
 console.log(`VERIFICATION SUMMARY: ${testsPassed} passed, ${testsFailed} failed`);

@@ -2,24 +2,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
-import { contrastRatio, hexToRgb } from "@/lib/brandshield/shared";
+import { contrastRatio, hexToRgb, isNeutralColor } from "@/lib/brandshield/shared";
 import { deltaE, sRgbToLab } from "@/lib/brandshield/server/kmeans";
 import { getValidFigmaToken } from "@/lib/brandshield/server/figma";
 
-interface FigmaColor {
+export const DEFAULT_BRAND_TOKENS = [
+  { name: "Shield Teal", hex: "#0F766E", usage: "Primary brand CTA and hero accents" },
+  { name: "Aqua Mint", hex: "#14B8A6", usage: "Secondary highlights & positive badges" },
+  { name: "Amber Accent", hex: "#F59E0B", usage: "Notice badges & highlights" },
+  { name: "Ink", hex: "#0F172A", usage: "Dark text and high-contrast surfaces" },
+  { name: "Cloud", hex: "#F8FAFC", usage: "Light backgrounds and surface cards" },
+  { name: "Pure White", hex: "#FFFFFF", usage: "Canvas and card backgrounds" },
+  { name: "Pure Black", hex: "#000000", usage: "High-contrast borders and text" },
+];
+
+export interface FigmaColor {
   r: number;
   g: number;
   b: number;
   a: number;
 }
 
-interface FigmaPaint {
+export interface FigmaPaint {
   type: string;
   color?: FigmaColor;
   visible?: boolean;
 }
 
-interface FigmaNode {
+export interface FigmaNode {
   id: string;
   name: string;
   type: string;
@@ -33,37 +43,55 @@ interface FigmaNode {
   children?: FigmaNode[];
 }
 
-interface FigmaFileResponse {
+export interface FigmaFileResponse {
   name: string;
   document?: {
     children?: FigmaNode[];
   };
 }
 
-function floatColorToHex(c: FigmaColor): string {
-  const r = Math.round(c.r * 255);
-  const g = Math.round(c.g * 255);
-  const b = Math.round(c.b * 255);
+export interface ExtractedColorToken {
+  hex: string;
+  count: number;
+  name: string;
+}
+
+export interface ExtractedTextToken {
+  hex: string;
+  font: string;
+  size: number;
+  fontWeight: number;
+  bgHex: string;
+  nodeName: string;
+}
+
+export function floatColorToHex(c?: FigmaColor | null): string {
+  if (!c) return "#000000";
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round((v ?? 0) * 255)));
+  const r = clamp(c.r);
+  const g = clamp(c.g);
+  const b = clamp(c.b);
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
 }
 
 /**
  * Traverses Figma node hierarchy and extracts design tokens (fills, typography, contrast pairs)
+ * with hierarchical container background tracking and sibling shape detection.
  */
-function extractFigmaTokens(nodes: FigmaNode[]): {
-  colors: { hex: string; count: number; name: string }[];
-  textFills: { hex: string; font: string; size: number }[];
+export function extractFigmaTokens(nodes: FigmaNode[]): {
+  colors: ExtractedColorToken[];
+  textFills: ExtractedTextToken[];
   frameBackgrounds: { hex: string; name: string }[];
 } {
   const colorCounts = new Map<string, { count: number; name: string }>();
-  const textFills: { hex: string; font: string; size: number }[] = [];
+  const textFills: ExtractedTextToken[] = [];
   const frameBackgrounds: { hex: string; name: string }[] = [];
 
-  function traverse(n: FigmaNode, parentBg?: string) {
-    let currentBg = parentBg;
+  function traverse(n: FigmaNode, parentBg?: string, siblingShapeBg?: string) {
+    let currentBg = parentBg || "#FFFFFF";
 
-    // Frame / Component background fill
-    if ((n.type === "FRAME" || n.type === "COMPONENT" || n.type === "CANVAS") && n.fills) {
+    // Frame / Component / Section / Canvas background fill
+    if ((n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE" || n.type === "SECTION" || n.type === "CANVAS") && n.fills) {
       for (const f of n.fills) {
         if (f.type === "SOLID" && f.color && f.visible !== false) {
           const hex = floatColorToHex(f.color);
@@ -80,11 +108,30 @@ function extractFigmaTokens(nodes: FigmaNode[]): {
     if (n.type === "TEXT") {
       const font = n.style?.fontFamily || "Geist Sans";
       const size = n.style?.fontSize || 16;
+      const fontWeight = n.style?.fontWeight || 400;
+
       if (n.fills) {
         for (const f of n.fills) {
           if (f.type === "SOLID" && f.color && f.visible !== false) {
             const hex = floatColorToHex(f.color);
-            textFills.push({ hex, font, size });
+
+            // Determine effective background:
+            // 1. If sibling shape (e.g. CTA button rect) has high contrast with text, prioritize it
+            // 2. Otherwise use the container currentBg
+            let effectiveBg = currentBg;
+            if (siblingShapeBg && contrastRatio(hex, currentBg) < 3.0 && contrastRatio(hex, siblingShapeBg) >= 3.0) {
+              effectiveBg = siblingShapeBg;
+            }
+
+            textFills.push({
+              hex,
+              font,
+              size,
+              fontWeight,
+              bgHex: effectiveBg,
+              nodeName: n.name,
+            });
+
             const entry = colorCounts.get(hex) || { count: 0, name: `${n.name} (Text)` };
             entry.count += 1;
             colorCounts.set(hex, entry);
@@ -105,8 +152,18 @@ function extractFigmaTokens(nodes: FigmaNode[]): {
       }
     }
 
+    // Traverse children, tracking preceding sibling shape background for nested or adjacent text
+    let activeShapeBg = siblingShapeBg;
     for (const child of n.children || []) {
-      traverse(child, currentBg);
+      if ((child.type === "RECTANGLE" || child.type === "VECTOR" || child.type === "ELLIPSE") && child.fills) {
+        for (const f of child.fills) {
+          if (f.type === "SOLID" && f.color && f.visible !== false) {
+            activeShapeBg = floatColorToHex(f.color);
+            break;
+          }
+        }
+      }
+      traverse(child, currentBg, activeShapeBg);
     }
   }
 
@@ -186,7 +243,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Sample Figma token data for demonstration and instant sandbox audits
+    // 2. Default sample Figma token data when no live file key is supplied
     if (nodes.length === 0) {
       fileName = "Nimbus Design System & Mobile App UI";
       nodes = [
@@ -207,7 +264,7 @@ export async function POST(req: NextRequest) {
               name: "Button Label",
               type: "TEXT",
               style: { fontFamily: "Geist Sans", fontSize: 16, fontWeight: 600 },
-              fills: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }], // #FFFFFF on #0F766E
+              fills: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }], // #FFFFFF on #0F766E (Contrast 4.88:1 -> PASSES)
             },
             {
               id: "subtext_unapproved",
@@ -235,14 +292,35 @@ export async function POST(req: NextRequest) {
 
     const { colors, textFills, frameBackgrounds } = extractFigmaTokens(nodes);
 
-    // Fetch approved brand visual tokens
+    // Fetch approved brand visual tokens for this user's organization
     const approvedTokens = await db.visualToken.findMany({
       where: { orgId: user.orgId },
     });
 
-    const approvedHexes = approvedTokens
+    let approvedHexes = approvedTokens
       .filter((t) => t.tokenType === "color")
       .map((t) => ({ name: t.name, hex: t.value.toUpperCase() }));
+
+    // Fallback to official brand tokens if organization has no custom tokens configured
+    if (approvedHexes.length === 0) {
+      approvedHexes = DEFAULT_BRAND_TOKENS.map((t) => ({
+        name: t.name,
+        hex: t.hex.toUpperCase(),
+      }));
+
+      // Non-blocking background seed into database for persistent tenant configuration
+      db.visualToken
+        .createMany({
+          data: DEFAULT_BRAND_TOKENS.map((t) => ({
+            orgId: user.orgId,
+            tokenType: "color",
+            name: t.name,
+            value: t.hex,
+            usageNotes: t.usage,
+          })),
+        })
+        .catch((err) => console.warn("[Figma Audit] Background visualToken seed skipped:", err));
+    }
 
     const findings: {
       category: "visual" | "style" | "trademark";
@@ -255,8 +333,8 @@ export async function POST(req: NextRequest) {
 
     // Analyze extracted colors against approved tokens using CIELAB Delta-E (CIE76)
     const colorAnalysis = colors.map((c) => {
-      let closestToken = approvedHexes[0] || { name: "Shield Teal", hex: "#0F766E" };
-      let minDeltaE = 999;
+      let closestToken = approvedHexes[0];
+      let minDeltaE = Infinity;
 
       const rgbA = hexToRgb(c.hex) || [0, 0, 0];
       const labA = sRgbToLab(rgbA[0], rgbA[1], rgbA[2]);
@@ -271,8 +349,11 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Delta-E <= 4.0 is considered perceptually matching an approved brand color
-      const isApproved = minDeltaE <= 4.0 || c.hex === "#FFFFFF" || c.hex === "#000000";
+      // Neutral colors (whites, blacks, slates, grays) are standard UI structural components
+      const isNeutral = isNeutralColor(c.hex) || c.hex === "#FFFFFF" || c.hex === "#000000" || c.hex === "#F8FAFC";
+      
+      // Approved if matching an official token (ΔE <= 6.0) or recognized as a structural neutral
+      const isApproved = isNeutral || minDeltaE <= 6.0;
 
       if (!isApproved && minDeltaE > 15.0) {
         findings.push({
@@ -291,11 +372,11 @@ export async function POST(req: NextRequest) {
         occurrences: c.count,
         isApproved,
         closestBrandToken: closestToken.name,
-        deltaE: minDeltaE,
+        deltaE: parseFloat(minDeltaE.toFixed(1)),
       };
     });
 
-    // Analyze text contrast ratios against frame backgrounds (WCAG 2.1 AA)
+    // Analyze text contrast ratios against effective container backgrounds (WCAG 2.1 AA)
     const contrastChecks: {
       textHex: string;
       bgHex: string;
@@ -304,16 +385,24 @@ export async function POST(req: NextRequest) {
       nodeName: string;
     }[] = [];
 
-    const defaultBg = frameBackgrounds[0]?.hex || "#FFFFFF";
+    const defaultCanvasBg = frameBackgrounds[0]?.hex || "#FFFFFF";
+
     for (const t of textFills) {
-      const ratio = contrastRatio(t.hex, defaultBg);
-      const passedAA = ratio >= 4.5;
+      const bg = t.bgHex || defaultCanvasBg;
+      const ratio = contrastRatio(t.hex, bg);
+      
+      // WCAG 2.1 AA distinction: large text (>=24px, or >=18px bold) requires 3.0:1; normal text requires 4.5:1
+      const isLargeText = t.size >= 24 || (t.size >= 18 && t.fontWeight >= 600);
+      const requiredRatio = isLargeText ? 3.0 : 4.5;
+      const passedAA = ratio >= requiredRatio;
+      const roundedRatio = parseFloat(ratio.toFixed(2));
+
       contrastChecks.push({
         textHex: t.hex,
-        bgHex: defaultBg,
-        ratio: parseFloat(ratio.toFixed(2)),
+        bgHex: bg,
+        ratio: roundedRatio,
         passedAA,
-        nodeName: `Text font ${t.font} (${t.size}px)`,
+        nodeName: `"${t.nodeName}" (${t.font} ${t.size}px)`,
       });
 
       if (!passedAA) {
@@ -321,17 +410,33 @@ export async function POST(req: NextRequest) {
           category: "visual",
           severity: "critical",
           ruleCitation: "WCAG-1.4.3",
-          flaggedValue: `${ratio.toFixed(2)}:1`,
-          nodeName: `Text (${t.hex}) on Canvas (${defaultBg})`,
-          suggestion: `Contrast ratio ${ratio.toFixed(2)}:1 fails WCAG 2.1 AA (minimum 4.5:1). Adjust font color or background brightness.`,
+          flaggedValue: `${roundedRatio}:1`,
+          nodeName: `Text "${t.nodeName}" (${t.hex}) on Container (${bg})`,
+          suggestion: `Contrast ratio ${roundedRatio}:1 fails WCAG 2.1 AA (requires ${requiredRatio}:1 for ${isLargeText ? "large text" : "body text"}). Adjust font color or background surface.`,
         });
       }
     }
 
+    // Weighted composite compliance score (60% contrast accessibility + 40% brand palette adherence)
+    const totalContrast = contrastChecks.length;
+    const passingContrast = contrastChecks.filter((c) => c.passedAA).length;
+    const contrastScore = totalContrast > 0 ? (passingContrast / totalContrast) * 100 : 100;
+
+    const totalColors = colorAnalysis.length;
+    const approvedColors = colorAnalysis.filter((c) => c.isApproved).length;
+    const paletteScore = totalColors > 0 ? (approvedColors / totalColors) * 100 : 100;
+
+    const compositeBase = contrastScore * 0.6 + paletteScore * 0.4;
+
     const criticalCount = findings.filter((f) => f.severity === "critical").length;
     const warningCount = findings.filter((f) => f.severity === "warning").length;
-    const complianceScore = Math.max(0, 100 - criticalCount * 30 - warningCount * 12);
-    const passed = criticalCount === 0;
+
+    // Measured deductions for flagged violations (capped to prevent zero-score wipes)
+    const criticalDeduction = Math.min(25, criticalCount * 6);
+    const warningDeduction = Math.min(15, warningCount * 3);
+
+    const complianceScore = Math.max(0, Math.min(100, Math.round(compositeBase - criticalDeduction - warningDeduction)));
+    const passed = criticalCount === 0 && complianceScore >= 70;
 
     // Log the Figma audit
     const assetAudit = await db.assetAudit.create({
@@ -375,4 +480,3 @@ export async function POST(req: NextRequest) {
     return jsonError(e);
   }
 }
-

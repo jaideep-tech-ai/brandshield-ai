@@ -54,7 +54,7 @@ export function isNeutralColor(hex: string): boolean {
   const [r, g, b] = rgb;
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
-  return max - min < 24; // low saturation → neutral
+  return max - min <= 42; // low saturation (<= 42 RGB spread) → neutral (grays, slates, zinc, stone)
 }
 
 export function colorDistance(hexA: string, hexB: string): number {
