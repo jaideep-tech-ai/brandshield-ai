@@ -19,6 +19,7 @@ import {
   Trash2,
   Send,
   Lock,
+  LogOut,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -113,6 +114,30 @@ export function IntegrationsView() {
   const [docUrl, setDocUrl] = useState("");
   const [gdocResult, setGdocResult] = useState<GoogleInspectResult | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  const googleStatusQuery = useQuery({
+    queryKey: ["google-status"],
+    queryFn: () =>
+      api.get<{
+        configured: boolean;
+        connected: boolean;
+        googleEmail?: string | null;
+        expiresAt?: string | null;
+        provider: string;
+        status: string;
+      }>("/api/integrations/google/status"),
+  });
+
+  const disconnectGoogle = useMutation({
+    mutationFn: () => api.post<{ success: boolean }>("/api/integrations/google/disconnect"),
+    onSuccess: () => {
+      toast.success("Google account disconnected successfully.");
+      qc.invalidateQueries({ queryKey: ["google-status"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to disconnect Google account");
+    },
+  });
 
   const inspectGdoc = useMutation({
     mutationFn: (body: { documentUrl?: string; sampleKey?: string }) =>
@@ -244,16 +269,44 @@ export function IntegrationsView() {
                     </CardDescription>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open("/api/integrations/google/auth", "_blank")}
-                  className="h-8 gap-1.5 rounded-lg text-xs"
-                >
-                  <Lock className="size-3" />
-                  <span>Connect Google Account</span>
-                  <ExternalLink className="size-3" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {googleStatusQuery.isLoading ? (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      <span>Checking connection...</span>
+                    </div>
+                  ) : googleStatusQuery.data?.connected ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                        <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Connected{googleStatusQuery.data.googleEmail ? `: ${googleStatusQuery.data.googleEmail}` : ""}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => disconnectGoogle.mutate()}
+                        disabled={disconnectGoogle.isPending}
+                        className="h-8 rounded-lg text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
+                        {disconnectGoogle.isPending ? <Loader2 className="size-3 animate-spin" /> : <LogOut className="size-3" />}
+                        <span className="ml-1">Disconnect</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        window.location.href = "/api/integrations/google/auth";
+                      }}
+                      className="h-8 gap-1.5 rounded-lg text-xs"
+                    >
+                      <Lock className="size-3" />
+                      <span>Connect Google Account</span>
+                      <ExternalLink className="size-3" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">

@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { useSession, hasAuthHint } from "@/lib/brandshield/client";
 import { useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-dash-a";
@@ -54,6 +55,61 @@ function App() {
     // sign-ins (data) — idempotent, import() returns the cached promise.
     if (gate || session.data) warmSignedInChunks();
   }, [gate, session.data]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const search = window.location.search;
+    if (!search) return;
+
+    const params = new URLSearchParams(search);
+    const view = params.get("view");
+    const integrations = params.get("integrations");
+    const status = params.get("status");
+    const error = params.get("error");
+    const details = params.get("details");
+
+    let touched = false;
+
+    if (integrations === "google" || view === "integrations") {
+      useUIStore.getState().setView("integrations");
+      touched = true;
+
+      if (status === "connected") {
+        toast.success("Google Account successfully connected!");
+      } else if (status === "error") {
+        const errorMsg = details || error || "Failed to link Google Account";
+        toast.error(`Google Integration: ${errorMsg}`);
+      }
+    } else if (
+      view &&
+      [
+        "dashboard",
+        "copilot",
+        "knowledge",
+        "scanner",
+        "findings",
+        "approvals",
+        "analytics",
+        "billing",
+        "settings",
+      ].includes(view)
+    ) {
+      useUIStore.getState().setView(view as any);
+      touched = true;
+    }
+
+    if (touched) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("view");
+      url.searchParams.delete("integrations");
+      url.searchParams.delete("status");
+      url.searchParams.delete("error");
+      url.searchParams.delete("details");
+      const remaining = url.searchParams.toString();
+      const cleanUrl = url.pathname + (remaining ? `?${remaining}` : "") + url.hash;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }, [session.data]);
 
   if (session.isLoading && gate) {
     return (

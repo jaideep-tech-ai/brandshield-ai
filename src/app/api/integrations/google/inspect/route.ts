@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
+import { getValidGoogleDocsToken } from "@/lib/brandshield/server/google";
 
 interface GoogleDocStructuralElement {
   paragraph?: {
@@ -82,7 +83,10 @@ export async function POST(req: NextRequest) {
       if (match) docId = match[1];
     }
 
-    const gdocToken = req.cookies.get("brandshield_gdoc_token")?.value;
+    let gdocToken = await getValidGoogleDocsToken(user.id);
+    if (!gdocToken) {
+      gdocToken = req.cookies.get("brandshield_gdoc_token")?.value || null;
+    }
 
     let docTitle = "Google Docs Pre-Publishing Audit";
     let extractedText = body.manualContent || "";

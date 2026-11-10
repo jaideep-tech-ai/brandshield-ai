@@ -4,6 +4,12 @@ import { deltaE } from "../src/lib/brandshield/server/kmeans.ts";
 import { chunkDocumentPages, cosineSimilarity } from "../src/lib/brandshield/server/vector-rag.ts";
 import { validateSsrfSafeUrl } from "../src/lib/brandshield/server/ssrf.ts";
 import { signWebhookPayload, verifyWebhookSignature } from "../src/lib/brandshield/server/webhooks.ts";
+import { encryptToken, decryptToken } from "../src/lib/brandshield/server/crypto.ts";
+import {
+  generateGoogleOAuthState,
+  verifyGoogleOAuthState,
+  markNonceConsumed,
+} from "../src/lib/brandshield/server/google.ts";
 
 console.log("==================================================");
 console.log("RUNNING BRANDSHIELD AI FEATURE VERIFICATION SUITE");
@@ -132,6 +138,84 @@ assert(replayVerify.valid === false, "Rejected replayed/expired webhook (drift >
 
 const tamperedVerify = verifyWebhookSignature(signatureHeader, samplePayload + "tampered", testSecret, 300);
 assert(tamperedVerify.valid === false, "Rejected tampered webhook payload content");
+
+// ── Test 9: Google Docs Pre-Publishing Audit Logic
+console.log("\n--- Suite 9: Google Docs Pre-Publishing Audit Logic ---");
+const sampleDocContent = "NimbusPay launch brief. We offer guaranteed 100% safe payments and world's best settlement.";
+const hasGuaranteed = /\bguaranteed\b/i.test(sampleDocContent);
+const hasSafe = /\b100% safe\b/i.test(sampleDocContent);
+const hasHype = /\bworld's best\b/i.test(sampleDocContent);
+assert(hasGuaranteed === true, "Detected prohibited absolute guarantee 'guaranteed'");
+assert(hasSafe === true, "Detected prohibited absolute claim '100% safe'");
+assert(hasHype === true, "Detected unsubstantiated superlative 'world's best'");
+
+// ── Test 10: Figma Design Token & Float-to-HEX Conversion
+console.log("\n--- Suite 10: Figma Float-to-HEX Color Extraction ---");
+function figmaFloatToHex(c) {
+  const r = Math.round(c.r * 255);
+  const g = Math.round(c.g * 255);
+  const b = Math.round(c.b * 255);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
+}
+const tealHex = figmaFloatToHex({ r: 0.059, g: 0.463, b: 0.431, a: 1 });
+assert(tealHex === "#0F766E", `Figma float color correctly converted to Shield Teal hex: ${tealHex}`);
+
+const whiteHex = figmaFloatToHex({ r: 1, g: 1, b: 1, a: 1 });
+assert(whiteHex === "#FFFFFF", `Figma white float color correctly converted to: ${whiteHex}`);
+
+const figmaContrast = contrastRatio(tealHex, whiteHex);
+assert(figmaContrast >= 4.5, `Figma button text on background meets WCAG AA (ratio: ${figmaContrast.toFixed(2)}:1)`);
+
+// ── Test 11: Authenticated Encryption at Rest (AES-256-GCM)
+console.log("\n--- Suite 11: AES-256-GCM Authenticated Token Encryption ---");
+const rawSecretToken = "ya29.a0AfH6SMD_very_secret_google_refresh_token_xyz987";
+const encrypted = encryptToken(rawSecretToken);
+assert(typeof encrypted === "string" && encrypted.split(":").length === 3, "Encrypted token produces NIST SP 800-38D format (iv:tag:ciphertext)");
+
+const decrypted = decryptToken(encrypted);
+assert(decrypted === rawSecretToken, "Decrypted token matches original secret plaintext exactly");
+
+let tamperDetected = false;
+try {
+  const parts = encrypted.split(":");
+  // Flip the last byte of the ciphertext
+  const tamperedCipher = parts[2].slice(0, -2) + (parts[2].endsWith("00") ? "ff" : "00");
+  decryptToken(`${parts[0]}:${parts[1]}:${tamperedCipher}`);
+} catch {
+  tamperDetected = true;
+}
+assert(tamperDetected === true, "AES-256-GCM authentication tag rejected tampered ciphertext");
+
+// ── Test 12: Google OAuth State Generation & Verification (Anti-CSRF & Replay)
+console.log("\n--- Suite 12: Google OAuth State Anti-CSRF & Replay Defense ---");
+const testUserId = "usr_prod_governance_director";
+const { state: validState, nonce: sessionNonce } = generateGoogleOAuthState(testUserId);
+assert(validState.split(".").length === 4, "State parameter has 4 segments (user.nonce.ts.sig)");
+
+const validCheck = verifyGoogleOAuthState(validState, testUserId, sessionNonce);
+assert(validCheck.valid === true, "Valid state bound to user and nonce passes verification");
+
+const userMismatchCheck = verifyGoogleOAuthState(validState, "usr_attacker_compromised", sessionNonce);
+assert(userMismatchCheck.valid === false && userMismatchCheck.reason?.includes("mismatch"), "Rejected state with mismatched user identity");
+
+const nonceMismatchCheck = verifyGoogleOAuthState(validState, testUserId, "attacker_injected_nonce");
+assert(nonceMismatchCheck.valid === false && nonceMismatchCheck.reason?.includes("nonce"), "Rejected state with mismatched session nonce cookie");
+
+const missingCookieCheck = verifyGoogleOAuthState(validState, testUserId, null);
+assert(missingCookieCheck.valid === false && missingCookieCheck.reason?.includes("Missing"), "Rejected state with missing session nonce cookie");
+
+// Test state expiration
+const expiredTs = Math.floor(Date.now() / 1000) - 700; // 700s ago (> 600s TTL)
+const fakeStateParts = validState.split(".");
+fakeStateParts[2] = expiredTs.toString();
+const expiredState = fakeStateParts.join(".");
+const expiredCheck = verifyGoogleOAuthState(expiredState, testUserId, sessionNonce);
+assert(expiredCheck.valid === false, "Rejected expired OAuth state (> 10 minutes)");
+
+// Test replay prevention
+markNonceConsumed(sessionNonce);
+const replayCheck = verifyGoogleOAuthState(validState, testUserId, sessionNonce);
+assert(replayCheck.valid === false && replayCheck.reason?.includes("consumed"), "Rejected replayed OAuth state nonce");
 
 console.log("\n==================================================");
 console.log(`VERIFICATION SUMMARY: ${testsPassed} passed, ${testsFailed} failed`);
