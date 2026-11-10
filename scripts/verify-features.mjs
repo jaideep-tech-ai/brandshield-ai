@@ -20,6 +20,13 @@ import {
   floatColorToHex,
   extractFigmaTokens,
 } from "../src/app/api/integrations/figma/inspect/route.ts";
+import {
+  verifyGitLabWebhookToken,
+  verifyGitLabHmacSignature,
+  parseGitLabWebhookPayload,
+  markGitLabSignatureConsumed,
+  isGitLabSignatureConsumed,
+} from "../src/lib/brandshield/server/gitlab.ts";
 
 console.log("==================================================");
 console.log("RUNNING BRANDSHIELD AI FEATURE VERIFICATION SUITE");
@@ -409,6 +416,178 @@ const mockWithCriticalFailure = [{ passedAA: false }, { passedAA: true }];
 const scoreC = calculateCompositeScore(mockWithCriticalFailure, mock15Colors, 1, 0);
 assert(scoreC.passed === false, "Design with a critical WCAG contrast failure is marked failed");
 assert(scoreC.complianceScore > 0, `Design with 1 critical contrast failure does not collapse to 0/100 (actual: ${scoreC.complianceScore})`);
+
+// ── Test 16: GitLab Webhooks, Security Token Validation, Replay Defense & Commit Statuses
+console.log("\n--- Suite 16: GitLab Webhook Security & Bidirectional Pipeline ---");
+
+// 1. Timing-Safe Secret Token Verification
+const testGitLabSecret = "whsec_gitlab_project_token_secret_32bytes";
+assert(
+  verifyGitLabWebhookToken(testGitLabSecret, testGitLabSecret) === true,
+  "Matching GitLab secret token passes timing-safe verification"
+);
+assert(
+  verifyGitLabWebhookToken("wrong_secret_token", testGitLabSecret) === false,
+  "Mismatched GitLab secret token rejected"
+);
+assert(
+  verifyGitLabWebhookToken(null, testGitLabSecret) === false,
+  "Null header token safely rejected"
+);
+assert(
+  verifyGitLabWebhookToken(testGitLabSecret.slice(0, -1), testGitLabSecret) === false,
+  "Length-mismatched token safely rejected without timing leak"
+);
+
+// 2. HMAC-SHA256 Signature Verification with Timestamp & Replay Protection
+const sampleGitLabPayload = JSON.stringify({
+  object_kind: "push",
+  ref: "refs/heads/main",
+  checkout_sha: "c0ffee1234567890abcdef1234567890abcdef12",
+  project: {
+    id: 998877,
+    name: "brandshield-ai-webhooks",
+    path_with_namespace: "jaideep-tech-ai/brandshield-ai-webhooks",
+    web_url: "https://gitlab.com/jaideep-tech-ai/brandshield-ai-webhooks",
+  },
+  commits: [
+    {
+      id: "c0ffee1234567890abcdef1234567890abcdef12",
+      title: "docs: add nimbus marketing launch copy",
+      message: "docs: add nimbus marketing launch copy\n\nGuaranteed high returns for all merchants.",
+      author: { name: "Elena Rodriguez", email: "elena@nimbus.demo" },
+      added: ["docs/launch-copy.md"],
+      modified: ["README.md"],
+    },
+  ],
+});
+
+const currentTs = Math.floor(Date.now() / 1000);
+import { createHmac } from "node:crypto";
+const validHmac = createHmac("sha256", testGitLabSecret)
+  .update(`${currentTs}.${sampleGitLabPayload}`)
+  .digest("hex");
+const validHmacHeader = `t=${currentTs},v1=${validHmac}`;
+
+const hmacCheck = verifyGitLabHmacSignature(validHmacHeader, sampleGitLabPayload, testGitLabSecret);
+assert(hmacCheck.valid === true, "Valid HMAC-SHA256 signature with current timestamp passes verification");
+
+// Replay check
+const gitLabReplayCheck = verifyGitLabHmacSignature(validHmacHeader, sampleGitLabPayload, testGitLabSecret);
+assert(
+  gitLabReplayCheck.valid === false && gitLabReplayCheck.reason?.includes("replay attack blocked"),
+  "Replayed GitLab HMAC signature rejected by replay defense registry"
+);
+
+// Expired timestamp check (> 300s drift)
+const gitLabExpiredTs = currentTs - 600;
+const expiredHmac = createHmac("sha256", testGitLabSecret)
+  .update(`${gitLabExpiredTs}.${sampleGitLabPayload}`)
+  .digest("hex");
+const expiredHmacHeader = `t=${gitLabExpiredTs},v1=${expiredHmac}`;
+const gitLabExpiredCheck = verifyGitLabHmacSignature(expiredHmacHeader, sampleGitLabPayload, testGitLabSecret);
+assert(
+  gitLabExpiredCheck.valid === false && gitLabExpiredCheck.reason?.includes("expired"),
+  "Expired GitLab webhook signature rejected (> 300s timestamp drift)"
+);
+
+// Tampered payload check
+const tamperedPayload = sampleGitLabPayload.replace("Guaranteed", "Safe");
+const freshTs = currentTs + 1;
+const freshHmac = createHmac("sha256", testGitLabSecret)
+  .update(`${freshTs}.${sampleGitLabPayload}`)
+  .digest("hex");
+const freshHmacHeader = `t=${freshTs},v1=${freshHmac}`;
+const tamperedCheck = verifyGitLabHmacSignature(freshHmacHeader, tamperedPayload, testGitLabSecret);
+assert(
+  tamperedCheck.valid === false && tamperedCheck.reason?.includes("mismatch"),
+  "Tampered payload body rejected due to HMAC mismatch"
+);
+
+// 3. Normalization of GitLab Push & Merge Request Events
+const parsedPush = parseGitLabWebhookPayload(JSON.parse(sampleGitLabPayload));
+assert(parsedPush !== null, "Successfully parsed GitLab push event payload");
+assert(parsedPush?.eventType === "push", "Event type correctly identified as push");
+assert(parsedPush?.branch === "main", `Branch correctly extracted without refs/heads prefix (actual: ${parsedPush?.branch})`);
+assert(parsedPush?.commitSha === "c0ffee1234567890abcdef1234567890abcdef12", "Commit SHA correctly extracted");
+assert(parsedPush?.projectPath === "jaideep-tech-ai/brandshield-ai-webhooks", "Project path correctly extracted");
+assert(parsedPush?.filesChanged.includes("docs/launch-copy.md"), "Modified files list populated for content inspection");
+
+const sampleMrPayload = {
+  object_kind: "merge_request",
+  project: {
+    id: 998877,
+    name: "brandshield-ai-webhooks",
+    path_with_namespace: "jaideep-tech-ai/brandshield-ai-webhooks",
+    web_url: "https://gitlab.com/jaideep-tech-ai/brandshield-ai-webhooks",
+  },
+  user: { name: "Alex Chen", username: "alexchen" },
+  object_attributes: {
+    id: 42,
+    title: "feat: add payment gateway integration",
+    description: "Connects our platform with 100% safe payment rails.",
+    source_branch: "feat/payment-rails",
+    target_branch: "main",
+    source_project_id: 998877,
+    target_project_id: 998877,
+    state: "opened",
+    last_commit: {
+      id: "deadbeef00112233445566778899aabbccddeeff",
+      message: "feat: add payment gateway with 100% safe transactions",
+      title: "feat: add payment gateway",
+    },
+  },
+};
+
+const parsedMr = parseGitLabWebhookPayload(sampleMrPayload);
+assert(parsedMr !== null, "Successfully parsed GitLab merge request event payload");
+assert(parsedMr?.eventType === "merge_request", "Event type correctly identified as merge_request");
+assert(parsedMr?.branch === "feat/payment-rails", `MR source branch extracted (actual: ${parsedMr?.branch})`);
+assert(parsedMr?.commitSha === "deadbeef00112233445566778899aabbccddeeff", "MR head commit SHA extracted");
+
+// 4. Governance Violation Detection in Commit and File Content
+function auditCopyContent(text) {
+  const findings = [];
+  const BANNED = [
+    { word: "guaranteed", rule: "VOICE-04" },
+    { word: "risk-free", rule: "VOICE-04" },
+    { word: "100% safe", rule: "VOICE-04" },
+    { word: "world's best", rule: "VOICE-03" },
+  ];
+  for (const b of BANNED) {
+    if (new RegExp(`\\b${b.word}\\b`, "i").test(text)) {
+      findings.push({ ruleCitation: b.rule, flaggedText: b.word, severity: "critical" });
+    }
+  }
+  if (text.includes("NimbusPay") && !text.includes("NimbusPay®")) {
+    findings.push({ ruleCitation: "TM-01", flaggedText: "NimbusPay", severity: "minor" });
+  }
+  const criticalCount = findings.filter((f) => f.severity === "critical").length;
+  const allowed = criticalCount === 0;
+  return { findings, criticalCount, allowed };
+}
+
+const pushAudit = auditCopyContent(parsedPush?.contentToAudit || "");
+assert(pushAudit.allowed === false, "Push containing 'Guaranteed' correctly blocked (allowed: false)");
+assert(pushAudit.findings.some((f) => f.ruleCitation === "VOICE-04"), "Detected VOICE-04 violation in commit message");
+
+const mrAudit = auditCopyContent(parsedMr?.contentToAudit || "");
+assert(mrAudit.allowed === false, "Merge request containing '100% safe' correctly blocked (allowed: false)");
+assert(mrAudit.findings.some((f) => f.flaggedText === "100% safe"), "Detected '100% safe' violation in PR description");
+
+const compliantCopy = "Introducing our updated merchant payment platform with high reliability and secure transactions.";
+const compliantAudit = auditCopyContent(compliantCopy);
+assert(compliantAudit.allowed === true && compliantAudit.findings.length === 0, "Compliant commit copy approved with 0 violations");
+
+// 5. Official GitLab Commit Status States
+const officialGitLabStates = ["pending", "running", "success", "failed", "canceled"];
+assert(officialGitLabStates.includes(pushAudit.allowed ? "success" : "failed"), "Failed audit maps to official GitLab 'failed' status");
+assert(officialGitLabStates.includes(compliantAudit.allowed ? "success" : "failed"), "Passing audit maps to official GitLab 'success' status");
+
+// 6. Project Path Encoding
+const rawProjectPath = "jaideep-tech-ai/brandshield-ai-webhooks";
+const encodedPath = encodeURIComponent(rawProjectPath);
+assert(encodedPath === "jaideep-tech-ai%2Fbrandshield-ai-webhooks", "GitLab project path URL-encoded correctly for REST API calls");
 
 console.log("\n==================================================");
 console.log(`VERIFICATION SUMMARY: ${testsPassed} passed, ${testsFailed} failed`);

@@ -588,9 +588,19 @@ export function IntegrationsView() {
                             <span className="font-mono text-xs font-bold text-slate-800">{p.hex}</span>
                             <div className="flex items-center gap-1">
                               {p.isApproved ? (
-                                <span className="text-[10px] text-emerald-700 font-semibold">Approved</span>
+                                <span
+                                  className="truncate text-[10px] font-semibold text-emerald-700"
+                                  title={`Matches approved token ${p.closestBrandToken} (ΔE = ${p.deltaE.toFixed(1)})`}
+                                >
+                                  Approved {p.closestBrandToken ? `(${p.closestBrandToken})` : ""}
+                                </span>
                               ) : (
-                                <span className="text-[10px] text-amber-700 font-semibold">ΔE: {p.deltaE.toFixed(1)}</span>
+                                <span
+                                  className="truncate text-[10px] font-semibold text-amber-700"
+                                  title={`Closest approved token: ${p.closestBrandToken} (ΔE = ${p.deltaE.toFixed(1)})`}
+                                >
+                                  ΔE: {p.deltaE.toFixed(1)} vs {p.closestBrandToken}
+                                </span>
                               )}
                             </div>
                           </div>
@@ -632,6 +642,58 @@ export function IntegrationsView() {
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Governance & Accessibility Findings */}
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Governance Findings ({figmaResult.findings.length})
+                    </h4>
+                    {figmaResult.findings.length === 0 ? (
+                      <div className="flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800">
+                        <CheckCircle2 className="size-4" />
+                        <span>All Figma color tokens and contrast pairs strictly satisfy brand guidelines and WCAG 2.1 AA.</span>
+                      </div>
+                    ) : (
+                      figmaResult.findings.map((f, i) => (
+                        <div
+                          key={i}
+                          className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xs sm:flex-row sm:items-start sm:justify-between"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "px-1.5 py-0 text-[10px] font-bold uppercase",
+                                  f.severity === "critical"
+                                    ? "border-red-200 bg-red-50 text-red-700"
+                                    : "border-amber-200 bg-amber-50 text-amber-700"
+                                )}
+                              >
+                                {f.severity}
+                              </Badge>
+                              <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-mono font-bold text-teal-800">
+                                {f.ruleCitation}
+                              </span>
+                              <span className="text-xs font-semibold text-slate-800">
+                                {f.nodeName}: &quot;{f.flaggedValue}&quot;
+                              </span>
+                            </div>
+                            <p className="text-xs text-teal-900 font-medium">{f.suggestion}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copy(f.suggestion, `figma_${i}`)}
+                            className="h-8 shrink-0 gap-1 rounded-lg text-xs text-slate-500 hover:text-slate-900"
+                          >
+                            {copiedText === `figma_${i}` ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                            <span>{copiedText === `figma_${i}` ? "Copied" : "Copy Suggestion"}</span>
+                          </Button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -794,6 +856,51 @@ export function IntegrationsView() {
                   >
                     {copiedText === "curl_sample" ? <Check className="size-3 text-teal-600" /> : <Copy className="size-3" />}
                     <span>Copy cURL Example</span>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* GitLab Project Webhook & Commit Statuses */}
+              <Card className="rounded-2xl border-slate-200/80 bg-gradient-to-br from-slate-50 to-orange-50/20 shadow-sm">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-orange-700">
+                    <Sparkles className="size-4 text-orange-600" />
+                    <span>GitLab Integration</span>
+                  </div>
+                  <CardTitle className="text-sm font-semibold">GitLab Webhook & Commit Statuses</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-xs text-slate-600">
+                  <p>
+                    Connect GitLab project <span className="font-semibold text-slate-800">jaideep-tech-ai/brandshield-ai-webhooks</span> to automatically block merge requests and commits with critical brand violations.
+                  </p>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">GitLab Webhook URL</span>
+                    <div className="mt-1 rounded-xl border border-slate-200 bg-white p-2.5 font-mono text-[11px] text-slate-800 break-all select-all">
+                      https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish?orgSlug=nimbus-labs
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-orange-50/70 p-2.5 text-[11px] text-orange-950 border border-orange-200/50 space-y-1">
+                    <p className="font-semibold">GitLab Project Setup Instructions:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-slate-600 text-[10.5px]">
+                      <li>In GitLab, go to <span className="font-semibold">Settings → Webhooks</span>.</li>
+                      <li>Paste the URL above and check <span className="font-semibold">Push events</span> and <span className="font-semibold">Merge request events</span>.</li>
+                      <li>Provide your Secret Token (<span className="font-mono">GITLAB_WEBHOOK_SECRET</span>).</li>
+                      <li>BrandShield will audit commits, changed files, and update GitLab commit statuses automatically.</li>
+                    </ol>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      copy(
+                        `https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish?orgSlug=nimbus-labs`,
+                        "gitlab_url"
+                      )
+                    }
+                    className="w-full h-8 gap-1.5 rounded-xl text-xs"
+                  >
+                    {copiedText === "gitlab_url" ? <Check className="size-3 text-orange-600" /> : <Copy className="size-3" />}
+                    <span>{copiedText === "gitlab_url" ? "URL Copied" : "Copy GitLab Webhook URL"}</span>
                   </Button>
                 </CardContent>
               </Card>

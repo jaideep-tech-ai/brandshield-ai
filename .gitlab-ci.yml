@@ -1,0 +1,94 @@
+# ── BrandShield AI — GitLab CI/CD Pipeline ──────────────────────────────────
+# Enforces automated pre-publishing brand governance, trademark compliance,
+# and WCAG accessibility standards before deployment.
+
+stages:
+  - compliance_audit
+  - test
+  - build
+
+variables:
+  BRANDSHIELD_URL: "https://brandshield-ai-five.vercel.app"
+  BRANDSHIELD_ORG_SLUG: "nimbus-labs"
+
+# ── Stage 1: Brand Governance & Compliance Gate ───────────────────────────────
+brandshield-governance-audit:
+  stage: compliance_audit
+  image: curlimages/curl:8.5.0
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - echo "=== RUNNING BRANDSHIELD AI PRE-PUBLISHING GOVERNANCE AUDIT ==="
+    - echo "Project: $CI_PROJECT_PATH"
+    - echo "Commit:  $CI_COMMIT_SHA ($CI_COMMIT_REF_NAME)"
+    - echo "Author:  $CI_COMMIT_AUTHOR"
+    - |
+      PAYLOAD=$(cat <<EOF
+      {
+        "object_kind": "push",
+        "ref": "$CI_COMMIT_REF_NAME",
+        "checkout_sha": "$CI_COMMIT_SHA",
+        "project": {
+          "id": "$CI_PROJECT_ID",
+          "name": "$CI_PROJECT_NAME",
+          "path_with_namespace": "$CI_PROJECT_PATH",
+          "web_url": "$CI_PROJECT_URL"
+        },
+        "commits": [
+          {
+            "id": "$CI_COMMIT_SHA",
+            "title": "$CI_COMMIT_TITLE",
+            "message": "$CI_COMMIT_MESSAGE",
+            "author": {
+              "name": "$CI_COMMIT_AUTHOR"
+            }
+          }
+        ]
+      }
+      EOF
+      )
+    - |
+      RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BRANDSHIELD_URL}/api/webhooks/incoming/prepublish?orgSlug=${BRANDSHIELD_ORG_SLUG}" \
+        -H "Content-Type: application/json" \
+        -H "X-Gitlab-Event: Push Hook" \
+        -H "X-Gitlab-Token: ${BRANDSHIELD_WEBHOOK_SECRET}" \
+        -d "$PAYLOAD")
+      HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+      BODY=$(echo "$RESPONSE" | sed '$d')
+      echo "HTTP Status: $HTTP_CODE"
+      echo "Response: $BODY"
+      if [ "$HTTP_CODE" -ne 200 ]; then
+        echo "❌ [ERROR] BrandShield API returned failure code: $HTTP_CODE"
+        exit 1
+      fi
+      ALLOWED=$(echo "$BODY" | grep -o '"allowed":true' || true)
+      if [ -z "$ALLOWED" ]; then
+        echo "🚨 [BLOCKED] Mandatory brand governance audit failed! Critical violations detected."
+        exit 1
+      fi
+      echo "✅ [PASSED] BrandShield AI governance audit verified. Proceeding to pipeline stages."
+  allow_failure: false
+
+# ── Stage 2: Code Quality & Feature Regression Suite ──────────────────────────
+unit-tests:
+  stage: test
+  image: oven/bun:1.2.2-alpine
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - bun install --frozen-lockfile || bun install
+  script:
+    - bun scripts/verify-features.mjs
+
+# ── Stage 3: Next.js Production Build Validation ──────────────────────────────
+production-build:
+  stage: build
+  image: oven/bun:1.2.2-alpine
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  before_script:
+    - bun install --frozen-lockfile || bun install
+  script:
+    - bun run build
