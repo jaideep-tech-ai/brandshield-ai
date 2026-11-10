@@ -108,7 +108,23 @@ interface WebhookItem {
 
 export function IntegrationsView() {
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState("gdocs");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("tab") === "figma" || p.get("integrations") === "figma") return "figma";
+      if (p.get("tab") === "webhooks") return "webhooks";
+    }
+    return "gdocs";
+  });
+
+  useState(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("tab") === "figma" || p.get("integrations") === "figma") {
+        setActiveTab("figma");
+      }
+    }
+  });
 
   // ── Google Docs State ──
   const [docUrl, setDocUrl] = useState("");
@@ -153,11 +169,36 @@ export function IntegrationsView() {
 
   // ── Figma State ──
   const [figmaUrl, setFigmaUrl] = useState("");
-  const [figmaPat, setFigmaPat] = useState("");
   const [figmaResult, setFigmaResult] = useState<FigmaInspectResult | null>(null);
 
+  const figmaStatusQuery = useQuery({
+    queryKey: ["figma-status"],
+    queryFn: () =>
+      api.get<{
+        configured: boolean;
+        connected: boolean;
+        figmaUserId?: string | null;
+        figmaEmail?: string | null;
+        figmaHandle?: string | null;
+        expiresAt?: string | null;
+        provider: string;
+        status: string;
+      }>("/api/integrations/figma/status"),
+  });
+
+  const disconnectFigma = useMutation({
+    mutationFn: () => api.post<{ success: boolean }>("/api/integrations/figma/disconnect"),
+    onSuccess: () => {
+      toast.success("Figma account disconnected successfully.");
+      qc.invalidateQueries({ queryKey: ["figma-status"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to disconnect Figma account");
+    },
+  });
+
   const inspectFigma = useMutation({
-    mutationFn: (body: { fileUrl?: string; personalAccessToken?: string; sampleKey?: string }) =>
+    mutationFn: (body: { fileUrl?: string; sampleKey?: string }) =>
       api.post<FigmaInspectResult>("/api/integrations/figma/inspect", body),
     onSuccess: (data) => {
       setFigmaResult(data);
@@ -425,51 +466,82 @@ export function IntegrationsView() {
         <TabsContent value="figma" className="space-y-5">
           <Card className="rounded-2xl border-slate-200/80 shadow-sm">
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <div className="flex size-8 items-center justify-center rounded-xl bg-purple-50 text-purple-700 border border-purple-200">
-                  <Figma className="size-4" />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-8 items-center justify-center rounded-xl bg-purple-50 text-purple-700 border border-purple-200">
+                    <Figma className="size-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold">Figma Design Token & Contrast Auditor</CardTitle>
+                    <CardDescription className="text-xs">
+                      Inspect Figma frames, extract fill palettes, compute Delta-E brand token matching, and verify WCAG 2.1 contrast.
+                    </CardDescription>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle className="text-base font-semibold">Figma Design Token & Contrast Auditor</CardTitle>
-                  <CardDescription className="text-xs">
-                    Inspect Figma frames, extract fill palettes, compute Delta-E brand token matching, and verify WCAG 2.1 contrast.
-                  </CardDescription>
+                <div className="flex items-center gap-2">
+                  {figmaStatusQuery.isLoading ? (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      <span>Checking connection...</span>
+                    </div>
+                  ) : figmaStatusQuery.data?.connected ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-800">
+                        <span className="size-2 rounded-full bg-purple-500 animate-pulse" />
+                        <span>Connected{figmaStatusQuery.data.figmaHandle ? `: ${figmaStatusQuery.data.figmaHandle}` : figmaStatusQuery.data.figmaEmail ? `: ${figmaStatusQuery.data.figmaEmail}` : ""}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => disconnectFigma.mutate()}
+                        disabled={disconnectFigma.isPending}
+                        className="h-8 rounded-lg text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
+                        {disconnectFigma.isPending ? <Loader2 className="size-3 animate-spin" /> : <LogOut className="size-3" />}
+                        <span className="ml-1">Disconnect</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        window.location.href = "/api/integrations/figma/auth";
+                      }}
+                      className="h-8 gap-1.5 rounded-lg text-xs"
+                    >
+                      <Lock className="size-3" />
+                      <span>Connect Figma Account</span>
+                      <ExternalLink className="size-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Input
-                  placeholder="Figma File URL or Key (optional for sample)"
+                  placeholder="Paste Figma File URL (e.g. https://www.figma.com/design/...)"
                   value={figmaUrl}
                   onChange={(e) => setFigmaUrl(e.target.value)}
                   className="h-10 rounded-xl text-xs sm:text-sm"
                 />
-                <Input
-                  type="password"
-                  placeholder="Personal Access Token (figd_...)"
-                  value={figmaPat}
-                  onChange={(e) => setFigmaPat(e.target.value)}
-                  className="h-10 rounded-xl text-xs sm:text-sm"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => inspectFigma.mutate({ fileUrl: figmaUrl, personalAccessToken: figmaPat })}
-                    disabled={inspectFigma.isPending}
-                    className="h-10 flex-1 gap-1.5 rounded-xl bg-purple-700 text-xs font-semibold text-white hover:bg-purple-800"
-                  >
-                    {inspectFigma.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Figma className="size-3.5" />}
-                    <span>Inspect</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => inspectFigma.mutate({ sampleKey: "design_system" })}
-                    disabled={inspectFigma.isPending}
-                    className="h-10 rounded-xl text-xs"
-                  >
-                    Load Sample UI
-                  </Button>
-                </div>
+                <Button
+                  onClick={() => inspectFigma.mutate({ fileUrl: figmaUrl })}
+                  disabled={inspectFigma.isPending}
+                  className="h-10 shrink-0 gap-2 rounded-xl bg-purple-700 text-xs font-semibold text-white hover:bg-purple-800"
+                >
+                  {inspectFigma.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Figma className="size-3.5" />}
+                  <span>Inspect File</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => inspectFigma.mutate({ sampleKey: "design_system" })}
+                  disabled={inspectFigma.isPending}
+                  className="h-10 shrink-0 rounded-xl text-xs"
+                >
+                  Load Sample UI
+                </Button>
               </div>
 
               {/* Figma Results */}

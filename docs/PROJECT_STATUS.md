@@ -29,7 +29,8 @@ All core subsystems, zero-touch automated access, pre-publishing webhook receive
 | **Feature 1: Visual Asset & WCAG 2.1 Accessibility Inspector** | **Completed** | Sharp decoding + decompression bomb guard (16.7M px), CIELAB K-Means++ clustering with Lloyd's iterations (`kmeans.ts`), CIE76 Delta-E brand token matching, WCAG 2.1 AA/AAA contrast ratio engine (`wcag.ts`), multi-tenant data isolation (`user.orgId`), base64 + multipart upload endpoint (`POST /api/inspect/visual`), DB persistence (`VisualInspection`), UI matrix rendering in Scanner and Findings views. | ✅ Yes (28/28 tests) | ✅ Yes |
 | **Feature 2: Dynamic Vector-RAG Ingestion Engine** | **Completed & Hardened** | Zero-dependency streaming PDF parser with page tracking (`pdf-parser.ts`), semantic recursive chunker with rule tags (`vector-rag.ts`), OpenAI-compatible 1536-dim embedding generator with batching & backoffs, hybrid search with BM25 + Reciprocal Rank Fusion (RRF, k=60), multi-tenant `orgId` isolation, UI document manager & search sandbox (`knowledge-view.tsx`), background queue migration to Next.js `after()` with `maxDuration = 60`. | ✅ Yes | ✅ Yes |
 | **Feature 3: Pre-Publishing Authoring Extensions & Webhooks** | **Completed (Full Scope)** | Google Docs OAuth & inspection engine (`/api/integrations/google/*`), Figma REST API token analyzer & WCAG contrast matrix (`/api/integrations/figma/*`), SSRF-safe webhook dispatcher (`ssrf.ts`), HMAC-SHA256 signatures (`webhooks.ts`), endpoints CRUD (`/api/webhooks`), inbound pre-publishing webhook (`/api/webhooks/incoming/prepublish`), and unified frontend UI (`IntegrationsView`). | ✅ Yes | ✅ Yes |
-| **Google OAuth Security & Token Management** | **Completed & Hardened** | Cryptographic nonce + user binding + 10-minute timestamp HMAC state validation (`verifyGoogleOAuthState`), AES-256-GCM encryption at rest (`crypto.ts`), auto-refresh via in-flight deduplication mutex (`getValidGoogleDocsToken`), status API (`GET /api/integrations/google/status`), disconnect & revocation API with tamper-evident audit logs (`POST /api/integrations/google/disconnect`), and UI integration with URL state cleanup (`page.tsx` & `integrations-view.tsx`). | ✅ Yes (44/44 tests) | ⚠️ Deploying to Prod |
+| **Google OAuth Security & Token Management** | **Completed & Hardened** | Cryptographic nonce + user binding + 10-minute timestamp HMAC state validation (`verifyGoogleOAuthState`), AES-256-GCM encryption at rest (`crypto.ts`), auto-refresh via in-flight deduplication mutex (`getValidGoogleDocsToken`), status API (`GET /api/integrations/google/status`), disconnect & revocation API with tamper-evident audit logs (`POST /api/integrations/google/disconnect`), and UI integration with URL state cleanup (`page.tsx` & `integrations-view.tsx`). | ✅ Yes (44/44 tests) | ✅ Yes |
+| **Figma OAuth 2.0 Security & Token Management** | **Completed & Hardened** | Cryptographic nonce + user binding + 10-minute timestamp HMAC state validation (`verifyFigmaOAuthState`), AES-256-GCM encryption at rest, automatic token refresh via `/v1/oauth/refresh` with basic auth header (`getValidFigmaToken`), status API (`GET /api/integrations/figma/status`), disconnect API with tamper-evident audit logs (`POST /api/integrations/figma/disconnect`), PAT removal, and UI integration (`page.tsx` & `integrations-view.tsx`). | ✅ Yes (55/55 tests) | ⚠️ Deploying to Prod |
 | **1-Click Auto Access / Instant Authentication** | **Completed** | Prominent "Instant Auto Access / One-Click Sign In" button on `auth-view.tsx`. Direct auto-provisioning via `POST /api/auth/auto-login` with session cookies. Fallback handling for unconfigured Firebase instances ensures zero dead-ends on live deployments. | ✅ Yes | ✅ Yes |
 | **4-Role One-Click Evaluation Switcher** | **Completed** | Built persistent switcher across all 4 enterprise personas (`admin`: Brand Director / Super Admin, `reviewer`: Compliance Officer, `creator`: Content Creator, `contractor`: Auditor / Viewer). Implemented `POST /api/auth/switch-role` with session cookie update, role metadata, and UI dropdown in shell header & mobile drawer. | ✅ Yes | ✅ Yes |
 | **AI Brand Governance Copilot / Chatbot** | **Completed** | Dedicated interactive Copilot view (`copilot-view.tsx`) wired to Vector-RAG retrieval (`/api/rag/query` & `/api/copilot/chat`). Returns verified rule citations (`[RULE: Page X]`), WCAG 2.1 contrast calculations, prompt starters, markdown rendering, and database persistence (`GovernanceChatSession`, `GovernanceChatMessage`). | ✅ Yes | ✅ Yes |
@@ -55,7 +56,7 @@ All core subsystems, zero-touch automated access, pre-publishing webhook receive
 - **TypeScript Compilation**: `bun x tsc --noEmit` ➔ 0 errors.
 - **ESLint Code Quality**: `bun run lint` ➔ 0 errors, 0 warnings.
 - **Bilingual Translation Matrix**: `bun scripts/check-i18n.ts` ➔ 908 keys verified across 125 files.
-- **Feature Verification Test Suite**: `bun scripts/verify-features.mjs` ➔ 44/44 passed:
+- **Feature Verification Test Suite**: `bun scripts/verify-features.mjs` ➔ 55/55 passed:
   - Suite 1: WCAG 2.1 Calculations & Compliance (7 tests)
   - Suite 2: CIELAB Delta E Calculations (2 tests)
   - Suite 3: Vector Math & Cosine Similarity (2 tests)
@@ -68,7 +69,9 @@ All core subsystems, zero-touch automated access, pre-publishing webhook receive
   - Suite 10: Figma Float-to-HEX Color Extraction (3 tests)
   - Suite 11: AES-256-GCM Authenticated Token Encryption (3 tests)
   - Suite 12: Google OAuth State Anti-CSRF & Replay Defense (7 tests)
-- **Production Build**: `bun run build` ➔ Compiled all 38 static pages and dynamic API routes in 8.9s with Turbopack.
+  - Suite 13: Figma OAuth 2.0 State Anti-CSRF & Replay Defense (7 tests)
+  - Suite 14: Figma OAuth Token Headers & Storage (4 tests)
+- **Production Build**: `bun run build` ➔ Compiled all 42 static pages and dynamic API routes in 9.2s with Turbopack.
 
 ---
 

@@ -70,7 +70,17 @@ function App() {
 
     let touched = false;
 
-    if (integrations === "google" || view === "integrations") {
+    if (integrations === "figma") {
+      useUIStore.getState().setView("integrations");
+      touched = true;
+
+      if (status === "connected") {
+        toast.success("Figma Account successfully connected!");
+      } else if (status === "error") {
+        const errorMsg = details || error || "Failed to link Figma Account";
+        toast.error(`Figma Integration: ${errorMsg}`);
+      }
+    } else if (integrations === "google" || view === "integrations") {
       useUIStore.getState().setView("integrations");
       touched = true;
 
@@ -101,6 +111,7 @@ function App() {
     if (touched) {
       const url = new URL(window.location.href);
       url.searchParams.delete("view");
+      url.searchParams.delete("tab");
       url.searchParams.delete("integrations");
       url.searchParams.delete("status");
       url.searchParams.delete("error");

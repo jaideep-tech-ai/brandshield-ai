@@ -33,6 +33,7 @@ model Organization {
   assetAudits      AssetAudit[]
   webhooks         WebhookEndpoint[]
   googleConnections GoogleOAuthConnection[]
+  figmaConnections  FigmaOAuthConnection[]
 }
 
 model User {
@@ -54,6 +55,7 @@ model User {
   chatSessions GovernanceChatSession[]
   assetAudits  AssetAudit[]
   googleConnection GoogleOAuthConnection?
+  figmaConnection  FigmaOAuthConnection?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -373,5 +375,28 @@ model GoogleOAuthConnection {
   @@index([orgId])
   @@index([userId])
 }
+
+// ─── Stage 8: Figma OAuth 2.0 & Design System Token Store ─────────────────
+
+model FigmaOAuthConnection {
+  id                    String       @id @default(cuid())
+  orgId                 String
+  userId                String       @unique
+  figmaUserId           String?
+  figmaEmail            String?
+  figmaHandle           String?
+  encryptedAccessToken  String       // AES-256-GCM authenticated ciphertext (iv:tag:ciphertext)
+  encryptedRefreshToken String?      // AES-256-GCM authenticated ciphertext (iv:tag:ciphertext)
+  tokenExpiry           DateTime
+  scope                 String       @default("file_content:read,current_user:read")
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([userId])
+}
+
 
 

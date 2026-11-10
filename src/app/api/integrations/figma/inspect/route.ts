@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
 import { contrastRatio, hexToRgb } from "@/lib/brandshield/shared";
 import { deltaE, sRgbToLab } from "@/lib/brandshield/server/kmeans";
+import { getValidFigmaToken } from "@/lib/brandshield/server/figma";
 
 interface FigmaColor {
   r: number;
@@ -142,7 +143,22 @@ export async function POST(req: NextRequest) {
       if (match) fileKey = match[1];
     }
 
-    const figmaToken = body.personalAccessToken?.trim() || process.env.FIGMA_ACCESS_TOKEN?.trim();
+    let figmaToken = await getValidFigmaToken(user.id);
+    let isOAuth = true;
+
+    if (!figmaToken) {
+      figmaToken = req.cookies.get("brandshield_figma_token")?.value || null;
+    }
+
+    if (!figmaToken && body.personalAccessToken?.trim()) {
+      figmaToken = body.personalAccessToken.trim();
+      isOAuth = false;
+    }
+
+    if (!figmaToken && process.env.FIGMA_ACCESS_TOKEN?.trim()) {
+      figmaToken = process.env.FIGMA_ACCESS_TOKEN.trim();
+      isOAuth = false;
+    }
 
     let fileName = "Nimbus Design System v3 (Figma)";
     let nodes: FigmaNode[] = [];
@@ -150,8 +166,12 @@ export async function POST(req: NextRequest) {
     // 1. Live Figma API call if token and fileKey are present
     if (fileKey && figmaToken) {
       try {
+        const headers: Record<string, string> = isOAuth
+          ? { Authorization: `Bearer ${figmaToken}` }
+          : { "X-Figma-Token": figmaToken };
+
         const res = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
-          headers: { "X-Figma-Token": figmaToken },
+          headers,
         });
 
         if (res.ok) {

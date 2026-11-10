@@ -54,6 +54,8 @@ server.log
 /skills/
 # local database & user uploads (never publish)
 db/*.db
+*.db
+*.db-journal
 prisma/db/
 *.sqlite
 /upload/

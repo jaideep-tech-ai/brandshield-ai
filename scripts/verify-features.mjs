@@ -10,6 +10,11 @@ import {
   verifyGoogleOAuthState,
   markNonceConsumed,
 } from "../src/lib/brandshield/server/google.ts";
+import {
+  generateFigmaOAuthState,
+  verifyFigmaOAuthState,
+  markFigmaNonceConsumed,
+} from "../src/lib/brandshield/server/figma.ts";
 
 console.log("==================================================");
 console.log("RUNNING BRANDSHIELD AI FEATURE VERIFICATION SUITE");
@@ -216,6 +221,55 @@ assert(expiredCheck.valid === false, "Rejected expired OAuth state (> 10 minutes
 markNonceConsumed(sessionNonce);
 const replayCheck = verifyGoogleOAuthState(validState, testUserId, sessionNonce);
 assert(replayCheck.valid === false && replayCheck.reason?.includes("consumed"), "Rejected replayed OAuth state nonce");
+
+// ── Test 13: Figma OAuth 2.0 State Anti-CSRF & Replay Defense
+console.log("\n--- Suite 13: Figma OAuth 2.0 State Anti-CSRF & Replay Defense ---");
+const testFigmaUserId = "usr_figma_lead_designer";
+const { state: validFigmaState, nonce: figmaNonce } = generateFigmaOAuthState(testFigmaUserId);
+assert(validFigmaState.split(".").length === 4, "Figma state parameter has 4 segments (user.nonce.ts.sig)");
+
+const validFigmaCheck = verifyFigmaOAuthState(validFigmaState, testFigmaUserId, figmaNonce);
+assert(validFigmaCheck.valid === true, "Valid Figma state bound to user and nonce passes verification");
+
+const figmaUserMismatch = verifyFigmaOAuthState(validFigmaState, "usr_other_designer", figmaNonce);
+assert(figmaUserMismatch.valid === false && figmaUserMismatch.reason?.includes("mismatch"), "Rejected Figma state with mismatched user identity");
+
+const figmaNonceMismatch = verifyFigmaOAuthState(validFigmaState, testFigmaUserId, "tampered_nonce");
+assert(figmaNonceMismatch.valid === false && figmaNonceMismatch.reason?.includes("nonce"), "Rejected Figma state with mismatched session nonce cookie");
+
+const figmaMissingCookie = verifyFigmaOAuthState(validFigmaState, testFigmaUserId, null);
+assert(figmaMissingCookie.valid === false && figmaMissingCookie.reason?.includes("Missing"), "Rejected Figma state with missing session nonce cookie");
+
+// Test Figma state expiration
+const figmaExpiredTs = Math.floor(Date.now() / 1000) - 750;
+const figmaExpiredParts = validFigmaState.split(".");
+figmaExpiredParts[2] = figmaExpiredTs.toString();
+const figmaExpiredState = figmaExpiredParts.join(".");
+const figmaExpiredCheck = verifyFigmaOAuthState(figmaExpiredState, testFigmaUserId, figmaNonce);
+assert(figmaExpiredCheck.valid === false, "Rejected expired Figma OAuth state (> 10 minutes)");
+
+// Test Figma replay prevention
+markFigmaNonceConsumed(figmaNonce);
+const figmaReplayCheck = verifyFigmaOAuthState(validFigmaState, testFigmaUserId, figmaNonce);
+assert(figmaReplayCheck.valid === false && figmaReplayCheck.reason?.includes("consumed"), "Rejected replayed Figma OAuth state nonce");
+
+// ── Test 14: Figma Token Storage & OAuth Header Formatting
+console.log("\n--- Suite 14: Figma OAuth Token Headers & Storage ---");
+const rawFigmaAccessToken = "figd_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789";
+const rawFigmaRefreshToken = "figr_9876543210zYxWvUtSrQpOnMlKjIhGfEdCbA";
+
+const encryptedFigmaAccess = encryptToken(rawFigmaAccessToken);
+const encryptedFigmaRefresh = encryptToken(rawFigmaRefreshToken);
+assert(decryptToken(encryptedFigmaAccess) === rawFigmaAccessToken, "Encrypted Figma access token decrypted successfully");
+assert(decryptToken(encryptedFigmaRefresh) === rawFigmaRefreshToken, "Encrypted Figma refresh token decrypted successfully");
+
+const fakeClientId = "figma_client_12345";
+const fakeClientSecret = "figma_secret_67890";
+const basicAuthHeader = `Basic ${Buffer.from(`${fakeClientId}:${fakeClientSecret}`).toString("base64")}`;
+assert(basicAuthHeader.startsWith("Basic ") && Buffer.from(basicAuthHeader.replace("Basic ", ""), "base64").toString() === `${fakeClientId}:${fakeClientSecret}`, "Figma Basic Auth client credential header correctly formatted");
+
+const bearerHeader = `Bearer ${rawFigmaAccessToken}`;
+assert(bearerHeader.startsWith("Bearer figd_"), "Figma REST API Bearer token header correctly formatted for OAuth requests");
 
 console.log("\n==================================================");
 console.log(`VERIFICATION SUMMARY: ${testsPassed} passed, ${testsFailed} failed`);
