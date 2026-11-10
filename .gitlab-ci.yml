@@ -24,7 +24,7 @@ brandshield-governance-audit:
       echo "Project: $CI_PROJECT_PATH"
       echo "Commit:  $CI_COMMIT_SHA ($CI_COMMIT_REF_NAME)"
       echo "Author:  $CI_COMMIT_AUTHOR"
-    - |
+
       PAYLOAD=$(cat <<EOF
       {
         "object_kind": "push",
@@ -49,7 +49,7 @@ brandshield-governance-audit:
       }
       EOF
       )
-    - |
+
       set +x
       RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BRANDSHIELD_URL}/api/webhooks/incoming/prepublish?orgSlug=${BRANDSHIELD_ORG_SLUG}" \
         -H "Content-Type: application/json" \
