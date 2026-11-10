@@ -34,6 +34,7 @@ model Organization {
   webhooks         WebhookEndpoint[]
   googleConnections GoogleOAuthConnection[]
   figmaConnections  FigmaOAuthConnection[]
+  gitlabConnections GitLabConnection[]
 }
 
 model User {
@@ -56,6 +57,7 @@ model User {
   assetAudits  AssetAudit[]
   googleConnection GoogleOAuthConnection?
   figmaConnection  FigmaOAuthConnection?
+  gitlabConnections GitLabConnection[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -397,6 +399,53 @@ model FigmaOAuthConnection {
   @@index([orgId])
   @@index([userId])
 }
+
+// ─── Stage 9: GitLab Self-Service Integration & OAuth Store ─────────────────
+
+model GitLabConnection {
+  id                     String       @id @default(cuid())
+  orgId                  String
+  userId                 String
+  gitlabUserId           String?
+  gitlabUsername         String?
+  encryptedAccessToken   String       // AES-256-GCM authenticated ciphertext (iv:tag:ciphertext)
+  encryptedRefreshToken  String?      // AES-256-GCM authenticated ciphertext (iv:tag:ciphertext)
+  tokenExpiry            DateTime?
+  scope                  String       @default("api,read_user")
+  projectId              String?      // GitLab numeric project ID e.g. "88747003"
+  projectPath            String?      // e.g. "jaideep-tech-ai/brandshield-ai-webhooks"
+  projectName            String?      // e.g. "brandshield-ai-webhooks"
+  projectUrl             String?      // e.g. "https://gitlab.com/jaideep-tech-ai/brandshield-ai-webhooks"
+  projectVisibility      String?      // "public" | "internal" | "private"
+  webhookId              Int?         // GitLab webhook ID returned by POST /projects/:id/hooks
+  encryptedWebhookSecret String?      // AES-256-GCM encrypted HMAC secret token configured on GitLab
+  lastEventAt            DateTime?
+  lastEventStatus        String?      // "PASSED" | "BLOCKED" | "FAILED"
+  lastEventError         String?
+  lastAuditId            String?
+  status                 String       @default("connected") // "connecting" | "connected" | "failed" | "disconnected"
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, projectId])
+  @@index([orgId])
+  @@index([userId])
+}
+
+model OAuthNonce {
+  id        String   @id @default(cuid())
+  nonce     String   @unique
+  provider  String   // "gitlab" | "figma" | "google"
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([nonce])
+  @@index([expiresAt])
+}
+
 
 
 

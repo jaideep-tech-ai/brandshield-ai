@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GitLabIntegrationCard } from "./gitlab-integration-card";
 
 interface GoogleInspectResult {
   document: {
@@ -701,8 +702,11 @@ export function IntegrationsView() {
           </Card>
         </TabsContent>
 
-        {/* ── TAB 3: WEBHOOKS ── */}
-        <TabsContent value="webhooks" className="space-y-5">
+        {/* ── TAB 3: WEBHOOKS & GITLAB ── */}
+        <TabsContent value="webhooks" className="space-y-6">
+          {/* Prominent Self-Service GitLab Integration Card */}
+          <GitLabIntegrationCard />
+
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             {/* Registered Endpoints */}
             <div className="space-y-4 lg:col-span-2">
@@ -860,48 +864,45 @@ export function IntegrationsView() {
                 </CardContent>
               </Card>
 
-              {/* GitLab Project Webhook & Commit Statuses */}
+              {/* GitLab Pipeline Automation Architecture */}
               <Card className="rounded-2xl border-slate-200/80 bg-gradient-to-br from-slate-50 to-orange-50/20 shadow-sm">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-orange-700">
                     <Sparkles className="size-4 text-orange-600" />
-                    <span>GitLab Integration</span>
+                    <span>Automated Governance</span>
                   </div>
-                  <CardTitle className="text-sm font-semibold">GitLab Webhook & Commit Statuses</CardTitle>
+                  <CardTitle className="text-sm font-semibold">How BrandShield Protects GitLab Repositories</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-xs text-slate-600">
                   <p>
-                    Connect GitLab project <span className="font-semibold text-slate-800">jaideep-tech-ai/brandshield-ai-webhooks</span> to automatically block merge requests and commits with critical brand violations.
+                    When a connected project receives commits or merge requests, BrandShield automatically runs real-time compliance inspections before code is merged:
                   </p>
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">GitLab Webhook URL</span>
-                    <div className="mt-1 rounded-xl border border-slate-200 bg-white p-2.5 font-mono text-[11px] text-slate-800 break-all select-all">
-                      https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish?orgSlug=nimbus-labs
+                  <div className="space-y-2 rounded-xl bg-white p-3 border border-slate-200">
+                    <div className="flex items-start gap-2">
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-orange-100 text-[10px] font-bold text-orange-700">
+                        1
+                      </span>
+                      <p className="text-[11px] text-slate-700">
+                        GitLab sends webhook event to BrandShield receiver with HMAC verification and replay defense.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-teal-100 text-[10px] font-bold text-teal-700">
+                        2
+                      </span>
+                      <p className="text-[11px] text-slate-700">
+                        Brand governance engine scans commit messages, descriptions, and modified copy against active guidelines.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">
+                        3
+                      </span>
+                      <p className="text-[11px] text-slate-700">
+                        Outbound commit status (<code className="font-mono text-[10px] font-semibold text-slate-800">brandshield/governance</code>) is updated directly on GitLab. Critical violations block the merge request.
+                      </p>
                     </div>
                   </div>
-                  <div className="rounded-lg bg-orange-50/70 p-2.5 text-[11px] text-orange-950 border border-orange-200/50 space-y-1">
-                    <p className="font-semibold">GitLab Project Setup Instructions:</p>
-                    <ol className="list-decimal list-inside space-y-0.5 text-slate-600 text-[10.5px]">
-                      <li>In GitLab, go to <span className="font-semibold">Settings → Webhooks</span>.</li>
-                      <li>Paste the URL above and check <span className="font-semibold">Push events</span> and <span className="font-semibold">Merge request events</span>.</li>
-                      <li>Provide your Secret Token (<span className="font-mono">GITLAB_WEBHOOK_SECRET</span>).</li>
-                      <li>BrandShield will audit commits, changed files, and update GitLab commit statuses automatically.</li>
-                    </ol>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      copy(
-                        `https://brandshield-ai-five.vercel.app/api/webhooks/incoming/prepublish?orgSlug=nimbus-labs`,
-                        "gitlab_url"
-                      )
-                    }
-                    className="w-full h-8 gap-1.5 rounded-xl text-xs"
-                  >
-                    {copiedText === "gitlab_url" ? <Check className="size-3 text-orange-600" /> : <Copy className="size-3" />}
-                    <span>{copiedText === "gitlab_url" ? "URL Copied" : "Copy GitLab Webhook URL"}</span>
-                  </Button>
                 </CardContent>
               </Card>
             </div>

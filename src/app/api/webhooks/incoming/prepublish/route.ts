@@ -275,12 +275,14 @@ export async function POST(req: NextRequest) {
     const complianceScore = Math.max(0, 100 - criticalCount * 30 - warningCount * 10);
     const allowed = criticalCount === 0;
 
+    const isSyntheticTest = Boolean(payload?.isSyntheticTest || payload?.test);
+
     // 7. Log Pre-publishing Asset Audit
     const assetAudit = await db.assetAudit.create({
       data: {
         orgId,
-        assetName,
-        assetType: isGitLab ? "gitlab_webhook" : "webhook",
+        assetName: isSyntheticTest ? `[Synthetic Test] ${assetName}` : assetName,
+        assetType: isSyntheticTest ? "gitlab_test" : isGitLab ? "gitlab_webhook" : "webhook",
         status: allowed ? "completed" : "failed",
         complianceScore,
         findingsCount: violationsCount,
@@ -290,6 +292,7 @@ export async function POST(req: NextRequest) {
           textLength: textToScan.length,
           receivedAt: new Date().toISOString(),
           isGitLab,
+          isSyntheticTest,
           gitlabEvent: parsedGitLab?.eventType,
           commitSha: parsedGitLab?.commitSha,
           ref: parsedGitLab?.ref,
@@ -300,16 +303,35 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Update GitLabConnection stats for this organization
+    if (isGitLab) {
+      try {
+        await db.gitLabConnection.updateMany({
+          where: { orgId },
+          data: {
+            lastEventAt: new Date(),
+            lastEventStatus: allowed ? "PASSED" : "BLOCKED",
+            lastEventError: null,
+            lastAuditId: assetAudit.id,
+          },
+        });
+      } catch (connUpdateErr) {
+        console.warn("[Webhook Prepublish] Notice updating GitLabConnection stats:", connUpdateErr);
+      }
+    }
+
     // 8. Outbound GitLab Commit Status Update (Awaited to avoid serverless termination)
     let gitlabStatusResult: { success: boolean; status?: number; error?: string } | null = null;
 
     if (
       isGitLab &&
+      !isSyntheticTest &&
       parsedGitLab &&
       parsedGitLab.commitSha &&
       parsedGitLab.commitSha !== "unknown_sha" &&
       parsedGitLab.commitSha !== "mr_head_sha" &&
-      parsedGitLab.commitSha !== "gitlab_test_sha"
+      parsedGitLab.commitSha !== "gitlab_test_sha" &&
+      parsedGitLab.commitSha !== "1111111111111111111111111111111111111111"
     ) {
       const origin =
         process.env.VERCEL_PROJECT_PRODUCTION_URL

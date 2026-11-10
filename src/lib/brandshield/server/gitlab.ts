@@ -1,6 +1,7 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { validateSsrfSafeUrl } from "./ssrf";
+import { encryptToken, decryptToken } from "./crypto";
 
 export interface GitLabCommit {
   id: string;
@@ -203,6 +204,7 @@ export async function verifyGitLabProjectMapping(
     },
     include: {
       webhooks: { where: { active: true } },
+      gitlabConnections: { where: { status: "connected" } },
     },
   });
 
@@ -237,11 +239,31 @@ export async function verifyGitLabProjectMapping(
         }
       }
     }
+
+    // 3. Check if token matches any connected GitLab project webhook secret for this organization
+    if (!hasValidSecret && org.gitlabConnections.length > 0) {
+      for (const conn of org.gitlabConnections) {
+        if (conn.encryptedWebhookSecret) {
+          try {
+            const decSecret = decryptToken(conn.encryptedWebhookSecret);
+            if (
+              verifyGitLabWebhookToken(secretTokenOrHmac, decSecret) ||
+              verifyGitLabHmacSignature(secretTokenOrHmac, rawBody, decSecret).valid
+            ) {
+              hasValidSecret = true;
+              break;
+            }
+          } catch {
+            // ignore decryption error
+          }
+        }
+      }
+    }
   }
 
-  // If the organization has configured webhook endpoints or a global secret exists,
+  // If the organization has configured webhook endpoints, gitlab connections or a global secret exists,
   // we require a valid token to verify project-to-organization ownership.
-  if ((org.webhooks.length > 0 || globalSecret) && !hasValidSecret) {
+  if ((org.webhooks.length > 0 || org.gitlabConnections.length > 0 || globalSecret) && !hasValidSecret) {
     return {
       verified: false,
       reason: "GitLab secret token or HMAC signature verification failed for this organization.",
@@ -531,3 +553,409 @@ export async function updateGitLabCommitStatus(
     return { success: false, error: msg };
   }
 }
+
+// ─── Self-Service GitLab OAuth & Webhook Provisioning Engine ─────────────────
+
+export const GITLAB_NONCE_COOKIE = "brandshield_gitlab_nonce";
+
+export interface GitLabProjectSummary {
+  id: string;
+  name: string;
+  nameWithNamespace: string;
+  pathWithNamespace: string;
+  webUrl: string;
+  visibility: string;
+  avatarUrl: string | null;
+  defaultBranch: string;
+}
+
+/**
+ * In-flight promise map to deduplicate concurrent GitLab token refresh requests
+ */
+const inFlightGitLabRefreshes = new Map<string, Promise<string | null>>();
+
+/**
+ * Generates an HMAC-signed state parameter bound to the authenticated user ID and a secure nonce.
+ * Format: `<userId>.<nonce>.<timestamp>.<signature>`
+ */
+export function generateGitLabOAuthState(userId: string): { state: string; nonce: string } {
+  const secret = process.env.SESSION_SECRET || "brandshield_session_secret_32bytes_min";
+  const nonce = randomBytes(16).toString("hex");
+  const timestamp = Math.floor(Date.now() / 1000);
+  const data = `gitlab:${userId}:${nonce}:${timestamp}`;
+  const sig = createHmac("sha256", secret).update(data).digest("hex");
+  return {
+    state: `${userId}.${nonce}.${timestamp}.${sig}`,
+    nonce,
+  };
+}
+
+/**
+ * Cryptographically verifies GitLab OAuth state against user identity, cookie nonce, timestamp,
+ * and performs persistent atomic one-time consumption in the database (OAuthNonce).
+ */
+export async function verifyGitLabOAuthState(
+  state: string | null | undefined,
+  expectedUserId: string,
+  cookieNonce?: string | null
+): Promise<{ valid: boolean; reason?: string; nonce?: string }> {
+  if (!state) {
+    return { valid: false, reason: "Missing OAuth state parameter." };
+  }
+
+  const parts = state.split(".");
+  if (parts.length !== 4) {
+    return { valid: false, reason: "Malformed OAuth state format. Expected 4-segment token." };
+  }
+
+  const [userId, nonce, tsStr, signature] = parts;
+
+  // 1. User binding check
+  if (userId !== expectedUserId) {
+    return { valid: false, reason: "State user identity mismatch." };
+  }
+
+  // 2. Cookie nonce binding check (CSRF defense)
+  if (!cookieNonce) {
+    return { valid: false, reason: "Missing session nonce cookie. State cannot be bound." };
+  }
+  if (nonce !== cookieNonce) {
+    return { valid: false, reason: "State nonce does not match session nonce cookie." };
+  }
+
+  // 3. Expiration check (10-minute maximum validity window)
+  const ts = parseInt(tsStr, 10);
+  if (isNaN(ts)) {
+    return { valid: false, reason: "Invalid timestamp in OAuth state." };
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (now - ts > 600 || ts - now > 60) {
+    return { valid: false, reason: "OAuth state has expired (maximum 10-minute lifespan)." };
+  }
+
+  // 4. HMAC signature verification
+  const secret = process.env.SESSION_SECRET || "brandshield_session_secret_32bytes_min";
+  const expectedData = `gitlab:${userId}:${nonce}:${tsStr}`;
+  const expectedSig = createHmac("sha256", secret).update(expectedData).digest("hex");
+
+  const sigBuf = Buffer.from(signature, "utf8");
+  const expBuf = Buffer.from(expectedSig, "utf8");
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+    return { valid: false, reason: "OAuth state signature verification failed." };
+  }
+
+  // 5. Persistent atomic one-time consumption via database atomic delete
+  try {
+    const consumed = await db.oAuthNonce.deleteMany({
+      where: {
+        nonce,
+        provider: "gitlab",
+        userId: expectedUserId,
+        expiresAt: { gte: new Date() },
+      },
+    });
+
+    if (consumed.count === 0) {
+      return {
+        valid: false,
+        reason: "OAuth state nonce has already been consumed, expired, or was never issued (replay attack rejected).",
+      };
+    }
+
+    // Opportunistically prune expired nonces in background
+    db.oAuthNonce.deleteMany({ where: { expiresAt: { lt: new Date() } } }).catch(() => {});
+  } catch (err: unknown) {
+    console.error("[GitLab OAuth] Nonce atomic consumption error:", err);
+    return { valid: false, reason: "Database error verifying OAuth state nonce." };
+  }
+
+  return { valid: true, nonce };
+}
+
+/**
+ * Persists an OAuth state nonce to the database prior to redirecting the user to GitLab.
+ * Ensures the nonce cannot be spoofed, replayed, or consumed out of order.
+ */
+export async function persistGitLabOAuthNonce(
+  nonce: string,
+  userId: string,
+  provider: string = "gitlab"
+): Promise<void> {
+  await db.oAuthNonce.upsert({
+    where: { nonce },
+    update: {
+      provider,
+      userId,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    },
+    create: {
+      nonce,
+      provider,
+      userId,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    },
+  });
+}
+
+/**
+ * Exchanges authorization code for access and refresh tokens.
+ */
+export async function exchangeGitLabOAuthCode(
+  code: string,
+  redirectUri: string
+): Promise<{
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn?: number;
+  scope?: string;
+  tokenType?: string;
+}> {
+  const clientId = process.env.GITLAB_CLIENT_ID?.trim();
+  const clientSecret = process.env.GITLAB_CLIENT_SECRET?.trim();
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Missing GITLAB_CLIENT_ID or GITLAB_CLIENT_SECRET on server");
+  }
+
+  const tokenUrl = "https://gitlab.com/oauth/token";
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri,
+  });
+
+  const res = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`GitLab token exchange failed (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresIn: data.expires_in,
+    scope: data.scope,
+    tokenType: data.token_type,
+  };
+}
+
+/**
+ * Refreshes an expired GitLab OAuth access token using refresh-token rotation.
+ */
+export async function refreshGitLabOAuthToken(connectionId: string): Promise<string | null> {
+  if (inFlightGitLabRefreshes.has(connectionId)) {
+    return inFlightGitLabRefreshes.get(connectionId)!;
+  }
+
+  const refreshPromise = (async () => {
+    try {
+      const conn = await db.gitLabConnection.findUnique({ where: { id: connectionId } });
+      if (!conn || !conn.encryptedRefreshToken) {
+        return null;
+      }
+
+      const refreshToken = decryptToken(conn.encryptedRefreshToken);
+      const clientId = process.env.GITLAB_CLIENT_ID?.trim();
+      const clientSecret = process.env.GITLAB_CLIENT_SECRET?.trim();
+
+      if (!clientId || !clientSecret) {
+        return null;
+      }
+
+      const body = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      });
+
+      const res = await fetch("https://gitlab.com/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+
+      if (!res.ok) {
+        console.warn(`[GitLab Token Refresh] Failed with status ${res.status}`);
+        return null;
+      }
+
+      const data = await res.json();
+      const newAccessToken = data.access_token;
+      const newRefreshToken = data.refresh_token || refreshToken;
+      const expiresIn = data.expires_in || 7200;
+      const newExpiry = new Date(Date.now() + expiresIn * 1000);
+
+      await db.gitLabConnection.update({
+        where: { id: connectionId },
+        data: {
+          encryptedAccessToken: encryptToken(newAccessToken),
+          encryptedRefreshToken: encryptToken(newRefreshToken),
+          tokenExpiry: newExpiry,
+        },
+      });
+
+      return newAccessToken;
+    } catch (err) {
+      console.error("[GitLab Token Refresh] Error:", err);
+      return null;
+    } finally {
+      inFlightGitLabRefreshes.delete(connectionId);
+    }
+  })();
+
+  inFlightGitLabRefreshes.set(connectionId, refreshPromise);
+  return refreshPromise;
+}
+
+/**
+ * Returns a valid decrypted GitLab access token, automatically refreshing if close to expiry.
+ */
+export async function getValidGitLabToken(conn: {
+  id: string;
+  encryptedAccessToken: string;
+  encryptedRefreshToken?: string | null;
+  tokenExpiry?: Date | null;
+}): Promise<string> {
+  const isExpiringSoon = conn.tokenExpiry && conn.tokenExpiry.getTime() - Date.now() < 60000;
+
+  if (isExpiringSoon && conn.encryptedRefreshToken) {
+    const refreshed = await refreshGitLabOAuthToken(conn.id);
+    if (refreshed) return refreshed;
+  }
+
+  return decryptToken(conn.encryptedAccessToken);
+}
+
+/**
+ * Retrieves the authenticated GitLab user's profile information.
+ */
+export async function fetchGitLabUserProfile(accessToken: string): Promise<{
+  id: number;
+  username: string;
+  name: string;
+  avatarUrl: string | null;
+  email: string | null;
+}> {
+  const res = await fetch("https://gitlab.com/api/v4/user", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "User-Agent": "BrandShield-AI",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch GitLab user profile (${res.status})`);
+  }
+
+  const user = await res.json();
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    avatarUrl: user.avatar_url || null,
+    email: user.email || null,
+  };
+}
+
+/**
+ * Retrieves the projects where the user has at least Developer access (min_access_level >= 30).
+ */
+export async function fetchGitLabUserProjects(accessToken: string): Promise<GitLabProjectSummary[]> {
+  const url = "https://gitlab.com/api/v4/projects?membership=true&min_access_level=30&per_page=50&order_by=updated_at";
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "User-Agent": "BrandShield-AI",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to list GitLab projects (${res.status})`);
+  }
+
+  const projects = await res.json();
+  if (!Array.isArray(projects)) return [];
+
+  return projects.map((p: any) => ({
+    id: String(p.id),
+    name: p.name || "",
+    nameWithNamespace: p.name_with_namespace || p.name || "",
+    pathWithNamespace: p.path_with_namespace || "",
+    webUrl: p.web_url || "",
+    visibility: p.visibility || "private",
+    avatarUrl: p.avatar_url || null,
+    defaultBranch: p.default_branch || "main",
+  }));
+}
+
+/**
+ * Automatically creates a webhook on a GitLab project.
+ */
+export async function createGitLabProjectWebhook(
+  accessToken: string,
+  projectId: string | number,
+  webhookUrl: string,
+  secretToken: string
+): Promise<{ id: number; url: string }> {
+  const encodedId = encodeURIComponent(String(projectId));
+  const url = `https://gitlab.com/api/v4/projects/${encodedId}/hooks`;
+
+  const body = {
+    url: webhookUrl,
+    token: secretToken,
+    push_events: true,
+    merge_requests_events: true,
+    enable_ssl_verification: true,
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      "User-Agent": "BrandShield-AI",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Failed to create GitLab project webhook (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  return { id: data.id, url: data.url };
+}
+
+/**
+ * Deletes a webhook from a GitLab project (with rollback and cleanup safety).
+ */
+export async function deleteGitLabProjectWebhook(
+  accessToken: string,
+  projectId: string | number,
+  webhookId: number
+): Promise<boolean> {
+  const encodedId = encodeURIComponent(String(projectId));
+  const url = `https://gitlab.com/api/v4/projects/${encodedId}/hooks/${webhookId}`;
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "User-Agent": "BrandShield-AI",
+    },
+  });
+
+  // 204 No Content is standard success; 404 means already deleted on GitLab
+  return res.status === 204 || res.status === 404;
+}
+
