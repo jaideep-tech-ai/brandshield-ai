@@ -135,3 +135,4 @@ export async function validateSsrfSafeUrl(targetUrl: string): Promise<SsrfValida
     return { valid: false, reason: "Malformed URL." };
   }
 }
+

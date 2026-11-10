@@ -20,6 +20,7 @@ import {
   FindingsView,
   ApprovalsView,
   AnalyticsView,
+  IntegrationsView,
   BillingView,
   SettingsView,
   warmSignedInChunks,
@@ -109,6 +110,7 @@ function ViewRouter() {
     case "findings": return <FindingsView />;
     case "approvals": return <ApprovalsView />;
     case "analytics": return <AnalyticsView />;
+    case "integrations": return <IntegrationsView />;
     case "billing": return <BillingView />;
     case "settings": return <SettingsView />;
     default: return <RoleDashboard />;

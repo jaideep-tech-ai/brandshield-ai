@@ -13,6 +13,7 @@ const dict = {
     "nav.findings": "Findings & Remediation",
     "nav.approvals": "Approval Board",
     "nav.analytics": "Analytics",
+    "nav.integrations": "Integrations & Extensions",
     "nav.billing": "Billing",
     "nav.settings": "Settings",
 
@@ -23,6 +24,7 @@ const dict = {
     "navShort.findings": "Findings",
     "navShort.approvals": "Approvals",
     "navShort.analytics": "Analytics",
+    "navShort.integrations": "Extensions",
     "navShort.billing": "Billing",
     "navShort.settings": "Settings",
 
@@ -61,6 +63,7 @@ const dict = {
     "nav.findings": "फाइंडिंग्स और सुधार",
     "nav.approvals": "स्वीकृति बोर्ड",
     "nav.analytics": "एनालिटिक्स",
+    "nav.integrations": "इंटीग्रेशन और एक्सटेंशन",
     "nav.billing": "बिलिंग",
     "nav.settings": "सेटिंग्स",
 
@@ -71,6 +74,7 @@ const dict = {
     "navShort.findings": "फाइंडिंग्स",
     "navShort.approvals": "स्वीकृति",
     "navShort.analytics": "एनालिटिक्स",
+    "navShort.integrations": "इंटीग्रेशन",
     "navShort.billing": "बिलिंग",
     "navShort.settings": "सेटिंग्स",
 

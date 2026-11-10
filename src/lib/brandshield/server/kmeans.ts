@@ -76,7 +76,7 @@ export function validateImageBuffer(buffer: Buffer): { format: string } {
 
 // ─── Color Space Conversions (sRGB <-> CIELAB with D65 Illuminant) ───────────
 
-function sRgbToLab(r: number, g: number, b: number): [number, number, number] {
+export function sRgbToLab(r: number, g: number, b: number): [number, number, number] {
   // 1. Linearize sRGB components
   const [lr, lg, lb] = [r / 255, g / 255, b / 255].map((v) =>
     v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)

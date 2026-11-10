@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
+  Blocks,
   ClipboardCheck,
   CreditCard,
   Database,
@@ -76,6 +77,7 @@ const NAV: readonly NavItem[] = [
   { key: "findings", labelKey: "shell.nav.findings", shortKey: "shell.navShort.findings", icon: FileSearch, roles: ALL_ROLES },
   { key: "approvals", labelKey: "shell.nav.approvals", shortKey: "shell.navShort.approvals", icon: ClipboardCheck, roles: ALL_ROLES },
   { key: "analytics", labelKey: "shell.nav.analytics", shortKey: "shell.navShort.analytics", icon: BarChart3, roles: ["reviewer", "admin"] },
+  { key: "integrations", labelKey: "shell.nav.integrations", shortKey: "shell.navShort.integrations", icon: Blocks, roles: ["creator", "reviewer", "admin"] },
   { key: "billing", labelKey: "shell.nav.billing", shortKey: "shell.navShort.billing", icon: CreditCard, roles: ["admin"] },
   { key: "settings", labelKey: "shell.nav.settings", shortKey: "shell.navShort.settings", icon: Settings, roles: ["admin"] },
 ];

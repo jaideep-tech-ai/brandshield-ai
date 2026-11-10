@@ -27,6 +27,8 @@ export const loadApprovals = () =>
   import("@/components/brandshield/approvals-view").then((m) => ({ default: m.ApprovalsView }));
 export const loadAnalytics = () =>
   import("@/components/brandshield/analytics-view").then((m) => ({ default: m.AnalyticsView }));
+export const loadIntegrations = () =>
+  import("@/components/brandshield/integrations-view").then((m) => ({ default: m.IntegrationsView }));
 export const loadBilling = () =>
   import("@/components/brandshield/billing-view").then((m) => ({ default: m.BillingView }));
 export const loadSettings = () =>
@@ -54,6 +56,7 @@ export const ScannerView = dynamic(loadScanner, { ssr: false, loading: () => <Ch
 export const FindingsView = dynamic(loadFindings, { ssr: false, loading: () => <ChunkFallback /> });
 export const ApprovalsView = dynamic(loadApprovals, { ssr: false, loading: () => <ChunkFallback /> });
 export const AnalyticsView = dynamic(loadAnalytics, { ssr: false, loading: () => <ChunkFallback /> });
+export const IntegrationsView = dynamic(loadIntegrations, { ssr: false, loading: () => <ChunkFallback /> });
 export const BillingView = dynamic(loadBilling, { ssr: false, loading: () => <ChunkFallback /> });
 export const SettingsView = dynamic(loadSettings, { ssr: false, loading: () => <ChunkFallback /> });
 // Overlay component — mount silently once the chunk arrives.

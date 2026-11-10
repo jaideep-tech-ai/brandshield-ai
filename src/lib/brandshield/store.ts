@@ -10,6 +10,7 @@ export type ViewKey =
   | "findings"
   | "approvals"
   | "analytics"
+  | "integrations"
   | "billing"
   | "settings";
 
