@@ -271,7 +271,7 @@ export async function POST(req: NextRequest) {
     if (!apiKey && process.env.GEMINI_API_KEY?.trim()) {
       apiKey = process.env.GEMINI_API_KEY.trim();
       baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai";
-      model = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+      model = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
     } else if (!apiKey && process.env.GROQ_API_KEY?.trim()) {
       apiKey = process.env.GROQ_API_KEY.trim();
       baseUrl = "https://api.groq.com/openai/v1";
@@ -336,14 +336,51 @@ CRITICAL INSTRUCTIONS:
             choices: { message: { content: string } }[];
           };
           finalReply = completion.choices?.[0]?.message?.content || "";
+        } else if (baseUrl.includes("generativelanguage.googleapis.com")) {
+          // Robust fallback to native Gemini generateContent endpoint
+          try {
+            const nativeRes = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [
+                    {
+                      role: "user",
+                      parts: [
+                        {
+                          text: `${systemPrompt}\n\nUser Question:\n${message}`,
+                        },
+                      ],
+                    },
+                  ],
+                  generationConfig: { temperature: 0.2 },
+                }),
+              }
+            );
+            if (nativeRes.ok) {
+              const nativeData = (await nativeRes.json()) as {
+                candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+              };
+              finalReply = nativeData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            } else {
+              console.warn("[Copilot API] Native Gemini returned status:", nativeRes.status);
+            }
+          } catch (nativeErr) {
+            console.warn("[Copilot API] Native Gemini fallback error:", nativeErr);
+          }
+        } else {
+          console.warn("[Copilot API] External LLM returned status:", res.status);
+        }
+
+        if (finalReply) {
           finalCitations = passages.slice(0, 4).map((p) => ({
             documentTitle: p.documentTitle,
             pageNumber: p.pageNumber,
             ruleTag: p.ruleTag,
             textSnippet: p.text.slice(0, 240).trim(),
           }));
-        } else {
-          console.warn("[Copilot API] External LLM returned status:", res.status);
         }
       } catch (err) {
         console.warn("[Copilot API] External LLM call error, using deterministic synthesis:", err);
