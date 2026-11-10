@@ -111,6 +111,24 @@ export async function firebaseEmailSignUp(input: { email: string; password: stri
   }
 }
 
+/** Sign in with Google OAuth via Firebase, then sync the session with the backend.
+ *  Resolves with the synced session user (drives the SPA dashboard swap). */
+export async function firebaseGoogleSignIn(): Promise<SessionUser> {
+  try {
+    const { GoogleAuthProvider, signInWithPopup } = await import("firebase/auth");
+    const auth = await loadFirebaseAuth();
+    const provider = new GoogleAuthProvider();
+    provider.addScope("email");
+    provider.addScope("profile");
+    provider.setCustomParameters({ prompt: "select_account" });
+    const credential = await signInWithPopup(auth, provider);
+    const idToken = await credential.user.getIdToken();
+    return await syncSession(idToken);
+  } catch (err) {
+    throw mapFirebaseError(err);
+  }
+}
+
 async function syncSession(idToken: string): Promise<SessionUser> {
   const res = await fetch("/api/auth/firebase-sync", {
     method: "POST",

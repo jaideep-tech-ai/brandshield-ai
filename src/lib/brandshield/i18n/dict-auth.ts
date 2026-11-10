@@ -52,6 +52,10 @@ const dict = {
     "signin.helperSuffix": ".",
     "action.signIn": "Sign in",
     "action.signingIn": "Signing in…",
+    "google.signIn": "Continue with Google",
+    "google.unconfiguredNotice": "Firebase Auth is running in local mode. Set NEXT_PUBLIC_FIREBASE_* in environment variables to connect live Google OAuth.",
+    "notice.localModeTitle": "Operational Notice: Local Sandbox Mode Active",
+    "notice.localModeDesc": "Firebase Authentication is unconfigured in this deployment. The platform operates safely in local workspace auth mode.",
 
     // Sign-up form
     "signup.name": "Full name",
@@ -149,6 +153,10 @@ const dict = {
     "signin.helperSuffix": " के साथ काम करता है।",
     "action.signIn": "लॉग इन",
     "action.signingIn": "लॉग इन हो रहा है…",
+    "google.signIn": "Google के साथ जारी रखें",
+    "google.unconfiguredNotice": "Firebase Auth लोकल मोड में चल रहा है। लाइव Google OAuth जोड़ने के लिए पर्यावरण वेरिएबल्स में NEXT_PUBLIC_FIREBASE_* सेट करें।",
+    "notice.localModeTitle": "परिचालन सूचना: लोकल सैंडबॉक्स मोड सक्रिय",
+    "notice.localModeDesc": "इस डिप्लॉयमेंट में Firebase Authentication कॉन्फ़िगर नहीं है। प्लेटफ़ॉर्म सुरक्षित लोकल वर्कस्पेस ऑथ मोड में काम कर रहा है।",
 
     // अकाउंट बनाने का फ़ॉर्म
     "signup.name": "पूरा नाम",

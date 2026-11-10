@@ -15,6 +15,8 @@ export const loadDemoTour = () =>
   import("@/components/brandshield/demo-tour").then((m) => ({ default: m.DemoTour }));
 export const loadRoleDashboard = () =>
   import("@/components/brandshield/dashboards/role-dashboard").then((m) => ({ default: m.RoleDashboard }));
+export const loadCopilot = () =>
+  import("@/components/brandshield/copilot-view").then((m) => ({ default: m.CopilotView }));
 export const loadKnowledge = () =>
   import("@/components/brandshield/knowledge-view").then((m) => ({ default: m.KnowledgeView }));
 export const loadScanner = () =>
@@ -46,6 +48,7 @@ function ChunkFallback({ full }: { full?: boolean }) {
 
 export const Shell = dynamic(loadShell, { ssr: false, loading: () => <ChunkFallback full /> });
 export const RoleDashboard = dynamic(loadRoleDashboard, { ssr: false, loading: () => <ChunkFallback /> });
+export const CopilotView = dynamic(loadCopilot, { ssr: false, loading: () => <ChunkFallback /> });
 export const KnowledgeView = dynamic(loadKnowledge, { ssr: false, loading: () => <ChunkFallback /> });
 export const ScannerView = dynamic(loadScanner, { ssr: false, loading: () => <ChunkFallback /> });
 export const FindingsView = dynamic(loadFindings, { ssr: false, loading: () => <ChunkFallback /> });
@@ -61,6 +64,7 @@ export function warmSignedInChunks() {
   void loadShell();
   void loadDemoTour();
   void loadRoleDashboard();
+  void loadCopilot();
   void loadKnowledge();
   void loadScanner();
   void loadFindings();

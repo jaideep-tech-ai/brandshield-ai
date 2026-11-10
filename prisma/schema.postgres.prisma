@@ -29,6 +29,7 @@ model Organization {
   auditLogs        AuditLog[]
   subscription     Subscription?
   visualInspections VisualInspection[]
+  chatSessions     GovernanceChatSession[]
 }
 
 model User {
@@ -47,6 +48,7 @@ model User {
   auditLogs    AuditLog[]
   revisions    Revision[]
   visualInspections VisualInspection[]
+  chatSessions GovernanceChatSession[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -254,4 +256,35 @@ model Subscription {
   organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+// ─── AI Brand Governance Copilot & Chat Audit ───────────────────────────────
+
+model GovernanceChatSession {
+  id           String                 @id @default(cuid())
+  orgId        String
+  userId       String
+  title        String                 @default("Brand Governance Session")
+  organization Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     GovernanceChatMessage[]
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@index([orgId])
+  @@index([userId])
+}
+
+model GovernanceChatMessage {
+  id         String                @id @default(cuid())
+  sessionId  String
+  orgId      String
+  role       String                // user | assistant | system
+  content    String
+  citations  String?               // JSON array of retrieved knowledge citations
+  createdAt  DateTime              @default(now())
+  session    GovernanceChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([orgId])
 }

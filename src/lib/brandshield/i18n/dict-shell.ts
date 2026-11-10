@@ -7,6 +7,7 @@ import { registerDict } from "@/lib/brandshield/i18n";
 const dict = {
   en: {
     "nav.dashboard": "Overview",
+    "nav.copilot": "AI Copilot",
     "nav.knowledge": "Knowledge Base",
     "nav.scanner": "Pre-Flight Scanner",
     "nav.findings": "Findings & Remediation",
@@ -16,6 +17,7 @@ const dict = {
     "nav.settings": "Settings",
 
     "navShort.dashboard": "Home",
+    "navShort.copilot": "Copilot",
     "navShort.knowledge": "Knowledge",
     "navShort.scanner": "Scanner",
     "navShort.findings": "Findings",
@@ -53,6 +55,7 @@ const dict = {
 
   hi: {
     "nav.dashboard": "अवलोकन",
+    "nav.copilot": "AI कोपायलट",
     "nav.knowledge": "नॉलेज बेस",
     "nav.scanner": "प्री-फ़्लाइट स्कैनर",
     "nav.findings": "फाइंडिंग्स और सुधार",
@@ -62,6 +65,7 @@ const dict = {
     "nav.settings": "सेटिंग्स",
 
     "navShort.dashboard": "होम",
+    "navShort.copilot": "कोपायलट",
     "navShort.knowledge": "नॉलेज",
     "navShort.scanner": "स्कैनर",
     "navShort.findings": "फाइंडिंग्स",

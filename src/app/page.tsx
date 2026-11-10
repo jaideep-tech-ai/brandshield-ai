@@ -14,6 +14,7 @@ import {
   Shell,
   DemoTour,
   RoleDashboard,
+  CopilotView,
   KnowledgeView,
   ScannerView,
   FindingsView,
@@ -102,6 +103,7 @@ function ShellWithTour({ children }: { children: React.ReactNode }) {
 function ViewRouter() {
   const view = useUIStore((s) => s.view);
   switch (view) {
+    case "copilot": return <CopilotView />;
     case "knowledge": return <KnowledgeView />;
     case "scanner": return <ScannerView />;
     case "findings": return <FindingsView />;

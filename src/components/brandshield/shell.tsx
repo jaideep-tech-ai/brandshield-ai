@@ -18,6 +18,7 @@ import {
   ScanSearch,
   Settings,
   ShieldCheck,
+  Sparkles,
   GraduationCap,
   type LucideIcon,
 } from "lucide-react";
@@ -47,6 +48,7 @@ import {
 } from "@/components/ui/sheet";
 import { LangToggle, useLang } from "@/lib/brandshield/i18n";
 import "@/lib/brandshield/i18n/dict-shell";
+import { RoleSwitcher } from "@/components/brandshield/role-switcher";
 
 // ─── Navigation model (role-gated) ───────────────────────────────────────────
 
@@ -62,6 +64,7 @@ const ALL_ROLES: readonly Role[] = ["creator", "reviewer", "contractor", "admin"
 
 const NAV: readonly NavItem[] = [
   { key: "dashboard", labelKey: "shell.nav.dashboard", shortKey: "shell.navShort.dashboard", icon: LayoutDashboard, roles: ALL_ROLES },
+  { key: "copilot", labelKey: "shell.nav.copilot", shortKey: "shell.navShort.copilot", icon: Sparkles, roles: ALL_ROLES },
   { key: "knowledge", labelKey: "shell.nav.knowledge", shortKey: "shell.navShort.knowledge", icon: Database, roles: ALL_ROLES },
   {
     key: "scanner",
@@ -306,6 +309,12 @@ export function Shell({ children }: { children: ReactNode }) {
                 </div>
                 <SheetDescription className="sr-only">{t("shell.mobile.sheetDesc")}</SheetDescription>
               </SheetHeader>
+              <div className="border-b border-slate-100 p-3 bg-slate-50/50">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Role Perspective
+                </p>
+                <RoleSwitcher />
+              </div>
               <nav className="space-y-1 p-3" aria-label={t("shell.aria.primary")}>
                 {nav.map((item) => {
                   const Icon = item.icon;
@@ -361,6 +370,9 @@ export function Shell({ children }: { children: ReactNode }) {
 
             {/* Language switcher — compact, always visible (even on mobile) */}
             <LangToggle />
+
+            {/* Persistent 4-role evaluation switcher */}
+            <RoleSwitcher />
 
             <Button
               variant="ghost"

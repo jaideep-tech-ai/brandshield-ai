@@ -8,6 +8,7 @@ import type {
   GuidelineDoc,
   Inspection,
   Revision,
+  Role,
   SessionUser,
   Submission,
   SubscriptionInfo,
@@ -137,6 +138,18 @@ export function useDemoLogin() {
   return useMutation({
     mutationFn: (email: string) => api.post<SessionUser>("/api/auth/login", { email, password: "demo1234" }),
     onSuccess: (user) => {
+      qc.setQueryData(["session"], user);
+      qc.invalidateQueries();
+    },
+  });
+}
+
+export function useSwitchRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (targetRole: Role) => api.post<SessionUser>("/api/auth/switch-role", { targetRole }),
+    onSuccess: (user) => {
+      markAuthHint();
       qc.setQueryData(["session"], user);
       qc.invalidateQueries();
     },

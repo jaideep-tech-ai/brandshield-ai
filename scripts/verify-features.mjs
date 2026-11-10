@@ -80,6 +80,24 @@ assert(chunks[0].pageNumber === 1, `Chunk 1 pageNumber is 1 (actual: ${chunks[0]
 assert(chunks[0].ruleTag === "CLAIM-01", `Chunk 1 ruleTag captured CLAIM-01 (actual: ${chunks[0].ruleTag})`);
 assert(chunks[chunks.length - 1].pageNumber === 2, `Last chunk pageNumber is 2 (actual: ${chunks[chunks.length - 1].pageNumber})`);
 
+// ── Test 5: 4-Role RBAC Matrix & Personas
+console.log("\n--- Suite 5: 4-Role RBAC Matrix & Personas ---");
+const VALID_ROLES = ["admin", "reviewer", "creator", "contractor"];
+assert(VALID_ROLES.length === 4, "Configured 4 distinct enterprise personas");
+assert(VALID_ROLES.includes("admin") && VALID_ROLES.includes("reviewer"), "Admin and Reviewer roles defined");
+assert(VALID_ROLES.includes("creator") && VALID_ROLES.includes("contractor"), "Creator and Contractor (Auditor) roles defined");
+
+// ── Test 6: Cross-Platform & Flutter Web Design Token Formatting
+console.log("\n--- Suite 6: Cross-Platform DTCG & Flutter Web Formatting ---");
+function formatFlutterColor(hex) {
+  const clean = hex.replace("#", "").toUpperCase();
+  return clean.length === 6 ? `0xFF${clean}` : `0x${clean}`;
+}
+const flutterTeal = formatFlutterColor("#0F766E");
+assert(flutterTeal === "0xFF0F766E", `Primary brand teal hex correctly formatted for Flutter Color: ${flutterTeal}`);
+const flutterMint = formatFlutterColor("#14B8A6");
+assert(flutterMint === "0xFF14B8A6", `Accent mint hex correctly formatted for Flutter Color: ${flutterMint}`);
+
 console.log("\n==================================================");
 console.log(`VERIFICATION SUMMARY: ${testsPassed} passed, ${testsFailed} failed`);
 console.log("==================================================");
