@@ -394,7 +394,19 @@ CRITICAL INSTRUCTIONS:
 
     // 5. Persist to GovernanceChatSession and GovernanceChatMessage
     let sessionId = body.sessionId;
-    if (!sessionId) {
+    if (sessionId) {
+      const existing = await db.governanceChatSession.findUnique({ where: { id: sessionId } });
+      if (!existing) {
+        await db.governanceChatSession.create({
+          data: {
+            id: sessionId,
+            orgId: user.orgId,
+            userId: user.id,
+            title: message.slice(0, 38) + (message.length > 38 ? "..." : ""),
+          },
+        });
+      }
+    } else {
       const titleSummary = message.slice(0, 38) + (message.length > 38 ? "..." : "");
       const newSession = await db.governanceChatSession.create({
         data: {
