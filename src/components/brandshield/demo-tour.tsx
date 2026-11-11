@@ -163,8 +163,16 @@ export function DemoTour({ role }: { role: Role }) {
 
     const timer = setTimeout(() => {
       if (typeof s.stepIndex === "number" && s.stepIndex > 0) {
-        setStepIndex(s.stepIndex);
-        setTourOpen(true);
+        if (s.stepIndex >= steps.length) {
+          // If stored step is from obsolete 16-step tour, clamp and finish
+          saveStepToDb(steps.length, true, false, false);
+          setStepIndex(0);
+          setShowWelcome(false);
+          setTourOpen(false);
+        } else {
+          setStepIndex(s.stepIndex);
+          setTourOpen(true);
+        }
       } else if (s.stepIndex === 0 && !tourOpen) {
         setShowWelcome(true);
       }
@@ -432,10 +440,11 @@ export function DemoTour({ role }: { role: Role }) {
             </Button>
             <Button
               onClick={startTour}
-              className="min-h-[46px] px-6 gap-2.5 rounded-xl bg-[#16a34a] text-xs sm:text-sm font-extrabold text-white shadow-lg shadow-green-600/35 hover:bg-[#15803d] active:bg-[#166534] ring-2 ring-[#22c55e]/70 transition-all cursor-pointer"
+              className="min-h-[46px] px-6 gap-2.5 rounded-xl bg-[#22c55e] hover:bg-[#16a34a] active:bg-[#15803d] text-xs sm:text-sm font-black text-white shadow-[0_4px_22px_rgba(34,197,94,0.7)] ring-2 ring-[#86efac] transition-all cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
+              style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
             >
               <Play className="size-4 fill-white text-white stroke-[2.5]" />
-              <span className="text-white font-extrabold tracking-wide">{t("tour.welcome.cta")}</span>
+              <span className="text-white font-black tracking-wide">{t("tour.welcome.cta")}</span>
             </Button>
           </div>
         </motion.div>
@@ -587,16 +596,16 @@ export function DemoTour({ role }: { role: Role }) {
                 <Button
                   size="sm"
                   onClick={next}
-                  className="min-h-11 px-6 sm:px-7 gap-2.5 rounded-xl bg-[#16a34a] hover:bg-[#15803d] active:bg-[#166534] text-white font-black text-sm tracking-wide shadow-[0_4px_16px_rgba(22,163,74,0.55)] ring-2 ring-[#22c55e] transition-all cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
-                  style={{ backgroundColor: "#16a34a" }}
+                  className="min-h-11 px-6 sm:px-7 gap-2.5 rounded-xl bg-[#22c55e] hover:bg-[#16a34a] active:bg-[#15803d] text-white font-black text-sm tracking-wide shadow-[0_4px_22px_rgba(34,197,94,0.7)] ring-2 ring-[#86efac] transition-all cursor-pointer transform hover:scale-[1.03] active:scale-[0.98]"
+                  style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
                 >
-                  <span className="text-white font-black tracking-wide text-sm drop-shadow-sm">
+                  <span className="text-white font-black tracking-wide text-sm drop-shadow">
                     {isLast ? t("tour.btn.finish") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}
                   </span>
                   {isLast ? (
-                    <CheckCircle2 className="size-4.5 text-white stroke-[3] drop-shadow-sm" />
+                    <CheckCircle2 className="size-5 text-white stroke-[3.5] drop-shadow" />
                   ) : (
-                    <ArrowRight className="size-4.5 text-white stroke-[3] drop-shadow-sm" />
+                    <ArrowRight className="size-5 text-white stroke-[3.5] drop-shadow" />
                   )}
                 </Button>
               </div>
