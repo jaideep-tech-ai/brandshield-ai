@@ -214,7 +214,7 @@ ${tokenSummary ? `#### Approved Visual Tokens:\n${tokenSummary}\n` : ""}
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getSessionUser();
+    const user = await getSessionUser(req);
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -443,7 +443,7 @@ CRITICAL INSTRUCTIONS:
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await getSessionUser();
+    const user = await getSessionUser(req);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
@@ -492,7 +492,7 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const user = await getSessionUser();
+    const user = await getSessionUser(req);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
@@ -524,7 +524,7 @@ export async function DELETE(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const user = await getSessionUser();
+    const user = await getSessionUser(req);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     const { sessionId, title } = (await req.json().catch(() => ({}))) as {

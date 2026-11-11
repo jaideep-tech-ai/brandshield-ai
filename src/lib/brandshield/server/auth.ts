@@ -29,11 +29,33 @@ export function verifySessionToken(token: string | undefined | null): string | n
   }
 }
 
-export async function getSessionUser(): Promise<SessionUser | null> {
-  const store = await cookies();
-  let token = store.get(COOKIE_NAME)?.value;
+export async function getSessionUser(req?: Request | { headers?: Headers | { get(name: string): string | null }; cookies?: { get(name: string): { value?: string } | undefined } }): Promise<SessionUser | null> {
+  let token: string | undefined | null = null;
 
-  // Support mobile / Flutter clients passing Authorization: Bearer <token>
+  // 1. Extract from passed request object if available (e.g. NextRequest)
+  if (req) {
+    if ("cookies" in req && typeof (req as { cookies?: { get(k: string): { value?: string } | undefined } }).cookies?.get === "function") {
+      token = (req as { cookies: { get(k: string): { value?: string } | undefined } }).cookies.get(COOKIE_NAME)?.value;
+    }
+    if (!token && req.headers && typeof req.headers.get === "function") {
+      const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.slice(7).trim();
+      }
+    }
+  }
+
+  // 2. Fallback to Next.js cookies()
+  if (!token) {
+    try {
+      const store = await cookies();
+      token = store.get(COOKIE_NAME)?.value;
+    } catch {
+      // headers may throw in non-request contexts
+    }
+  }
+
+  // 3. Fallback to Next.js headers()
   if (!token) {
     try {
       const reqHeaders = await headers();
