@@ -533,3 +533,207 @@ Join our webinar and learn how NimbusPay customers cut failed payments by 40% in
 
   console.log("✅ BrandShield seed complete: Nimbus Labs workspace is ready");
 }
+
+/**
+ * Seeds sample compliance submissions into any empty organization (e.g. self-serve workspaces).
+ * Guarantees that the Findings, Approvals, and Tour views have realistic, interactive data.
+ */
+export async function seedStarterSubmissionsForOrg(orgId: string, authorId?: string): Promise<number> {
+  const existingCount = await db.submission.count({ where: { orgId } });
+  if (existingCount > 0) return existingCount;
+
+  // Resolve author
+  let effectiveAuthorId = authorId;
+  if (!effectiveAuthorId) {
+    const firstUser = await db.user.findFirst({ where: { orgId }, select: { id: true } });
+    if (!firstUser) return 0;
+    effectiveAuthorId = firstUser.id;
+  }
+
+  // 1. Ensure visual tokens exist
+  const tokenCount = await db.visualToken.count({ where: { orgId } });
+  if (tokenCount === 0) {
+    await db.visualToken.createMany({
+      data: [
+        { orgId, tokenType: "color", name: "Shield Teal", value: "#0F766E", secondary: "#F8FAFC", usageNotes: "Primary brand color. Use for headers, CTAs, and key moments." },
+        { orgId, tokenType: "color", name: "Aqua Mint", value: "#14B8A6", secondary: "#0F172A", usageNotes: "Secondary accent. Gradients with Shield Teal only." },
+        { orgId, tokenType: "color", name: "Amber Accent", value: "#F59E0B", secondary: "#0F172A", usageNotes: "Highlight accents, badges, never body text on white." },
+        { orgId, tokenType: "color", name: "Ink", value: "#0F172A", secondary: "#F8FAFC", usageNotes: "Headline text color on light backgrounds." },
+        { orgId, tokenType: "color", name: "Cloud", value: "#F8FAFC", secondary: "#0F172A", usageNotes: "Light section backgrounds." },
+        { orgId, tokenType: "typography", name: "Headings — Geist SemiBold", value: "Geist Sans / 600 / -0.02em tracking", secondary: null, usageNotes: "H1 40–56px, H2 28–36px. Sentence case per STYLE-02." },
+        { orgId, tokenType: "typography", name: "Body — Geist Regular", value: "Geist Sans / 400 / 16–18px / 1.6 line height", secondary: null, usageNotes: "Max 70ch measure." },
+        { orgId, tokenType: "logo", name: "Nimbus Shield Mark", value: SHIELD_LOGO_SVG, secondary: null, usageNotes: "Primary logo. Clear space = 1/2 mark height. Never place on low-contrast backgrounds." },
+      ],
+    });
+  }
+
+  // 2. Ensure guidelines exist
+  const guideCount = await db.guidelineDocument.count({ where: { orgId } });
+  if (guideCount === 0) {
+    const defaultGuides: { title: string; docType: string; content: string }[] = [
+      { title: "Voice & Tone Playbook", docType: "tone", content: VOICE_PLAYBOOK },
+      { title: "Product Facts Datasheet Q3 2025", docType: "datasheet", content: PRODUCT_FACTS },
+      { title: "Trademark & Naming Rules", docType: "trademark", content: TRADEMARK_RULES },
+      { title: "Banned & Restricted Terms", docType: "banned_words", content: BANNED_WORDS },
+      { title: "Terminology List", docType: "terminology", content: TERMINOLOGY },
+    ];
+    for (const g of defaultGuides) {
+      const chunks = chunkDocument(g.content);
+      await db.guidelineDocument.create({
+        data: {
+          orgId,
+          title: g.title,
+          docType: g.docType,
+          content: g.content,
+          sourceName: `${g.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.pdf`,
+          chunkCount: chunks.length,
+          chunks: {
+            create: chunks.map((c) => ({
+              orgId,
+              chunkIndex: c.chunkIndex,
+              text: c.text,
+              ruleTag: c.ruleTag,
+              keywords: c.keywords,
+            })),
+          },
+        },
+      });
+    }
+  }
+
+  // 3. Submission 1: Draft with critical claims & AI suggestion (hero copy)
+  const s1Content = `Introducing the Spring Boost Campaign!
+
+Our new merchants see 10x ROI in 7 days — guaranteed. nimbuspay is the world's best payment platform!!! Sign up TODAY and enjoy risk-free onboarding.
+
+We process 180+ currencies and settle funds instantly. Trusted by over 50,000 merchants across 120 countries since 2019.`;
+
+  const s1 = await db.submission.create({
+    data: {
+      orgId,
+      authorId: effectiveAuthorId,
+      title: "Spring Boost Campaign — Email Hero",
+      contentType: "text",
+      content: s1Content,
+      status: "draft",
+      complianceScore: 37,
+      scanCount: 1,
+      department: "Marketing",
+      creatorNote: "Hero copy for the spring re-engagement email. Needs pre-flight check.",
+    },
+  });
+  await db.revision.create({ data: { submissionId: s1.id, version: 1, content: s1Content, changeSummary: "Initial draft", authorId: effectiveAuthorId } });
+  await db.inspection.create({
+    data: {
+      submissionId: s1.id,
+      durationMs: 6420,
+      complianceScore: 37,
+      stageA: JSON.stringify({
+        durationMs: 1.8,
+        bannedTerms: [
+          { term: "guaranteed", index: 62, excerpt: "10x ROI in 7 days — guaranteed" },
+          { term: "world's best", index: 118, excerpt: "nimbuspay is the world's best payment platform" },
+          { term: "risk-free", index: 178, excerpt: "enjoy risk-free onboarding" },
+        ],
+        trademarkIssues: [{ brand: "NimbusPay", expectedGlyph: "®", index: 97, excerpt: "nimbuspay is the world's best payment platform" }],
+        claimCandidates: [
+          "Our new merchants see 10x ROI in 7 days — guaranteed.",
+          "We process 180+ currencies and settle funds instantly.",
+          "Trusted by over 50,000 merchants across 120 countries since 2019.",
+        ],
+        hexCodesFound: [],
+        styleIssues: [{ type: "excessive-punctuation", excerpt: "!!!", detail: "Repeated exclamation marks read as hype; brand voice prefers confident, measured statements." }],
+        checks: [
+          { name: "Banned terms", passed: false, count: 3, ms: 0.21 },
+          { name: "Trademark glyphs", passed: false, count: 1, ms: 0.14 },
+          { name: "Claim candidates", passed: true, count: 3, ms: 0.42 },
+          { name: "Hex discovery", passed: true, count: 0, ms: 0.05 },
+          { name: "Style mechanics", passed: false, count: 1, ms: 0.33 },
+        ],
+      }),
+      stageB: JSON.stringify({
+        durationMs: 6418,
+        tone: {
+          score: 41,
+          voiceSummary: "Copy leans heavily on hype, urgency and unverified superlatives — far from the friendly-expert voice.",
+          driftFlags: [{ phrase: "Sign up TODAY", reason: "Urgency pressure tactic with all-caps shouting.", suggestion: "Sign up today" }],
+        },
+        claimVerdicts: [
+          { claim: "Our new merchants see 10x ROI in 7 days — guaranteed.", verdict: "UNSUPPORTED", citation: "FACT PD-10: The company does NOT publish average merchant ROI figures. No ROI multiplier claims are approved for any channel.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "No approved ROI multiplier exists; an explicit guarantee also breaches VOICE-04.", suggestion: "Our new merchants typically recover 11.4% more failed payments with Smart Retries." },
+          { claim: "We process 180+ currencies and settle funds instantly.", verdict: "UNSUPPORTED", citation: "FACT PD-01: NimbusPay processes payments in 32 currencies across 14 markets. FACT PD-02: Standard settlement time is 2 business days.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "Currency count and settlement speed contradict the approved datasheet.", suggestion: "We process payments in 32 currencies and settle funds in 2 business days." },
+        ],
+        vision: null,
+      }),
+    },
+  });
+  await db.finding.createMany({
+    data: [
+      { submissionId: s1.id, severity: "critical", category: "claim", flaggedText: "Our new merchants see 10x ROI in 7 days — guaranteed.", ruleCitation: "FACT PD-10: The company does NOT publish average merchant ROI figures.", sourceDoc: "Product Facts Datasheet Q3 2025", rationale: "No approved ROI multiplier exists; an explicit guarantee also breaches VOICE-04.", suggestion: "Our new merchants typically recover 11.4% more failed payments with Smart Retries.", stage: "ai" },
+      { submissionId: s1.id, severity: "warning", category: "trademark", flaggedText: "nimbuspay", ruleCitation: "RULE TM-01: Master brand must be written camel-case with the ® glyph.", sourceDoc: "Trademark & Naming Rules", rationale: "Brand appears lowercase and missing required ® registration mark.", suggestion: "NimbusPay®", stage: "deterministic" },
+      { submissionId: s1.id, severity: "warning", category: "style", flaggedText: "guaranteed", ruleCitation: "Banned Terms — term is prohibited in external marketing copy", sourceDoc: "Banned & Restricted Terms", rationale: "\"guaranteed\" risks deceptive marketing scrutiny.", stage: "deterministic" },
+    ],
+  });
+
+  // 4. Submission 2: Social Banner with WCAG contrast findings
+  const s2 = await db.submission.create({
+    data: {
+      orgId,
+      authorId: effectiveAuthorId,
+      title: "Summer Splash — Social Banner",
+      contentType: "banner",
+      content: "Summer Splash Sale — Up to 30% off NimbusPay fees for new merchants!",
+      imageData: "/banners/summer-splash.png",
+      imagePalette: JSON.stringify(["#FCE7F3", "#7C3AED", "#A78BFA", "#111827"]),
+      status: "draft",
+      complianceScore: 55,
+      scanCount: 1,
+      department: "Design Agency",
+      creatorNote: "Instagram promo banner for the summer campaign.",
+    },
+  });
+  await db.inspection.create({
+    data: {
+      submissionId: s2.id,
+      durationMs: 7340,
+      complianceScore: 55,
+      stageA: JSON.stringify({ durationMs: 1.1, bannedTerms: [], trademarkIssues: [], claimCandidates: ["Summer Splash Sale — Up to 30% off NimbusPay fees for new merchants!"], hexCodesFound: ["#7C3AED"], styleIssues: [], checks: [] }),
+      stageB: JSON.stringify({
+        durationMs: 7338,
+        tone: null,
+        claimVerdicts: [],
+        vision: {
+          dominantColors: ["#FCE7F3", "#7C3AED", "#A78BFA", "#111827"],
+          offBrandColors: ["#7C3AED", "#A78BFA", "#FCE7F3"],
+          contrastIssues: [{ foreground: "#A78BFA", background: "#FCE7F3", ratio: 2.1, requirement: "WCAG 2.1 AA requires ≥ 4.5:1 for normal text" }],
+          logoPresent: false,
+          ocrText: "Summer Splash Sale — Up to 30% off NimbusPay fees for new merchants!",
+          summary: "Banner uses an off-brand purple/violet palette outside the approved tokens.",
+        },
+      }),
+    },
+  });
+  await db.finding.createMany({
+    data: [
+      { submissionId: s2.id, severity: "critical", category: "visual", flaggedText: "Text #A78BFA on #FCE7F3", ruleCitation: "WCAG 2.1 AA — contrast ratio must be ≥ 4.5:1 (measured 2.1:1)", sourceDoc: "Accessibility & Visual Tokens", rationale: "Foreground #A78BFA on background #FCE7F3 yields only 2.1:1, below the 4.5:1 AA threshold.", suggestion: "Use #0F172A text on #FCE7F3 for guaranteed AA compliance.", suggestedHex: "#0F172A", stage: "vision" },
+      { submissionId: s2.id, severity: "warning", category: "visual", flaggedText: "#7C3AED", ruleCitation: "Visual Token Registry — only approved hex values may appear in creative assets", sourceDoc: "Visual Token Registry", rationale: "#7C3AED is not part of the approved palette. Nearest official token is #0F766E (Shield Teal).", suggestion: "Replace #7C3AED with #0F766E", suggestedHex: "#0F766E", stage: "vision" },
+    ],
+  });
+
+  // 5. Submission 3: Approved submission
+  await db.submission.create({
+    data: {
+      orgId,
+      authorId: effectiveAuthorId,
+      title: "SmartRetries Launch Note",
+      contentType: "text",
+      content: "NimbusPay® Smart Retries recovers failed payments automatically. Setup takes minutes in your workspace.",
+      status: "approved",
+      complianceScore: 100,
+      scanCount: 3,
+      department: "Content Studio",
+      creatorNote: "Launch note for merchant newsletter.",
+    },
+  });
+
+  return 3;
+}

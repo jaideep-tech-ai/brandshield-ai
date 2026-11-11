@@ -456,8 +456,11 @@ export function useUpdateTourState() {
       restart?: boolean;
       reset?: boolean;
     }) => api.post<{ ok: boolean; state: Partial<TourStateData> }>("/api/user/tour", update),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["user-tour-state"] });
+    onSuccess: (_, variables) => {
+      // Only invalidate on terminal / reset / dismiss states to avoid racing intermediate steps
+      if (variables.reset || variables.completed || variables.dismissed) {
+        qc.invalidateQueries({ queryKey: ["user-tour-state"] });
+      }
     },
   });
 }

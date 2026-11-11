@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -162,6 +162,7 @@ export function DemoTour({ role }: { role: Role }) {
   const [showWelcome, setShowWelcome] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const hasHydratedRef = useRef(false);
 
   // Detect mobile viewport (breakpoint aligned with mobile bottom nav at md)
   useEffect(() => {
@@ -177,21 +178,33 @@ export function DemoTour({ role }: { role: Role }) {
   const step = steps[Math.min(stepIndex, steps.length - 1)];
   const roleLabel = t(`common.role.${role}`);
 
-  // Restore step from database on initial load if present
+  // Restore step from database on initial mount only once (prevents tour from repeatedly popping up)
   useEffect(() => {
-    if (!tourStateQuery.data) return;
+    if (!tourStateQuery.data || hasHydratedRef.current) return;
+    hasHydratedRef.current = true;
     const s = tourStateQuery.data;
+
+    const isSessionDismissed =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("brandshield:tour-dismissed") === "true";
+
+    if (isSessionDismissed) return;
+
+    if (s.completed || s.dismissed || s.paused) {
+      // User has already completed, dismissed, or paused the tour — do not re-show automatically
+      return;
+    }
+
     const timer = setTimeout(() => {
-      if (!s.completed && !s.dismissed && !s.paused && typeof s.stepIndex === "number") {
+      if (typeof s.stepIndex === "number" && s.stepIndex > 0) {
         setStepIndex(s.stepIndex);
-      }
-      // If user never completed or dismissed, show welcome screen on first visit
-      if (!s.completed && !s.dismissed && s.stepIndex === 0 && !tourOpen) {
+        setTourOpen(true);
+      } else if (s.stepIndex === 0 && !tourOpen) {
         setShowWelcome(true);
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [tourStateQuery.data, tourOpen]);
+  }, [tourStateQuery.data, tourOpen, setTourOpen]);
 
   // Save progress to DB when stepIndex changes
   const saveStepToDb = useCallback(
@@ -208,6 +221,9 @@ export function DemoTour({ role }: { role: Role }) {
   );
 
   const finish = useCallback(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("brandshield:tour-dismissed", "true");
+    }
     saveStepToDb(steps.length, true, false, false);
     setTourOpen(false);
     setShowWelcome(false);
@@ -216,18 +232,28 @@ export function DemoTour({ role }: { role: Role }) {
   }, [steps.length, saveStepToDb, setTourOpen, setView, t]);
 
   const pauseTour = useCallback(() => {
-    saveStepToDb(stepIndex, false, true, false);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("brandshield:tour-dismissed", "true");
+    }
+    setShowWelcome(false);
     setTourOpen(false);
+    saveStepToDb(stepIndex, false, true, false);
     toast.info(lang === "hi" ? "टूर रोक दिया गया है। हेडर से कभी भी फिर शुरू करें।" : "Tour paused. Resume anytime from the Tour button in the header.");
   }, [stepIndex, saveStepToDb, setTourOpen, lang]);
 
   const skipTour = useCallback(() => {
-    saveStepToDb(stepIndex, false, false, true);
-    setTourOpen(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("brandshield:tour-dismissed", "true");
+    }
     setShowWelcome(false);
+    setTourOpen(false);
+    saveStepToDb(stepIndex, false, false, true);
   }, [stepIndex, saveStepToDb, setTourOpen]);
 
   const startTour = useCallback(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brandshield:tour-dismissed");
+    }
     setShowWelcome(false);
     setStepIndex(0);
     setTourOpen(true);
@@ -235,9 +261,12 @@ export function DemoTour({ role }: { role: Role }) {
   }, [setTourOpen, saveStepToDb]);
 
   const restartTour = useCallback(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brandshield:tour-dismissed");
+    }
     setStepIndex(0);
-    setShowWelcome(true);
-    setTourOpen(false);
+    setShowWelcome(false);
+    setTourOpen(true);
     updateTourState.mutate({ reset: true });
     toast.info(lang === "hi" ? "टूर रीसेट हो गया है।" : "Tour reset. Starting fresh from onboarding.");
   }, [setTourOpen, updateTourState, lang]);
@@ -245,6 +274,9 @@ export function DemoTour({ role }: { role: Role }) {
   // Listen for shell trigger
   useEffect(() => {
     const handler = () => {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("brandshield:tour-dismissed");
+      }
       setStepIndex(0);
       setShowWelcome(false);
       setTourOpen(true);
@@ -424,10 +456,10 @@ export function DemoTour({ role }: { role: Role }) {
             </Button>
             <Button
               onClick={startTour}
-              className="min-h-[44px] px-5 gap-2 rounded-xl bg-emerald-600 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-700/25 hover:bg-emerald-700 active:bg-emerald-800 ring-1 ring-emerald-500 transition-all"
+              className="min-h-[46px] px-6 gap-2.5 rounded-xl bg-[#16a34a] text-xs sm:text-sm font-extrabold text-white shadow-lg shadow-green-600/35 hover:bg-[#15803d] active:bg-[#166534] ring-2 ring-[#22c55e]/70 transition-all cursor-pointer"
             >
-              <Play className="size-4 fill-white" />
-              <span>{t("tour.welcome.cta")}</span>
+              <Play className="size-4 fill-white text-white stroke-[2.5]" />
+              <span className="text-white font-extrabold tracking-wide">{t("tour.welcome.cta")}</span>
             </Button>
           </div>
         </motion.div>
@@ -581,10 +613,16 @@ export function DemoTour({ role }: { role: Role }) {
                 <Button
                   size="sm"
                   onClick={next}
-                  className="min-h-9 sm:min-h-10 px-4 sm:px-5 gap-1.5 sm:gap-2 rounded-xl bg-emerald-600 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-700/25 hover:bg-emerald-700 active:bg-emerald-800 ring-1 ring-emerald-500 transition-all"
+                  className="min-h-10 sm:min-h-11 px-5 sm:px-6 gap-2 rounded-xl bg-[#16a34a] text-xs sm:text-sm font-extrabold text-white shadow-lg shadow-green-600/35 hover:bg-[#15803d] active:bg-[#166534] ring-2 ring-[#22c55e]/70 transition-all cursor-pointer"
                 >
-                  <span>{isLast ? t("tour.btn.finish") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}</span>
-                  {isLast ? <CheckCircle2 className="size-4" /> : <ArrowRight className="size-4" />}
+                  <span className="text-white font-extrabold tracking-wide">
+                    {isLast ? t("tour.btn.finish") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}
+                  </span>
+                  {isLast ? (
+                    <CheckCircle2 className="size-4 text-white stroke-[2.5]" />
+                  ) : (
+                    <ArrowRight className="size-4 text-white stroke-[2.5]" />
+                  )}
                 </Button>
               </div>
             </div>

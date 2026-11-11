@@ -25,6 +25,8 @@ import {
   AlertTriangle,
   UploadCloud,
   ImageIcon,
+  ScanSearch,
+  Sparkles,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -176,10 +178,42 @@ export function FindingsView() {
         <ContextualHelpButton guideKey="findings" labelKey="help.needHelp.findings" className="hidden sm:inline-flex shrink-0" />
       </div>
 
-      {isLoading || !sub ? (
-        <div className="flex h-64 items-center justify-center text-slate-400">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("findings.loading")}
+      {submissions.isLoading || (!!selectedId && isLoading) ? (
+        <div className="flex h-64 flex-col items-center justify-center text-slate-400 gap-2">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+          <span className="text-xs sm:text-sm font-medium">{t("findings.loading")}</span>
         </div>
+      ) : (submissions.data ?? []).length === 0 || !sub ? (
+        <Card className="border-dashed border-slate-200 bg-white/70 p-8 sm:p-12 text-center shadow-xs">
+          <CardContent className="flex flex-col items-center justify-center p-0">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80">
+              <ScanSearch className="size-7" />
+            </div>
+            <h3 className="mt-4 text-base sm:text-lg font-bold text-slate-900">
+              {t("findings.submissions.empty")}
+            </h3>
+            <p className="mt-1.5 max-w-md text-xs sm:text-sm leading-relaxed text-slate-500">
+              This workspace has no scanned assets yet. Run a pre-flight scan on marketing copy or UI assets, or refresh to load sample compliance demo submissions.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Button
+                onClick={() => useUIStore.getState().setView("scanner")}
+                className="min-h-10 px-5 gap-2 rounded-xl bg-[#16a34a] text-xs sm:text-sm font-bold text-white shadow-md shadow-green-700/25 hover:bg-[#15803d]"
+              >
+                <ScanSearch className="size-4" />
+                <span>Start New Pre-Flight Scan</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void submissions.refetch()}
+                className="min-h-10 px-4 gap-2 rounded-xl border-slate-200 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Sparkles className="size-4 text-emerald-600" />
+                <span>Load Sample Compliance Demo</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* ── Left pane: annotated content ── */}
