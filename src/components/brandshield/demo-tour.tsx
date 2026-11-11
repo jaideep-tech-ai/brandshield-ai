@@ -63,83 +63,44 @@ interface TourStep {
   bodyKey: string;
 }
 
-// ─── Four Detailed Role-Based Tours ──────────────────────────────────────────
+// ─── Four Streamlined, Crisp Role-Based Tours (5 Steps Each) ─────────────────
 
 function buildSteps(role: Role): TourStep[] {
   switch (role) {
     case "admin":
       return [
-        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.admin.s1.title", bodyKey: "tour.admin.s1.body" },
-        { view: "dashboard", target: "[data-tour='kpi']", icon: Gauge, titleKey: "tour.admin.s2.title", bodyKey: "tour.admin.s2.body" },
-        { view: "settings", target: "[data-tour='page-root']", icon: Settings, titleKey: "tour.admin.s3.title", bodyKey: "tour.admin.s3.body" },
-        { view: "settings", target: "[data-tour='page-root']", icon: Users, titleKey: "tour.admin.s4.title", bodyKey: "tour.admin.s4.body" },
-        { view: "settings", target: "[data-tour='page-root']", icon: UserCheck, titleKey: "tour.admin.s5.title", bodyKey: "tour.admin.s5.body" },
-        { view: "settings", target: "[data-tour='page-root']", icon: ShieldCheck, titleKey: "tour.admin.s6.title", bodyKey: "tour.admin.s6.body" },
-        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.admin.s7.title", bodyKey: "tour.admin.s7.body" },
-        { view: "knowledge", target: "[data-tour='page-root']", icon: Palette, titleKey: "tour.admin.s8.title", bodyKey: "tour.admin.s8.body" },
-        { view: "integrations", target: "[data-tour='page-root']", icon: BookOpen, titleKey: "tour.admin.s9.title", bodyKey: "tour.admin.s9.body" },
-        { view: "integrations", target: "[data-tour='page-root']", icon: Layers, titleKey: "tour.admin.s10.title", bodyKey: "tour.admin.s10.body" },
-        { view: "integrations", target: "[data-tour='page-root']", icon: FolderGit2, titleKey: "tour.admin.s11.title", bodyKey: "tour.admin.s11.body" },
-        { view: "scanner", target: "[data-tour='page-root']", icon: ScanSearch, titleKey: "tour.admin.s12.title", bodyKey: "tour.admin.s12.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.admin.s13.title", bodyKey: "tour.admin.s13.body" },
-        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.admin.s14.title", bodyKey: "tour.admin.s14.body" },
-        { view: "analytics", target: "[data-tour='page-root']", icon: BarChart3, titleKey: "tour.admin.s15.title", bodyKey: "tour.admin.s15.body" },
-        { view: "settings", target: "[data-tour='page-root']", icon: HeartPulse, titleKey: "tour.admin.s16.title", bodyKey: "tour.admin.s16.body" },
-        { view: "copilot", target: "[data-tour='page-root']", icon: Sparkles, titleKey: "tour.admin.s17.title", bodyKey: "tour.admin.s17.body" },
+        { view: "dashboard", target: "[data-tour='kpi']", icon: Gauge, titleKey: "tour.admin.s1.title", bodyKey: "tour.admin.s1.body" },
+        { view: "knowledge", target: null, icon: Database, titleKey: "tour.admin.s2.title", bodyKey: "tour.admin.s2.body" },
+        { view: "scanner", target: null, icon: ScanSearch, titleKey: "tour.admin.s3.title", bodyKey: "tour.admin.s3.body" },
+        { view: "findings", target: null, icon: FileSearch, titleKey: "tour.admin.s4.title", bodyKey: "tour.admin.s4.body" },
+        { view: "approvals", target: null, icon: ClipboardCheck, titleKey: "tour.admin.s5.title", bodyKey: "tour.admin.s5.body" },
       ];
 
     case "reviewer":
       return [
-        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.reviewer.s1.title", bodyKey: "tour.reviewer.s1.body" },
-        { view: "dashboard", target: "[data-tour='queue']", icon: ListOrdered, titleKey: "tour.reviewer.s2.title", bodyKey: "tour.reviewer.s2.body" },
-        { view: "dashboard", target: "[data-tour='risk']", icon: Radar, titleKey: "tour.reviewer.s3.title", bodyKey: "tour.reviewer.s3.body" },
-        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.reviewer.s4.title", bodyKey: "tour.reviewer.s4.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.reviewer.s5.title", bodyKey: "tour.reviewer.s5.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: ShieldAlert, titleKey: "tour.reviewer.s6.title", bodyKey: "tour.reviewer.s6.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: Eye, titleKey: "tour.reviewer.s7.title", bodyKey: "tour.reviewer.s7.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: Flag, titleKey: "tour.reviewer.s8.title", bodyKey: "tour.reviewer.s8.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: BookOpen, titleKey: "tour.reviewer.s9.title", bodyKey: "tour.reviewer.s9.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: Wand2, titleKey: "tour.reviewer.s10.title", bodyKey: "tour.reviewer.s10.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: CheckCircle2, titleKey: "tour.reviewer.s11.title", bodyKey: "tour.reviewer.s11.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: ShieldCheck, titleKey: "tour.reviewer.s12.title", bodyKey: "tour.reviewer.s12.body" },
-        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.reviewer.s13.title", bodyKey: "tour.reviewer.s13.body" },
-        { view: "approvals", target: "[data-tour='page-root']", icon: GitBranch, titleKey: "tour.reviewer.s14.title", bodyKey: "tour.reviewer.s14.body" },
-        { view: "copilot", target: "[data-tour='page-root']", icon: Sparkles, titleKey: "tour.reviewer.s15.title", bodyKey: "tour.reviewer.s15.body" },
+        { view: "dashboard", target: "[data-tour='queue']", icon: ListOrdered, titleKey: "tour.reviewer.s1.title", bodyKey: "tour.reviewer.s1.body" },
+        { view: "knowledge", target: null, icon: Database, titleKey: "tour.reviewer.s2.title", bodyKey: "tour.reviewer.s2.body" },
+        { view: "findings", target: null, icon: FileSearch, titleKey: "tour.reviewer.s3.title", bodyKey: "tour.reviewer.s3.body" },
+        { view: "findings", target: null, icon: Wand2, titleKey: "tour.reviewer.s4.title", bodyKey: "tour.reviewer.s4.body" },
+        { view: "approvals", target: null, icon: ClipboardCheck, titleKey: "tour.reviewer.s5.title", bodyKey: "tour.reviewer.s5.body" },
       ];
 
     case "creator":
       return [
-        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.creator.s1.title", bodyKey: "tour.creator.s1.body" },
-        { view: "dashboard", target: "[data-tour='composer']", icon: PenLine, titleKey: "tour.creator.s2.title", bodyKey: "tour.creator.s2.body" },
-        { view: "dashboard", target: "[data-tour='pipeline']", icon: GitBranch, titleKey: "tour.creator.s3.title", bodyKey: "tour.creator.s3.body" },
-        { view: "dashboard", target: "[data-tour='attention']", icon: Flag, titleKey: "tour.creator.s4.title", bodyKey: "tour.creator.s4.body" },
-        { view: "dashboard", target: "[data-tour='composer']", icon: Palette, titleKey: "tour.creator.s5.title", bodyKey: "tour.creator.s5.body" },
-        { view: "integrations", target: "[data-tour='page-root']", icon: Blocks, titleKey: "tour.creator.s6.title", bodyKey: "tour.creator.s6.body" },
-        { view: "integrations", target: "[data-tour='page-root']", icon: BookOpen, titleKey: "tour.creator.s7.title", bodyKey: "tour.creator.s7.body" },
-        { view: "integrations", target: "[data-tour='page-root']", icon: Layers, titleKey: "tour.creator.s8.title", bodyKey: "tour.creator.s8.body" },
-        { view: "scanner", target: "[data-tour='page-root']", icon: ScanSearch, titleKey: "tour.creator.s9.title", bodyKey: "tour.creator.s9.body" },
-        { view: "scanner", target: "[data-tour='page-root']", icon: Gauge, titleKey: "tour.creator.s10.title", bodyKey: "tour.creator.s10.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.creator.s11.title", bodyKey: "tour.creator.s11.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: Wand2, titleKey: "tour.creator.s12.title", bodyKey: "tour.creator.s12.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: CheckCircle2, titleKey: "tour.creator.s13.title", bodyKey: "tour.creator.s13.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.creator.s14.title", bodyKey: "tour.creator.s14.body" },
-        { view: "copilot", target: "[data-tour='page-root']", icon: Sparkles, titleKey: "tour.creator.s15.title", bodyKey: "tour.creator.s15.body" },
+        { view: "dashboard", target: "[data-tour='composer']", icon: PenLine, titleKey: "tour.creator.s1.title", bodyKey: "tour.creator.s1.body" },
+        { view: "scanner", target: null, icon: ScanSearch, titleKey: "tour.creator.s2.title", bodyKey: "tour.creator.s2.body" },
+        { view: "findings", target: null, icon: FileSearch, titleKey: "tour.creator.s3.title", bodyKey: "tour.creator.s3.body" },
+        { view: "approvals", target: null, icon: ClipboardCheck, titleKey: "tour.creator.s4.title", bodyKey: "tour.creator.s4.body" },
+        { view: "copilot", target: null, icon: Sparkles, titleKey: "tour.creator.s5.title", bodyKey: "tour.creator.s5.body" },
       ];
 
     case "contractor":
       return [
-        { view: "dashboard", target: null, icon: Sparkles, titleKey: "tour.contractor.s1.title", bodyKey: "tour.contractor.s1.body" },
-        { view: "dashboard", target: "[data-tour='sandbox-hero']", icon: Lock, titleKey: "tour.contractor.s2.title", bodyKey: "tour.contractor.s2.body" },
-        { view: "knowledge", target: "[data-tour='page-root']", icon: Database, titleKey: "tour.contractor.s3.title", bodyKey: "tour.contractor.s3.body" },
-        { view: "scanner", target: "[data-tour='page-root']", icon: ScanSearch, titleKey: "tour.contractor.s4.title", bodyKey: "tour.contractor.s4.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: FileSearch, titleKey: "tour.contractor.s5.title", bodyKey: "tour.contractor.s5.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: ShieldAlert, titleKey: "tour.contractor.s6.title", bodyKey: "tour.contractor.s6.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: Palette, titleKey: "tour.contractor.s7.title", bodyKey: "tour.contractor.s7.body" },
-        { view: "findings", target: "[data-tour='page-root']", icon: BookOpen, titleKey: "tour.contractor.s8.title", bodyKey: "tour.contractor.s8.body" },
-        { view: "approvals", target: "[data-tour='page-root']", icon: ClipboardCheck, titleKey: "tour.contractor.s9.title", bodyKey: "tour.contractor.s9.body" },
-        { view: "approvals", target: "[data-tour='page-root']", icon: ShieldCheck, titleKey: "tour.contractor.s10.title", bodyKey: "tour.contractor.s10.body" },
-        { view: "analytics", target: "[data-tour='page-root']", icon: BarChart3, titleKey: "tour.contractor.s11.title", bodyKey: "tour.contractor.s11.body" },
-        { view: "copilot", target: "[data-tour='page-root']", icon: Sparkles, titleKey: "tour.contractor.s12.title", bodyKey: "tour.contractor.s12.body" },
+        { view: "dashboard", target: "[data-tour='sandbox-hero']", icon: Lock, titleKey: "tour.contractor.s1.title", bodyKey: "tour.contractor.s1.body" },
+        { view: "knowledge", target: null, icon: Database, titleKey: "tour.contractor.s2.title", bodyKey: "tour.contractor.s2.body" },
+        { view: "scanner", target: null, icon: ScanSearch, titleKey: "tour.contractor.s3.title", bodyKey: "tour.contractor.s3.body" },
+        { view: "findings", target: null, icon: FileSearch, titleKey: "tour.contractor.s4.title", bodyKey: "tour.contractor.s4.body" },
+        { view: "analytics", target: null, icon: BarChart3, titleKey: "tour.contractor.s5.title", bodyKey: "tour.contractor.s5.body" },
       ];
   }
 }
@@ -174,7 +135,7 @@ export function DemoTour({ role }: { role: Role }) {
 
   const steps = useMemo(() => buildSteps(role), [role]);
   const isLast = stepIndex === steps.length;
-  const total = steps.length + 1;
+  const total = steps.length;
   const step = steps[Math.min(stepIndex, steps.length - 1)];
   const roleLabel = t(`common.role.${role}`);
 
@@ -403,10 +364,14 @@ export function DemoTour({ role }: { role: Role }) {
   const cardStyle: React.CSSProperties | undefined =
     !isMobile && rect
       ? {
+          position: "absolute",
           top: hugeTarget ? Math.max(84, rect.top + 16) : cardBelow ? rect.top + rect.height + 14 : undefined,
           bottom: !hugeTarget && !cardBelow ? window.innerHeight - rect.top + 14 : undefined,
-          left: Math.max(16, Math.min(rect.left + rect.width / 2 - 190, window.innerWidth - 396)),
+          left: Math.max(16, Math.min(rect.left + rect.width / 2 - 205, window.innerWidth - 426)),
+          zIndex: 50,
         }
+      : !isMobile && !rect
+      ? { position: "absolute", zIndex: 50 }
       : undefined;
 
   // 1. First-Time Welcome Modal
@@ -483,7 +448,7 @@ export function DemoTour({ role }: { role: Role }) {
             height: rect.height + 12,
           }}
           transition={{ type: "spring", stiffness: 340, damping: 32 }}
-          className="pointer-events-none absolute rounded-xl border-2 border-emerald-500 shadow-[0_0_0_9999px_rgba(15,23,42,0.55)]"
+          className="pointer-events-none absolute z-20 rounded-xl border-2 border-emerald-400 shadow-[0_0_0_9999px_rgba(15,23,42,0.6)] ring-4 ring-emerald-500/20"
         >
           <motion.span
             className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg"
@@ -496,17 +461,15 @@ export function DemoTour({ role }: { role: Role }) {
       )}
 
       {/* Dimmed backdrop when centered or on mobile */}
-      {(!rect || isMobile) && <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />}
+      {(!rect || isMobile) && <div className="absolute inset-0 z-20 bg-slate-950/65 backdrop-blur-[2px]" />}
 
-      {/* Tour Tooltip Card / Mobile Bottom Sheet */}
+      {/* Tour Tooltip Card / Mobile Bottom Sheet — GUARANTEED Z-50+ ABOVE SPOTLIGHT AND SHADOW */}
       <div
         className={cn(
           isMobile
-            ? "fixed inset-x-0 bottom-0 z-[85] p-3 sm:p-4 pb-[max(16px,env(safe-area-inset-bottom))] pointer-events-auto"
-            : cn(
-                "z-[85] w-[390px] max-w-[calc(100vw-24px)] pointer-events-auto",
-                !rect && "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-              )
+            ? "fixed inset-x-0 bottom-0 z-50 p-3 sm:p-4 pb-[max(16px,env(safe-area-inset-bottom))] pointer-events-auto"
+            : "absolute z-50 w-[410px] max-w-[calc(100vw-32px)] pointer-events-auto",
+          !rect && !isMobile && "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
         )}
         style={cardStyle}
       >
@@ -517,7 +480,7 @@ export function DemoTour({ role }: { role: Role }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: isMobile ? 18 : -8, scale: isMobile ? 1 : 0.98 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="w-full max-w-lg mx-auto rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4.5 sm:p-5 shadow-2xl shadow-slate-950/25"
+            className="w-full max-w-lg mx-auto rounded-2xl sm:rounded-3xl border-2 border-emerald-500/25 bg-white p-5 sm:p-6 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5),0_0_0_1px_rgba(0,0,0,0.08)] ring-1 ring-black/5"
           >
             {/* Grab handle for mobile touch bottom sheet */}
             {isMobile && (
@@ -571,12 +534,12 @@ export function DemoTour({ role }: { role: Role }) {
             <div className="mt-3.5 sm:mt-4 space-y-1.5">
               <div className="flex items-center justify-between text-[10px] sm:text-xs font-medium text-slate-400">
                 <span>{roleLabel} Tour</span>
-                <span>{Math.round(((stepIndex + 1) / total) * 100)}%</span>
+                <span>{Math.round(((stepIndex + (isLast ? 0 : 1)) / total) * 100)}%</span>
               </div>
-              <Progress value={((stepIndex + 1) / total) * 100} className="h-1.5 sm:h-2 bg-slate-100" />
+              <Progress value={Math.min(100, Math.round(((stepIndex + (isLast ? 0 : 1)) / total) * 100))} className="h-1.5 sm:h-2 bg-slate-100" />
             </div>
 
-            {/* Action Buttons with Vibrant Emerald Green CTA */}
+            {/* Action Buttons with Vibrant Glowing Emerald Green CTA */}
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 sm:pt-3.5">
               <div className="flex items-center gap-1">
                 <Button
@@ -613,15 +576,16 @@ export function DemoTour({ role }: { role: Role }) {
                 <Button
                   size="sm"
                   onClick={next}
-                  className="min-h-10 sm:min-h-11 px-5 sm:px-6 gap-2 rounded-xl bg-[#16a34a] text-xs sm:text-sm font-extrabold text-white shadow-lg shadow-green-600/35 hover:bg-[#15803d] active:bg-[#166534] ring-2 ring-[#22c55e]/70 transition-all cursor-pointer"
+                  className="min-h-11 px-6 sm:px-7 gap-2.5 rounded-xl bg-[#16a34a] hover:bg-[#15803d] active:bg-[#166534] text-white font-black text-sm tracking-wide shadow-[0_4px_16px_rgba(22,163,74,0.55)] ring-2 ring-[#22c55e] transition-all cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
+                  style={{ backgroundColor: "#16a34a" }}
                 >
-                  <span className="text-white font-extrabold tracking-wide">
+                  <span className="text-white font-black tracking-wide text-sm drop-shadow-sm">
                     {isLast ? t("tour.btn.finish") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}
                   </span>
                   {isLast ? (
-                    <CheckCircle2 className="size-4 text-white stroke-[2.5]" />
+                    <CheckCircle2 className="size-4.5 text-white stroke-[3] drop-shadow-sm" />
                   ) : (
-                    <ArrowRight className="size-4 text-white stroke-[2.5]" />
+                    <ArrowRight className="size-4.5 text-white stroke-[3] drop-shadow-sm" />
                   )}
                 </Button>
               </div>
