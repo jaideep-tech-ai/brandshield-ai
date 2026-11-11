@@ -3,9 +3,9 @@ import { db } from "@/lib/db";
 import { getSessionUser, requireRole, requireUser } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(req);
     const tokens = await db.visualToken.findMany({
       where: { orgId: user.orgId },
       orderBy: { createdAt: "asc" },

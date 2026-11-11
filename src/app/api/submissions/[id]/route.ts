@@ -3,9 +3,9 @@ import { db } from "@/lib/db";
 import { getSessionUser, requireUser } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(req);
     const { id } = await params;
     const sub = await db.submission.findUnique({
       where: { id },

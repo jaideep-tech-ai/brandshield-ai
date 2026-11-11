@@ -4,9 +4,9 @@ import { getSessionUser, requireUser, requireRole } from "@/lib/brandshield/serv
 import { chunkDocument } from "@/lib/brandshield/server/engine";
 import { jsonError } from "@/lib/brandshield/server/json";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(req);
     const docs = await db.guidelineDocument.findMany({
       where: { orgId: user.orgId },
       orderBy: { createdAt: "desc" },

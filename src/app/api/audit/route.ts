@@ -5,7 +5,7 @@ import { jsonError } from "@/lib/brandshield/server/json";
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(req);
     const submissionId = req.nextUrl.searchParams.get("submissionId");
     const logs = await db.auditLog.findMany({
       where: {

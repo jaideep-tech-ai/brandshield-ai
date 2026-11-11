@@ -1,12 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
 import type { AnalyticsPayload, Finding, Severity, SubmissionStatus } from "@/lib/brandshield/types";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(req);
     const [submissions, findings, auditLogs] = await Promise.all([
       db.submission.findMany({
         where: { orgId: user.orgId },

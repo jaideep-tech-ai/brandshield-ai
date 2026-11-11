@@ -5,9 +5,9 @@ import { appendAuditLog } from "@/lib/brandshield/server/engine";
 import { jsonError } from "@/lib/brandshield/server/json";
 import { seedStarterSubmissionsForOrg } from "@/lib/brandshield/server/seed";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(req);
     // Auto-seed sample compliance submissions if org is newly provisioned / empty
     let subs = await db.submission.findMany({
       where: { orgId: user.orgId },

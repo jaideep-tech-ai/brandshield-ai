@@ -8,9 +8,9 @@ import { jsonError } from "@/lib/brandshield/server/json";
 // (deterministic stage + grounded LLM + vision) typically finishes in ~15s.
 export const maxDuration = 60;
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireUser();
+    const user = await requireUser(req);
     requireRole(user, "creator", "contractor", "admin", "reviewer");
     const { id } = await params;
     const sub = await db.submission.findUnique({ where: { id } });

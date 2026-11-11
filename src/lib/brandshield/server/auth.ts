@@ -95,8 +95,8 @@ export async function getSessionUser(req?: Request | { headers?: Headers | { get
   };
 }
 
-export async function requireUser(): Promise<SessionUser> {
-  const user = await getSessionUser();
+export async function requireUser(req?: Request | { headers?: Headers | { get(name: string): string | null }; cookies?: { get(name: string): { value?: string } | undefined } }): Promise<SessionUser> {
+  const user = await getSessionUser(req);
   if (!user) throw new HttpError(401, "Not authenticated");
   return user;
 }
