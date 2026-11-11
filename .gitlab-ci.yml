@@ -25,9 +25,9 @@ brandshield-governance-audit:
       echo "Commit:  $CI_COMMIT_SHA ($CI_COMMIT_REF_NAME)"
       echo "Author:  $CI_COMMIT_AUTHOR"
 
-      # Sanitize commit message and title to ensure valid JSON payload
-      CLEAN_TITLE=$(printf '%s' "${CI_COMMIT_TITLE:-GitLab Commit}" | tr -d '\r\n"' | sed 's/\\/\\\\/g')
-      CLEAN_MSG=$(printf '%s' "${CI_COMMIT_MESSAGE:-Pre-publishing commit}" | tr '\r\n' '  ' | sed 's/"/\\"/g' | sed 's/\\/\\\\/g')
+      # Sanitize commit message and title with correct escape order (backslash FIRST, then quotes)
+      CLEAN_TITLE=$(printf '%s' "${CI_COMMIT_TITLE:-GitLab Commit}" | tr -d '\r\n' | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
+      CLEAN_MSG=$(printf '%s' "${CI_COMMIT_MESSAGE:-Pre-publishing commit}" | tr '\r\n' '  ' | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
       if [ -z "$CLEAN_TITLE" ]; then CLEAN_TITLE="GitLab Push"; fi
       if [ -z "$CLEAN_MSG" ]; then CLEAN_MSG="Automated pre-publish commit"; fi
 
@@ -65,9 +65,15 @@ unit-tests:
     - if: $CI_PIPELINE_SOURCE == "push"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
+    - apk add --no-cache openssl
     - bun install --frozen-lockfile || bun install
+    - DATABASE_URL="file:./test.db" bun x prisma generate --schema prisma/schema.prisma
+    - bun x prisma validate --schema prisma/schema.prisma
+    - bun x prisma validate --schema prisma/schema.postgres.prisma
+    - DATABASE_URL="file:./test.db" bun x prisma db push --schema prisma/schema.prisma --skip-generate
   script:
-    - bun scripts/verify-features.mjs
+    - bun x tsc --noEmit
+    - DATABASE_URL="file:./test.db" bun scripts/verify-features.mjs
 
 # ── Stage 3: Next.js Production Build Validation ──────────────────────────────
 production-build:
@@ -76,7 +82,9 @@ production-build:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
   before_script:
+    - apk add --no-cache openssl
     - bun install --frozen-lockfile || bun install
+    - DATABASE_URL="file:./test.db" bun x prisma generate --schema prisma/schema.prisma
   script:
     - bun run build
 

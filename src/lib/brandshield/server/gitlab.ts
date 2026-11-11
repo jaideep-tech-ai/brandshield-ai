@@ -212,14 +212,19 @@ export async function verifyGitLabProjectMapping(
     return { verified: false, reason: "Organization not found." };
   }
 
-  // Check against global environment variable or enterprise fallback secret
+  // Check against global environment variable or enterprise dev fallback secret
+  const isProd = process.env.NODE_ENV === "production";
   const globalSecret =
     process.env.GITLAB_WEBHOOK_SECRET?.trim() ||
     process.env.BRANDSHIELD_WEBHOOK_SECRET?.trim() ||
-    "brandshield-gitlab-webhook-secret-2026";
+    (!isProd ? "brandshield-gitlab-webhook-secret-2026" : "");
   let hasValidSecret = false;
 
-  const isSyntheticTest = rawBody.includes('"isSyntheticTest":true') || rawBody.includes('"test":true');
+  // External callers must never bypass authentication in production with synthetic flags.
+  // Synthetic test pushes are strictly restricted to local unit tests (NODE_ENV === 'test').
+  const isSyntheticTest =
+    process.env.NODE_ENV === "test" &&
+    (rawBody.includes('"isSyntheticTest":true') || rawBody.includes('"test":true'));
   if (isSyntheticTest) {
     return {
       verified: true,

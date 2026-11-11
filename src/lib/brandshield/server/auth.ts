@@ -15,6 +15,8 @@ export function createSessionToken(userId: string): string {
   return `${payload}.${sign(payload)}`;
 }
 
+const MAX_SESSION_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 export function verifySessionToken(token: string | undefined | null): string | null {
   if (!token) return null;
   const [payload, sig] = token.split(".");
@@ -22,8 +24,12 @@ export function verifySessionToken(token: string | undefined | null): string | n
   const expected = sign(payload);
   try {
     if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
-    const { userId } = JSON.parse(Buffer.from(payload, "base64url").toString()) as { userId: string };
-    return userId ?? null;
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as { userId?: string; iat?: number };
+    if (!data.userId) return null;
+    if (typeof data.iat === "number" && Date.now() - data.iat > MAX_SESSION_AGE_MS) {
+      return null; // Expired session token
+    }
+    return data.userId;
   } catch {
     return null;
   }

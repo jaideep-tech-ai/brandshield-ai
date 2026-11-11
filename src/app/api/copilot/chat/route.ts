@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
 import { searchKnowledgeHybrid, type SearchResultPassage } from "@/lib/brandshield/server/vector-rag";
 import { contrastRatio } from "@/lib/brandshield/shared";
+import { checkRateLimit, clientIp } from "@/lib/brandshield/server/rate-limit";
 
 export const maxDuration = 60;
 
@@ -219,6 +220,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    // Rate Limiting (Sliding Window: 20 req/min per user, 30 req/min per IP)
+    const rlUser = checkRateLimit(`copilot_user:${user.id}`, 20, 60_000);
+    const rlIp = checkRateLimit(`copilot_ip:${clientIp(req)}`, 30, 60_000);
+    if (!rlUser.ok || !rlIp.ok) {
+      const retryAfter = Math.max(rlUser.retryAfterSec, rlIp.retryAfterSec);
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment before sending another message." },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } }
+      );
+    }
+
     const body = (await req.json()) as {
       message?: string;
       sessionId?: string;
@@ -232,6 +244,18 @@ export async function POST(req: NextRequest) {
     }
 
     const lang = body.lang || "en";
+
+    // Validate sessionId ownership early if provided
+    if (body.sessionId) {
+      const existingSession = await db.governanceChatSession.findUnique({
+        where: { id: body.sessionId },
+      });
+      if (existingSession) {
+        if (existingSession.orgId !== user.orgId || (existingSession.userId !== user.id && user.role !== "admin")) {
+          return NextResponse.json({ error: "Access denied to chat session." }, { status: 403 });
+        }
+      }
+    }
 
     // 1. Hybrid semantic RAG search across organization knowledge chunks
     const passages = await searchKnowledgeHybrid({
@@ -268,7 +292,7 @@ export async function POST(req: NextRequest) {
       ? "https://generativelanguage.googleapis.com/v1beta/openai"
       : process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1";
     let model = process.env.GEMINI_API_KEY?.trim()
-      ? process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest"
+      ? process.env.GEMINI_MODEL?.trim() || "gemini-3-flash-preview"
       : process.env.CHAT_MODEL?.trim() || "gpt-4o-mini";
 
     if (!apiKey && process.env.GROQ_API_KEY?.trim()) {
@@ -405,6 +429,8 @@ CRITICAL INSTRUCTIONS:
             title: message.slice(0, 38) + (message.length > 38 ? "..." : ""),
           },
         });
+      } else if (existing.orgId !== user.orgId || (existing.userId !== user.id && user.role !== "admin")) {
+        return NextResponse.json({ error: "Access denied to chat session." }, { status: 403 });
       }
     } else {
       const titleSummary = message.slice(0, 38) + (message.length > 38 ? "..." : "");
@@ -480,7 +506,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    if (!session || session.orgId !== user.orgId) {
+    if (!session || session.orgId !== user.orgId || (session.userId !== user.id && user.role !== "admin")) {
       return NextResponse.json({ error: "Chat session not found." }, { status: 404 });
     }
 
@@ -518,7 +544,7 @@ export async function DELETE(req: NextRequest) {
       where: { id: sessionId },
     });
 
-    if (!session || session.orgId !== user.orgId) {
+    if (!session || session.orgId !== user.orgId || (session.userId !== user.id && user.role !== "admin")) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
@@ -552,7 +578,7 @@ export async function PATCH(req: NextRequest) {
       where: { id: sessionId },
     });
 
-    if (!session || session.orgId !== user.orgId) {
+    if (!session || session.orgId !== user.orgId || (session.userId !== user.id && user.role !== "admin")) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
