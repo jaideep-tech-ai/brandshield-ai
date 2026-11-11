@@ -67,6 +67,78 @@ export function extractOrgIdentifier(
   return null;
 }
 
+/**
+ * Lenient JSON parser that gracefully handles unescaped control characters (%x00-1F)
+ * and raw multi-line strings often emitted by CI/CD bash variables ($CI_COMMIT_MESSAGE).
+ * If the payload is genuinely malformed, returns actionable diagnostic details.
+ */
+export function parseJsonWithResilience(raw: string): {
+  success: boolean;
+  data?: Record<string, unknown>;
+  error?: string;
+  hint?: string;
+} {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return { success: true, data: parsed as Record<string, unknown> };
+    }
+    return { success: true, data: { payload: parsed } };
+  } catch (initialErr) {
+    try {
+      // Walk string and sanitize raw unescaped newlines/tabs inside string literals
+      let inString = false;
+      let escaped = false;
+      let sanitized = "";
+      for (let i = 0; i < raw.length; i++) {
+        const c = raw[i];
+        if (escaped) {
+          sanitized += c;
+          escaped = false;
+          continue;
+        }
+        if (c === "\\") {
+          sanitized += c;
+          escaped = true;
+          continue;
+        }
+        if (c === '"') {
+          inString = !inString;
+          sanitized += c;
+          continue;
+        }
+        if (inString) {
+          if (c === "\n") {
+            sanitized += "\\n";
+            continue;
+          }
+          if (c === "\r") {
+            sanitized += "\\r";
+            continue;
+          }
+          if (c === "\t") {
+            sanitized += "\\t";
+            continue;
+          }
+        }
+        sanitized += c;
+      }
+      const parsed = JSON.parse(sanitized);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return { success: true, data: parsed as Record<string, unknown> };
+      }
+      return { success: true, data: { payload: parsed } };
+    } catch {
+      const msg = initialErr instanceof Error ? initialErr.message : "Syntax error";
+      return {
+        success: false,
+        error: `Malformed JSON payload: ${msg}`,
+        hint: "Ensure JSON string literals have escaped quotes and newlines.",
+      };
+    }
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -74,12 +146,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Empty request body." }, { status: 400 });
     }
 
-    let payload: Record<string, unknown>;
-    try {
-      payload = JSON.parse(rawBody);
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+    const parseResult = parseJsonWithResilience(rawBody);
+    if (!parseResult.success || !parseResult.data) {
+      return NextResponse.json(
+        {
+          error: parseResult.error || "Invalid JSON payload.",
+          hint: parseResult.hint || "Ensure request body is valid JSON with escaped characters.",
+        },
+        { status: 400 }
+      );
     }
+    const payload = parseResult.data;
 
     // 1. Detect if this is a GitLab Webhook request
     const gitlabEvent = req.headers.get("x-gitlab-event")?.trim();

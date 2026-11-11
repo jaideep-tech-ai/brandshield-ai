@@ -40,3 +40,4 @@ class ChatMessage {
 
   bool get isUser => role == 'user';
 }
+

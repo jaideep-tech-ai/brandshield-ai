@@ -96,3 +96,4 @@ To point to your local Next.js dev server:
    - Android Emulator: `http://10.0.2.2:3000`
    - Physical Device on same Wi-Fi: `http://<your-mac-ip>:3000`
 4. Tap the green checkmark to save.
+

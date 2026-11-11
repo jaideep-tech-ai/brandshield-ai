@@ -53,3 +53,4 @@ class Submission {
 
   int get openCount => findings.where((f) => f.status == 'open').length;
 }
+

@@ -262,17 +262,16 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    // 4. Resolve multi-provider AI credentials
-    // Supported: OpenAI, Google Gemini (via OpenAI-compatible endpoint), Groq, ZAI
-    let apiKey = process.env.OPENAI_API_KEY?.trim();
-    let baseUrl = process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1";
-    let model = process.env.CHAT_MODEL?.trim() || "gpt-4o-mini";
+    // 4. Resolve multi-provider AI credentials (prioritizing Google Gemini)
+    let apiKey = process.env.GEMINI_API_KEY?.trim() || process.env.OPENAI_API_KEY?.trim();
+    let baseUrl = process.env.GEMINI_API_KEY?.trim()
+      ? "https://generativelanguage.googleapis.com/v1beta/openai"
+      : process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1";
+    let model = process.env.GEMINI_API_KEY?.trim()
+      ? process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest"
+      : process.env.CHAT_MODEL?.trim() || "gpt-4o-mini";
 
-    if (!apiKey && process.env.GEMINI_API_KEY?.trim()) {
-      apiKey = process.env.GEMINI_API_KEY.trim();
-      baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai";
-      model = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
-    } else if (!apiKey && process.env.GROQ_API_KEY?.trim()) {
+    if (!apiKey && process.env.GROQ_API_KEY?.trim()) {
       apiKey = process.env.GROQ_API_KEY.trim();
       baseUrl = "https://api.groq.com/openai/v1";
       model = "llama-3.3-70b-versatile";

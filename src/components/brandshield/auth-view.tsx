@@ -198,7 +198,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
     });
   }
 
-  function handleAutoLogin(targetRole: Role = "admin") {
+  function handleAutoLogin(targetRole: Role = "reviewer") {
     if (busy) return;
     autoLogin.mutate(targetRole, {
       onSuccess: (user) => {
@@ -249,7 +249,7 @@ export function AuthView({ onBack }: { onBack: () => void }) {
     if (busy) return;
     if (!firebaseConnected) {
       toast.info("Firebase is unconfigured in this deployment. Logging you in via Instant Auto Access...");
-      handleAutoLogin("admin");
+      handleAutoLogin("reviewer");
       return;
     }
     setFirebaseBusy(true);
@@ -426,11 +426,11 @@ export function AuthView({ onBack }: { onBack: () => void }) {
               </span>
             </div>
             <p className="mt-1 text-xs text-slate-600">
-              Instant zero-setup access. Auto-provisions an enterprise workspace with full permissions.
+              Instant zero-setup access. Auto-provisions an isolated demo workspace with restricted reviewer permissions.
             </p>
             <Button
               type="button"
-              onClick={() => handleAutoLogin("admin")}
+              onClick={() => handleAutoLogin("reviewer")}
               disabled={busy}
               className="mt-2.5 h-10 w-full gap-2 rounded-xl bg-gradient-to-r from-teal-700 to-emerald-700 text-xs font-semibold text-white shadow-sm transition hover:from-teal-800 hover:to-emerald-800 active:scale-[0.99]"
             >

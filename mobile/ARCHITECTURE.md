@@ -118,3 +118,4 @@ Every login, auto-login, role-switch, and registration route returns:
 ```
 
 The Flutter `ApiClient` intercepts every outgoing HTTP request, reads the token from `SharedPreferences`, and attaches `Authorization: Bearer <token>`.
+

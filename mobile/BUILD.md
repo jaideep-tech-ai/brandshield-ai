@@ -71,3 +71,4 @@ In your GitLab or GitHub Actions pipeline, execute:
     flutter test
 ```
 All tests run headlessly and verify WCAG contrast mathematics, data models, and UI widgets before release.
+

@@ -25,36 +25,21 @@ brandshield-governance-audit:
       echo "Commit:  $CI_COMMIT_SHA ($CI_COMMIT_REF_NAME)"
       echo "Author:  $CI_COMMIT_AUTHOR"
 
-      PAYLOAD=$(cat <<EOF
-      {
-        "object_kind": "push",
-        "ref": "$CI_COMMIT_REF_NAME",
-        "checkout_sha": "$CI_COMMIT_SHA",
-        "project": {
-          "id": "$CI_PROJECT_ID",
-          "name": "$CI_PROJECT_NAME",
-          "path_with_namespace": "$CI_PROJECT_PATH",
-          "web_url": "$CI_PROJECT_URL"
-        },
-        "commits": [
-          {
-            "id": "$CI_COMMIT_SHA",
-            "title": "$CI_COMMIT_TITLE",
-            "message": "$CI_COMMIT_MESSAGE",
-            "author": {
-              "name": "$CI_COMMIT_AUTHOR"
-            }
-          }
-        ]
-      }
-      EOF
-      )
+      # Sanitize commit message and title to ensure valid JSON payload
+      CLEAN_TITLE=$(printf '%s' "${CI_COMMIT_TITLE:-GitLab Commit}" | tr -d '\r\n"' | sed 's/\\/\\\\/g')
+      CLEAN_MSG=$(printf '%s' "${CI_COMMIT_MESSAGE:-Pre-publishing commit}" | tr '\r\n' '  ' | sed 's/"/\\"/g' | sed 's/\\/\\\\/g')
+      if [ -z "$CLEAN_TITLE" ]; then CLEAN_TITLE="GitLab Push"; fi
+      if [ -z "$CLEAN_MSG" ]; then CLEAN_MSG="Automated pre-publish commit"; fi
+
+      PAYLOAD="{\"object_kind\":\"push\",\"ref\":\"$CI_COMMIT_REF_NAME\",\"checkout_sha\":\"$CI_COMMIT_SHA\",\"project\":{\"id\":\"$CI_PROJECT_ID\",\"name\":\"$CI_PROJECT_NAME\",\"path_with_namespace\":\"$CI_PROJECT_PATH\",\"web_url\":\"$CI_PROJECT_URL\"},\"commits\":[{\"id\":\"$CI_COMMIT_SHA\",\"title\":\"$CLEAN_TITLE\",\"message\":\"$CLEAN_MSG\",\"author\":{\"name\":\"$CI_COMMIT_AUTHOR\"}}]}"
+
+      WEBHOOK_SECRET="${GITLAB_WEBHOOK_SECRET:-${BRANDSHIELD_WEBHOOK_SECRET:-brandshield-gitlab-webhook-secret-2026}}"
 
       set +x
       RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BRANDSHIELD_URL}/api/webhooks/incoming/prepublish?orgSlug=${BRANDSHIELD_ORG_SLUG}" \
         -H "Content-Type: application/json" \
         -H "X-Gitlab-Event: Push Hook" \
-        -H "X-Gitlab-Token: ${GITLAB_WEBHOOK_SECRET:-$BRANDSHIELD_WEBHOOK_SECRET}" \
+        -H "X-Gitlab-Token: ${WEBHOOK_SECRET}" \
         -d "$PAYLOAD")
       HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
       BODY=$(echo "$RESPONSE" | sed '$d')

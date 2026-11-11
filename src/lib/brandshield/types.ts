@@ -18,6 +18,7 @@ export interface SessionUser {
   orgName: string;
   orgSlug: string;
   zeroDataRetention: boolean;
+  token?: string;
 }
 
 export interface GuidelineDoc {

@@ -47,3 +47,4 @@ You can configure the active API backend dynamically at runtime without rebuildi
    - Local Dev (Android Emulator): `http://10.0.2.2:3000`
    - LAN Wi-Fi: `http://192.168.1.X:3000`
 4. Tap the green checkmark button to save. The URL is persisted to `SharedPreferences` and used for all subsequent requests.
+

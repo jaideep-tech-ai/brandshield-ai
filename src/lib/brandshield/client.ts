@@ -31,10 +31,39 @@ export class ApiRequestError extends Error {
   }
 }
 
+const AUTH_HINT_KEY = "bs.auth.hint";
+const TOKEN_KEY = "bs.auth.token";
+
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredToken(token?: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  } catch {}
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(init?.headers as Record<string, string> ?? {}),
+  };
   const res = await fetch(path, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers,
     credentials: "same-origin",
   });
   const text = await res.text();
@@ -64,8 +93,6 @@ export const api = {
 // visitors (no hint) render the landing instantly instead of waiting on the
 // /api/auth/me round trip; returning users get the branded gate while the
 // session check and signed-in chunk warm-up run in parallel.
-const AUTH_HINT_KEY = "bs.auth.hint";
-
 export function markAuthHint(): void {
   try {
     localStorage.setItem(AUTH_HINT_KEY, "1");
@@ -77,6 +104,7 @@ export function markAuthHint(): void {
 export function clearAuthHint(): void {
   try {
     localStorage.removeItem(AUTH_HINT_KEY);
+    setStoredToken(null);
   } catch {
     /* private browsing */
   }
@@ -98,6 +126,7 @@ export function useSession(options?: Partial<UseQueryOptions<SessionUser | null>
     queryFn: async () => {
       try {
         const user = await api.get<SessionUser>("/api/auth/me");
+        if (user.token) setStoredToken(user.token);
         markAuthHint();
         return user;
       } catch {
@@ -115,8 +144,12 @@ export function useLogin() {
   return useMutation({
     mutationFn: (input: { email: string; password: string }) => api.post<SessionUser>("/api/auth/login", input),
     onSuccess: (user) => {
+      if (user.token) setStoredToken(user.token);
+      markAuthHint();
       qc.setQueryData(["session"], user);
-      qc.invalidateQueries();
+      qc.invalidateQueries({ queryKey: ["submissions"] });
+      qc.invalidateQueries({ queryKey: ["kpis"] });
+      qc.invalidateQueries({ queryKey: ["tour"] });
     },
   });
 }
@@ -127,8 +160,12 @@ export function useRegister() {
     mutationFn: (input: { name: string; email: string; password: string; role: string; department?: string; organizationName?: string }) =>
       api.post<SessionUser>("/api/auth/register", input),
     onSuccess: (user) => {
+      if (user.token) setStoredToken(user.token);
+      markAuthHint();
       qc.setQueryData(["session"], user);
-      qc.invalidateQueries();
+      qc.invalidateQueries({ queryKey: ["submissions"] });
+      qc.invalidateQueries({ queryKey: ["kpis"] });
+      qc.invalidateQueries({ queryKey: ["tour"] });
     },
   });
 }
@@ -138,8 +175,12 @@ export function useDemoLogin() {
   return useMutation({
     mutationFn: (email: string) => api.post<SessionUser>("/api/auth/login", { email, password: "demo1234" }),
     onSuccess: (user) => {
+      if (user.token) setStoredToken(user.token);
+      markAuthHint();
       qc.setQueryData(["session"], user);
-      qc.invalidateQueries();
+      qc.invalidateQueries({ queryKey: ["submissions"] });
+      qc.invalidateQueries({ queryKey: ["kpis"] });
+      qc.invalidateQueries({ queryKey: ["tour"] });
     },
   });
 }
@@ -150,9 +191,12 @@ export function useAutoLogin() {
     mutationFn: (targetRole?: Role) =>
       api.post<SessionUser>("/api/auth/auto-login", targetRole ? { role: targetRole } : {}),
     onSuccess: (user) => {
+      if (user.token) setStoredToken(user.token);
       markAuthHint();
       qc.setQueryData(["session"], user);
-      qc.invalidateQueries();
+      qc.invalidateQueries({ queryKey: ["submissions"] });
+      qc.invalidateQueries({ queryKey: ["kpis"] });
+      qc.invalidateQueries({ queryKey: ["tour"] });
     },
   });
 }
@@ -162,9 +206,12 @@ export function useSwitchRole() {
   return useMutation({
     mutationFn: (targetRole: Role) => api.post<SessionUser>("/api/auth/switch-role", { targetRole }),
     onSuccess: (user) => {
+      if (user.token) setStoredToken(user.token);
       markAuthHint();
       qc.setQueryData(["session"], user);
-      qc.invalidateQueries();
+      qc.invalidateQueries({ queryKey: ["submissions"] });
+      qc.invalidateQueries({ queryKey: ["kpis"] });
+      qc.invalidateQueries({ queryKey: ["tour"] });
     },
   });
 }
@@ -174,9 +221,10 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => api.post<{ ok: boolean }>("/api/auth/logout"),
     onSuccess: () => {
+      clearAuthHint();
+      setStoredToken(null);
       qc.setQueryData(["session"], null);
       qc.clear();
-      clearAuthHint();
     },
   });
 }

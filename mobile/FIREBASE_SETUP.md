@@ -66,3 +66,4 @@ This guide details the Firebase configuration for Android and iOS in BrandShield
 The Next.js backend verifies Firebase ID tokens at `src/app/api/auth/firebase-sync/route.ts` using the Google Identity public certificate keyset (`https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com`).
 
 No server private key or service account JSON needs to be exposed on client devices.
+
