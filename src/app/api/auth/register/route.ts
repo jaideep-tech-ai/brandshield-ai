@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
       organizationName,
     });
 
+    const sessionToken = createSessionToken(user.id);
     const res = NextResponse.json({
       id: user.id,
       email: user.email,
@@ -105,8 +106,9 @@ export async function POST(req: NextRequest) {
       orgName: organization.name,
       orgSlug: organization.slug,
       zeroDataRetention: organization.zeroDataRetention,
+      token: sessionToken,
     });
-    res.cookies.set(SESSION_COOKIE, createSessionToken(user.id), {
+    res.cookies.set(SESSION_COOKIE, sessionToken, {
       httpOnly: true,
       sameSite: "lax",
       path: "/",

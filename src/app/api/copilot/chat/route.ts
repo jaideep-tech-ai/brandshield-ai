@@ -271,7 +271,7 @@ export async function POST(req: NextRequest) {
     if (!apiKey && process.env.GEMINI_API_KEY?.trim()) {
       apiKey = process.env.GEMINI_API_KEY.trim();
       baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai";
-      model = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
+      model = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
     } else if (!apiKey && process.env.GROQ_API_KEY?.trim()) {
       apiKey = process.env.GROQ_API_KEY.trim();
       baseUrl = "https://api.groq.com/openai/v1";

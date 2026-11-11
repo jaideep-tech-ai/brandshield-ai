@@ -93,7 +93,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const sessionPayload: SessionUser = {
+    const sessionToken = createSessionToken(targetUser.id);
+    const sessionPayload = {
       id: targetUser.id,
       email: targetUser.email,
       name: targetUser.name,
@@ -104,10 +105,11 @@ export async function POST(req: NextRequest) {
       orgName: targetUser.organization.name,
       orgSlug: targetUser.organization.slug,
       zeroDataRetention: targetUser.organization.zeroDataRetention,
+      token: sessionToken,
     };
 
     const res = NextResponse.json(sessionPayload);
-    res.cookies.set(SESSION_COOKIE, createSessionToken(targetUser.id), {
+    res.cookies.set(SESSION_COOKIE, sessionToken, {
       httpOnly: true,
       sameSite: "lax",
       path: "/",

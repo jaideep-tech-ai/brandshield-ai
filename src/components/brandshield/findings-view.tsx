@@ -171,14 +171,14 @@ export function FindingsView() {
               </span>
             </button>
           ))}
-          {(submissions.data ?? []).length === 0 && (
+          {!submissions.isLoading && (submissions.data ?? []).length === 0 && (
             <p className="text-sm text-slate-400">{t("findings.submissions.empty")}</p>
           )}
         </div>
         <ContextualHelpButton guideKey="findings" labelKey="help.needHelp.findings" className="hidden sm:inline-flex shrink-0" />
       </div>
 
-      {submissions.isLoading || (!!selectedId && isLoading) ? (
+      {submissions.isLoading ? (
         <div className="flex h-64 flex-col items-center justify-center text-slate-400 gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
           <span className="text-xs sm:text-sm font-medium">{t("findings.loading")}</span>

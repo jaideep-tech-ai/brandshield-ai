@@ -128,6 +128,7 @@ export async function POST(req: NextRequest) {
       user = { ...user, firebaseUid: claims.sub };
     }
 
+    const sessionToken = createSessionToken(user.id);
     const res = NextResponse.json({
       id: user.id,
       email: user.email,
@@ -139,8 +140,9 @@ export async function POST(req: NextRequest) {
       orgName: user.organization.name,
       orgSlug: user.organization.slug,
       zeroDataRetention: user.organization.zeroDataRetention,
+      token: sessionToken,
     });
-    res.cookies.set(SESSION_COOKIE, createSessionToken(user.id), {
+    res.cookies.set(SESSION_COOKIE, sessionToken, {
       httpOnly: true,
       sameSite: "lax",
       path: "/",

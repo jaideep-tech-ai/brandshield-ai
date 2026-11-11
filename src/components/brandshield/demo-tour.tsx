@@ -145,14 +145,19 @@ export function DemoTour({ role }: { role: Role }) {
     hasHydratedRef.current = true;
     const s = tourStateQuery.data;
 
-    const isSessionDismissed =
+    const isDismissed =
       typeof window !== "undefined" &&
-      sessionStorage.getItem("brandshield:tour-dismissed") === "true";
+      (sessionStorage.getItem("brandshield:tour-dismissed") === "true" ||
+        localStorage.getItem("brandshield:tour-dismissed") === "true");
 
-    if (isSessionDismissed) return;
+    if (isDismissed) return;
 
     if (s.completed || s.dismissed || s.paused) {
       // User has already completed, dismissed, or paused the tour — do not re-show automatically
+      if (typeof window !== "undefined") {
+        localStorage.setItem("brandshield:tour-dismissed", "true");
+        sessionStorage.setItem("brandshield:tour-dismissed", "true");
+      }
       return;
     }
 
@@ -184,6 +189,7 @@ export function DemoTour({ role }: { role: Role }) {
   const finish = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("brandshield:tour-dismissed", "true");
+      localStorage.setItem("brandshield:tour-dismissed", "true");
     }
     saveStepToDb(steps.length, true, false, false);
     setTourOpen(false);
@@ -195,6 +201,7 @@ export function DemoTour({ role }: { role: Role }) {
   const pauseTour = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("brandshield:tour-dismissed", "true");
+      localStorage.setItem("brandshield:tour-dismissed", "true");
     }
     setShowWelcome(false);
     setTourOpen(false);
@@ -205,6 +212,7 @@ export function DemoTour({ role }: { role: Role }) {
   const skipTour = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("brandshield:tour-dismissed", "true");
+      localStorage.setItem("brandshield:tour-dismissed", "true");
     }
     setShowWelcome(false);
     setTourOpen(false);
@@ -214,6 +222,7 @@ export function DemoTour({ role }: { role: Role }) {
   const startTour = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("brandshield:tour-dismissed");
+      localStorage.removeItem("brandshield:tour-dismissed");
     }
     setShowWelcome(false);
     setStepIndex(0);
@@ -224,6 +233,7 @@ export function DemoTour({ role }: { role: Role }) {
   const restartTour = useCallback(() => {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("brandshield:tour-dismissed");
+      localStorage.removeItem("brandshield:tour-dismissed");
     }
     setStepIndex(0);
     setShowWelcome(false);
@@ -237,6 +247,7 @@ export function DemoTour({ role }: { role: Role }) {
     const handler = () => {
       if (typeof window !== "undefined") {
         sessionStorage.removeItem("brandshield:tour-dismissed");
+        localStorage.removeItem("brandshield:tour-dismissed");
       }
       setStepIndex(0);
       setShowWelcome(false);

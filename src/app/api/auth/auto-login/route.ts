@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to initialize auto-login user" }, { status: 500 });
     }
 
+    const sessionToken = createSessionToken(user.id);
     const payload = {
       id: user.id,
       email: user.email,
@@ -52,10 +53,11 @@ export async function POST(req: NextRequest) {
       orgName: user.organization.name,
       orgSlug: user.organization.slug,
       zeroDataRetention: user.organization.zeroDataRetention,
+      token: sessionToken,
     };
 
     const res = NextResponse.json(payload);
-    res.cookies.set(SESSION_COOKIE, createSessionToken(user.id), {
+    res.cookies.set(SESSION_COOKIE, sessionToken, {
       httpOnly: true,
       sameSite: "lax",
       path: "/",

@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
 import type { SessionUser } from "../types";
 
@@ -31,7 +31,22 @@ export function verifySessionToken(token: string | undefined | null): string | n
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const store = await cookies();
-  const userId = verifySessionToken(store.get(COOKIE_NAME)?.value);
+  let token = store.get(COOKIE_NAME)?.value;
+
+  // Support mobile / Flutter clients passing Authorization: Bearer <token>
+  if (!token) {
+    try {
+      const reqHeaders = await headers();
+      const authHeader = reqHeaders.get("authorization") || reqHeaders.get("Authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        token = authHeader.slice(7).trim();
+      }
+    } catch {
+      // headers() may throw in non-request contexts
+    }
+  }
+
+  const userId = verifySessionToken(token);
   if (!userId) return null;
   const user = await db.user.findUnique({
     where: { id: userId },
