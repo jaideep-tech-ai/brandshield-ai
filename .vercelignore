@@ -10,3 +10,4 @@ agent-ctx/
 tests/
 .playwright/
 drizzle/
+mobile/
