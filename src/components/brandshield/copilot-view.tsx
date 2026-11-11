@@ -231,6 +231,15 @@ I am your real-time compliance assistant, wired directly to your organization's 
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // Restore active session on initial mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedSessionId = localStorage.getItem("brandshield:active-chat-session");
+    if (savedSessionId) {
+      loadSession(savedSessionId);
+    }
+  }, []);
+
   // Fetch session list
   const fetchSessions = async () => {
     try {
@@ -254,9 +263,17 @@ I am your real-time compliance assistant, wired directly to your organization's 
     setHistoryOpen(false);
     try {
       const res = await fetch(`/api/copilot/chat?sessionId=${id}`);
-      if (!res.ok) throw new Error("Could not load session");
+      if (!res.ok) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("brandshield:active-chat-session");
+        }
+        throw new Error("Could not load session");
+      }
       const data = await res.json();
       setSessionId(data.id);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("brandshield:active-chat-session", data.id);
+      }
       setSessionTitle(data.title || "Conversation");
       setMessages(
         data.messages.map((m: any) => ({
@@ -276,6 +293,9 @@ I am your real-time compliance assistant, wired directly to your organization's 
 
   // Start fresh conversation
   const handleNewConversation = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("brandshield:active-chat-session");
+    }
     setSessionId(null);
     setSessionTitle("New Conversation");
     setMessages([
@@ -373,9 +393,15 @@ I am your real-time compliance assistant, wired directly to your organization's 
       }
 
       const data = await res.json();
-      if (!sessionId && data.sessionId) {
+      if (data.sessionId) {
         setSessionId(data.sessionId);
-        setSessionTitle(textToSend.slice(0, 32));
+        if (typeof window !== "undefined") {
+          localStorage.setItem("brandshield:active-chat-session", data.sessionId);
+        }
+        if (!sessionId) {
+          setSessionTitle(textToSend.slice(0, 32));
+        }
+        fetchSessions();
       }
 
       const assistantMsg: ChatMessage = {

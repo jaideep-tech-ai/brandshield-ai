@@ -2,9 +2,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:brandshield_mobile/models/user.dart';
 import 'package:brandshield_mobile/models/finding.dart';
 import 'package:brandshield_mobile/models/submission.dart';
+import 'package:brandshield_mobile/models/chat_session.dart';
 
 void main() {
   group('Data Model Deserialization Tests', () {
+    test('ChatSession.fromJson deserializes id, title, and count correctly', () {
+      final json = {
+        'id': 'sess_123',
+        'title': 'WCAG Contrast Inquiry',
+        'createdAt': '2026-11-11T12:00:00.000Z',
+        'updatedAt': '2026-11-11T12:05:00.000Z',
+        '_count': {'messages': 4},
+      };
+
+      final session = ChatSession.fromJson(json);
+      expect(session.id, equals('sess_123'));
+      expect(session.title, equals('WCAG Contrast Inquiry'));
+      expect(session.messageCount, equals(4));
+    });
     test('User.fromJson deserializes correctly', () {
       final json = {
         'id': 'usr_123',

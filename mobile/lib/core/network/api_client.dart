@@ -92,6 +92,49 @@ class ApiClient {
     }
   }
 
+  Future<dynamic> patch(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool requiresAuth = true,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl$endpoint');
+      final headers = await _headers(requiresAuth: requiresAuth);
+
+      final response = await http
+          .patch(
+            uri,
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(const Duration(seconds: 30));
+
+      return _handleResponse(response);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Network connection error: $e');
+    }
+  }
+
+  Future<dynamic> delete(
+    String endpoint, {
+    bool requiresAuth = true,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl$endpoint');
+      final headers = await _headers(requiresAuth: requiresAuth);
+
+      final response = await http
+          .delete(uri, headers: headers)
+          .timeout(const Duration(seconds: 25));
+
+      return _handleResponse(response);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Network connection error: $e');
+    }
+  }
+
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return {};

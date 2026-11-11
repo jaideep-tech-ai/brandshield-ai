@@ -360,24 +360,29 @@ CRITICAL INSTRUCTIONS:
           };
           finalReply = completion.choices?.[0]?.message?.content || "";
         } else if (baseUrl.includes("generativelanguage.googleapis.com")) {
-          // Robust fallback to native Gemini generateContent endpoint
+          // Robust fallback to native Gemini generateContent endpoint with full conversation memory
           try {
+            const nativeContents = [
+              ...conversationHistory.map((m) => ({
+                role: m.role === "assistant" ? "model" : "user",
+                parts: [{ text: m.content }],
+              })),
+              {
+                role: "user",
+                parts: [{ text: message }],
+              },
+            ];
+
             const nativeRes = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  contents: [
-                    {
-                      role: "user",
-                      parts: [
-                        {
-                          text: `${systemPrompt}\n\nUser Question:\n${message}`,
-                        },
-                      ],
-                    },
-                  ],
+                  systemInstruction: {
+                    parts: [{ text: systemPrompt }],
+                  },
+                  contents: nativeContents,
                   generationConfig: { temperature: 0.2 },
                 }),
               }
@@ -416,63 +421,81 @@ CRITICAL INSTRUCTIONS:
       finalCitations = synthesized.citations;
     }
 
-    // 5. Persist to GovernanceChatSession and GovernanceChatMessage
+    // 5. Persist to GovernanceChatSession and GovernanceChatMessage atomically in a transaction
     let sessionId = body.sessionId;
-    if (sessionId) {
-      const existing = await db.governanceChatSession.findUnique({ where: { id: sessionId } });
-      if (!existing) {
-        await db.governanceChatSession.create({
+
+    const txResult = await db.$transaction(async (tx) => {
+      if (sessionId) {
+        const existing = await tx.governanceChatSession.findUnique({ where: { id: sessionId } });
+        if (!existing) {
+          await tx.governanceChatSession.create({
+            data: {
+              id: sessionId,
+              orgId: user.orgId,
+              userId: user.id,
+              title: message.slice(0, 38) + (message.length > 38 ? "..." : ""),
+            },
+          });
+        } else if (existing.orgId !== user.orgId || (existing.userId !== user.id && user.role !== "admin")) {
+          throw new Error("UNAUTHORIZED_CHAT_SESSION");
+        } else {
+          // Touch updatedAt so recent sessions bubble to the top
+          await tx.governanceChatSession.update({
+            where: { id: sessionId },
+            data: { updatedAt: new Date() },
+          });
+        }
+      } else {
+        const titleSummary = message.slice(0, 38) + (message.length > 38 ? "..." : "");
+        const newSession = await tx.governanceChatSession.create({
           data: {
-            id: sessionId,
             orgId: user.orgId,
             userId: user.id,
-            title: message.slice(0, 38) + (message.length > 38 ? "..." : ""),
+            title: titleSummary,
           },
         });
-      } else if (existing.orgId !== user.orgId || (existing.userId !== user.id && user.role !== "admin")) {
-        return NextResponse.json({ error: "Access denied to chat session." }, { status: 403 });
+        sessionId = newSession.id;
       }
-    } else {
-      const titleSummary = message.slice(0, 38) + (message.length > 38 ? "..." : "");
-      const newSession = await db.governanceChatSession.create({
+
+      // Record user message
+      await tx.governanceChatMessage.create({
         data: {
+          sessionId: sessionId!,
           orgId: user.orgId,
-          userId: user.id,
-          title: titleSummary,
+          role: "user",
+          content: message,
         },
       });
-      sessionId = newSession.id;
-    }
 
-    // Record user message
-    await db.governanceChatMessage.create({
-      data: {
-        sessionId,
-        orgId: user.orgId,
-        role: "user",
-        content: message,
-      },
-    });
+      // Record assistant message
+      const assistantMsg = await tx.governanceChatMessage.create({
+        data: {
+          sessionId: sessionId!,
+          orgId: user.orgId,
+          role: "assistant",
+          content: finalReply,
+          citations: JSON.stringify(finalCitations),
+        },
+      });
 
-    // Record assistant message
-    const assistantMsg = await db.governanceChatMessage.create({
-      data: {
+      return {
         sessionId,
-        orgId: user.orgId,
-        role: "assistant",
-        content: finalReply,
-        citations: JSON.stringify(finalCitations),
-      },
+        messageId: assistantMsg.id,
+        createdAt: assistantMsg.createdAt,
+      };
     });
 
     return NextResponse.json({
-      sessionId,
-      messageId: assistantMsg.id,
+      sessionId: txResult.sessionId,
+      messageId: txResult.messageId,
       reply: finalReply,
       citations: finalCitations,
-      createdAt: assistantMsg.createdAt,
+      createdAt: txResult.createdAt,
     });
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.message === "UNAUTHORIZED_CHAT_SESSION") {
+      return NextResponse.json({ error: "Access denied to chat session." }, { status: 403 });
+    }
     return jsonError(e);
   }
 }
@@ -489,9 +512,9 @@ export async function GET(req: NextRequest) {
 
     if (!sessionId) {
       const sessions = await db.governanceChatSession.findMany({
-        where: { orgId: user.orgId, userId: user.id },
+        where: user.role === "admin" ? { orgId: user.orgId } : { orgId: user.orgId, userId: user.id },
         orderBy: { updatedAt: "desc" },
-        take: 20,
+        take: 50,
         include: {
           _count: { select: { messages: true } },
         },

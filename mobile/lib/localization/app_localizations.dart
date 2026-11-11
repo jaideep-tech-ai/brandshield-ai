@@ -97,6 +97,13 @@ class AppLocalizations {
       'copilot_prompt_2': 'Calculate WCAG contrast between #0F766E and #FFFFFF',
       'copilot_prompt_3': 'What are the approved trademark rules for product names?',
       'copilot_citations': 'Source Citations',
+      'copilot_new_chat': 'New Chat',
+      'copilot_history': 'Chat History',
+      'copilot_rename': 'Rename',
+      'copilot_delete': 'Delete',
+      'copilot_no_history': 'No previous conversations found',
+      'copilot_delete_confirm': 'Delete this conversation?',
+      'copilot_rename_hint': 'Enter conversation title',
 
       // Analytics
       'analyticsTitle': 'Governance Analytics & Metrics',
@@ -226,6 +233,13 @@ class AppLocalizations {
       'copilot_prompt_2': '#0F766E और #FFFFFF के बीच WCAG कंट्रास्ट निकालें',
       'copilot_prompt_3': 'उत्पाद नामों के लिए अनुमोदित ट्रेडमार्क नियम क्या हैं?',
       'copilot_citations': 'स्रोत उद्धरण',
+      'copilot_new_chat': 'नया चैट',
+      'copilot_history': 'बातचीत इतिहास',
+      'copilot_rename': 'नाम बदलें',
+      'copilot_delete': 'हटाएं',
+      'copilot_no_history': 'कोई पूर्व बातचीत नहीं मिली',
+      'copilot_delete_confirm': 'क्या आप इस बातचीत को हटाना चाहते हैं?',
+      'copilot_rename_hint': 'बातचीत का शीर्षक दर्ज करें',
 
       // Analytics
       'analyticsTitle': 'शासन एनालिटिक्स और मीट्रिक्स',
