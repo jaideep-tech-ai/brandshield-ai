@@ -163,9 +163,9 @@ export function DemoTour({ role }: { role: Role }) {
   const [rect, setRect] = useState<Rect | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile viewport
+  // Detect mobile viewport (breakpoint aligned with mobile bottom nav at md)
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 640);
+    const check = () => setIsMobile(window.innerWidth < 768);
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -195,12 +195,13 @@ export function DemoTour({ role }: { role: Role }) {
 
   // Save progress to DB when stepIndex changes
   const saveStepToDb = useCallback(
-    (index: number, completed = false, paused = false, dismissed = false) => {
+    (index: number, completed = false, paused = false, dismissed = false, reset = false) => {
       updateTourState.mutate({
         stepIndex: index,
         completed,
         paused,
         dismissed,
+        reset,
       });
     },
     [updateTourState]
@@ -217,8 +218,8 @@ export function DemoTour({ role }: { role: Role }) {
   const pauseTour = useCallback(() => {
     saveStepToDb(stepIndex, false, true, false);
     setTourOpen(false);
-    toast.info("Tour paused. Resume anytime from the Tour button in the header.");
-  }, [stepIndex, saveStepToDb, setTourOpen]);
+    toast.info(lang === "hi" ? "टूर रोक दिया गया है। हेडर से कभी भी फिर शुरू करें।" : "Tour paused. Resume anytime from the Tour button in the header.");
+  }, [stepIndex, saveStepToDb, setTourOpen, lang]);
 
   const skipTour = useCallback(() => {
     saveStepToDb(stepIndex, false, false, true);
@@ -234,12 +235,12 @@ export function DemoTour({ role }: { role: Role }) {
   }, [setTourOpen, saveStepToDb]);
 
   const restartTour = useCallback(() => {
-    setShowWelcome(false);
     setStepIndex(0);
-    setTourOpen(true);
-    updateTourState.mutate({ restart: true });
-    toast.info("Tour restarted from Step 1.");
-  }, [setTourOpen, updateTourState]);
+    setShowWelcome(true);
+    setTourOpen(false);
+    updateTourState.mutate({ reset: true });
+    toast.info(lang === "hi" ? "टूर रीसेट हो गया है।" : "Tour reset. Starting fresh from onboarding.");
+  }, [setTourOpen, updateTourState, lang]);
 
   // Listen for shell trigger
   useEffect(() => {
@@ -258,6 +259,8 @@ export function DemoTour({ role }: { role: Role }) {
     if (!isLast && view !== step.view) {
       setView(step.view);
     }
+    // Mobile optimization: skip DOM queries and scrolling to maximize touch response time
+    if (isMobile) return;
     let raf = 0;
     let tries = 0;
     let scrolled = false;
@@ -297,11 +300,11 @@ export function DemoTour({ role }: { role: Role }) {
       window.clearTimeout(timeout);
       window.cancelAnimationFrame(raf);
     };
-  }, [tourOpen, stepIndex, isLast, step, view, setView]);
+  }, [tourOpen, stepIndex, isLast, step, view, setView, isMobile]);
 
-  // Sticky spotlight on scroll/resize
+  // Sticky spotlight on scroll/resize (desktop only; skips mobile to maximize response time)
   useLayoutEffect(() => {
-    if (!tourOpen || isLast) return;
+    if (!tourOpen || isLast || isMobile) return;
     const update = () => {
       const el = step.target ? document.querySelector<HTMLElement>(step.target) : null;
       if (el) {
@@ -315,7 +318,7 @@ export function DemoTour({ role }: { role: Role }) {
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [tourOpen, isLast, step]);
+  }, [tourOpen, isLast, isMobile, step]);
 
   // Keyboard navigation: Escape skips/pauses, ArrowRight goes next, ArrowLeft goes back
   useEffect(() => {
@@ -362,69 +365,69 @@ export function DemoTour({ role }: { role: Role }) {
     });
   };
 
-  // Card positioning logic
+  // Card positioning logic (desktop only)
   const hugeTarget = rect ? rect.height > window.innerHeight - 260 : false;
   const cardBelow = rect ? rect.top + rect.height + 16 < window.innerHeight - 240 : true;
-  const cardStyle: React.CSSProperties | undefined = isMobile
-    ? {
-        position: "fixed",
-        bottom: 12,
-        left: 12,
-        right: 12,
-        width: "auto",
-        maxWidth: "100%",
-      }
-    : rect
-    ? {
-        top: hugeTarget ? Math.max(84, rect.top + 16) : cardBelow ? rect.top + rect.height + 14 : undefined,
-        bottom: !hugeTarget && !cardBelow ? window.innerHeight - rect.top + 14 : undefined,
-        left: Math.max(16, Math.min(rect.left + rect.width / 2 - 185, window.innerWidth - 386)),
-      }
-    : undefined;
+  const cardStyle: React.CSSProperties | undefined =
+    !isMobile && rect
+      ? {
+          top: hugeTarget ? Math.max(84, rect.top + 16) : cardBelow ? rect.top + rect.height + 14 : undefined,
+          bottom: !hugeTarget && !cardBelow ? window.innerHeight - rect.top + 14 : undefined,
+          left: Math.max(16, Math.min(rect.left + rect.width / 2 - 190, window.innerWidth - 396)),
+        }
+      : undefined;
 
   // 1. First-Time Welcome Modal
   if (showWelcome) {
     return (
-      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[85] flex items-end sm:items-center justify-center bg-slate-950/65 p-3 sm:p-4 backdrop-blur-sm pb-[max(16px,env(safe-area-inset-bottom))]">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 12 }}
+          initial={{ opacity: 0, scale: 0.96, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 12 }}
-          className="relative w-full max-w-lg rounded-2xl border border-teal-100 bg-white p-6 shadow-2xl"
+          exit={{ opacity: 0, scale: 0.96, y: 16 }}
+          className="relative w-full max-w-lg rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
         >
           <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-700 text-white shadow-md">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md">
               <ShieldCheck className="size-6" />
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">{t("tour.welcome.title")}</h2>
-              <p className="text-xs font-medium text-teal-700">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 break-words">{t("tour.welcome.title")}</h2>
+              <p className="text-xs font-semibold text-emerald-700 truncate">
                 {t("tour.welcome.roleLabel")}: <span className="font-bold uppercase tracking-wider">{roleLabel}</span>
               </p>
             </div>
           </div>
 
-          <p className="mt-3.5 text-xs leading-relaxed text-slate-600 sm:text-sm">
+          <p className="mt-3.5 text-xs sm:text-sm leading-relaxed text-slate-600 break-words font-normal">
             {t("tour.welcome.tagline")}
           </p>
 
-          <div className="mt-4 rounded-xl border border-teal-100 bg-teal-50/50 p-3.5">
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-teal-800">
-              <Sparkles className="size-3.5" />
-              {t("tour.welcome.permissionsTitle")}
+          <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3.5">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-800">
+              <Sparkles className="size-3.5 shrink-0" />
+              <span>{t("tour.welcome.permissionsTitle")}</span>
             </p>
-            <p className="mt-1 text-xs leading-normal text-teal-900/90 font-medium">
+            <p className="mt-1 text-xs sm:text-sm leading-relaxed text-emerald-950/90 font-medium break-words">
               {t(`tour.perm.${role}`)}
             </p>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-            <Button variant="ghost" size="sm" onClick={skipTour} className="text-slate-500 hover:text-slate-700">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={skipTour}
+              className="min-h-[42px] px-3 text-xs sm:text-sm text-slate-500 hover:text-slate-800"
+            >
               {t("tour.welcome.skipCta")}
             </Button>
-            <Button onClick={startTour} className="gap-2 bg-teal-700 text-white hover:bg-teal-800">
+            <Button
+              onClick={startTour}
+              className="min-h-[44px] px-5 gap-2 rounded-xl bg-emerald-600 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-700/25 hover:bg-emerald-700 active:bg-emerald-800 ring-1 ring-emerald-500 transition-all"
+            >
               <Play className="size-4 fill-white" />
-              {t("tour.welcome.cta")}
+              <span>{t("tour.welcome.cta")}</span>
             </Button>
           </div>
         </motion.div>
@@ -435,7 +438,7 @@ export function DemoTour({ role }: { role: Role }) {
   if (!tourOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label={t("tour.aria.dialog")}>
+    <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label={t("tour.aria.dialog")}>
       {/* Spotlight highlight over targeted element */}
       {rect && !isMobile && (
         <motion.div
@@ -448,10 +451,10 @@ export function DemoTour({ role }: { role: Role }) {
             height: rect.height + 12,
           }}
           transition={{ type: "spring", stiffness: 340, damping: 32 }}
-          className="pointer-events-none absolute rounded-xl border-2 border-teal-400 shadow-[0_0_0_9999px_rgba(15,23,42,0.55)]"
+          className="pointer-events-none absolute rounded-xl border-2 border-emerald-500 shadow-[0_0_0_9999px_rgba(15,23,42,0.55)]"
         >
           <motion.span
-            className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg"
+            className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
           >
@@ -461,85 +464,94 @@ export function DemoTour({ role }: { role: Role }) {
       )}
 
       {/* Dimmed backdrop when centered or on mobile */}
-      {(!rect || isMobile) && <div className="absolute inset-0 bg-slate-950/60" />}
+      {(!rect || isMobile) && <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[2px]" />}
 
-      {/* Tour Tooltip Card / Bottom Sheet */}
+      {/* Tour Tooltip Card / Mobile Bottom Sheet */}
       <div
         className={cn(
-          "w-[370px] max-w-[calc(100vw-24px)]",
-          !rect && !isMobile && "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          isMobile
+            ? "fixed inset-x-0 bottom-0 z-[85] p-3 sm:p-4 pb-[max(16px,env(safe-area-inset-bottom))] pointer-events-auto"
+            : cn(
+                "z-[85] w-[390px] max-w-[calc(100vw-24px)] pointer-events-auto",
+                !rect && "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              )
         )}
         style={cardStyle}
       >
         <AnimatePresence mode="wait">
           <motion.div
             key={stepIndex}
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            initial={{ opacity: 0, y: isMobile ? 18 : 10, scale: isMobile ? 1 : 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            className="rounded-2xl border border-slate-200/90 bg-white p-4.5 shadow-2xl shadow-slate-950/20 sm:p-5"
+            exit={{ opacity: 0, y: isMobile ? 18 : -8, scale: isMobile ? 1 : 0.98 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="w-full max-w-lg mx-auto rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4.5 sm:p-5 shadow-2xl shadow-slate-950/25"
           >
+            {/* Grab handle for mobile touch bottom sheet */}
+            {isMobile && (
+              <div className="mx-auto -mt-1 mb-3 h-1 w-10 rounded-full bg-slate-300/80" />
+            )}
+
             {/* Header with Icon, Step Counter, and Close/Pause */}
-            <div className="flex items-start justify-between gap-2.5">
-              <div className="flex items-center gap-2.5">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-teal-200/70">
-                  {isLast ? <PartyPopper className="size-4.5" /> : <step.icon className="size-4.5" />}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-1 min-w-0 items-start gap-3">
+                <span className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70">
+                  {isLast ? <PartyPopper className="size-4.5 sm:size-5" /> : <step.icon className="size-4.5 sm:size-5" />}
                 </span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-700">
                     {isLast ? t("tour.allSet") : t("tour.stepCounter", { x: stepIndex + 1, y: total })}
                   </p>
-                  <h3 className="text-xs font-bold text-slate-900 sm:text-sm">
+                  <h3 className="mt-0.5 text-sm sm:text-base font-bold text-slate-900 leading-snug break-words">
                     {isLast ? t("tour.complete.title") : t(step.titleKey, { role: roleLabel })}
                   </h3>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   onClick={pauseTour}
                   title={t("tour.btn.pause")}
-                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                  className="rounded-lg p-1.5 sm:p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                 >
-                  <Pause className="size-3.5" />
+                  <Pause className="size-3.5 sm:size-4" />
                 </button>
                 <button
                   type="button"
                   onClick={skipTour}
                   aria-label={t("tour.aria.skip")}
-                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                  className="rounded-lg p-1.5 sm:p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                 >
                   <X className="size-4" />
                 </button>
               </div>
             </div>
 
-            {/* Step Body */}
-            <p className="mt-2.5 text-xs leading-relaxed text-slate-600 sm:text-sm">
+            {/* Step Body - readable, smooth line wrapping without broken words */}
+            <p className="mt-2.5 sm:mt-3 text-xs sm:text-sm leading-relaxed text-slate-600 break-words font-normal">
               {isLast
                 ? t(`tour.${role}.done.body`, { role: roleLabel })
                 : t(step.bodyKey, { role: roleLabel })}
             </p>
 
             {/* Progress Bar & Dots */}
-            <div className="mt-3.5 space-y-1.5">
-              <div className="flex items-center justify-between text-[10px] font-medium text-slate-400">
+            <div className="mt-3.5 sm:mt-4 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] sm:text-xs font-medium text-slate-400">
                 <span>{roleLabel} Tour</span>
                 <span>{Math.round(((stepIndex + 1) / total) * 100)}%</span>
               </div>
-              <Progress value={((stepIndex + 1) / total) * 100} className="h-1.5 bg-slate-100" />
+              <Progress value={((stepIndex + 1) / total) * 100} className="h-1.5 sm:h-2 bg-slate-100" />
             </div>
 
-            {/* Action Buttons */}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            {/* Action Buttons with Vibrant Emerald Green CTA */}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 sm:pt-3.5">
               <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={pauseTour}
-                  className="h-8 px-2 text-xs text-slate-500 hover:text-slate-800"
+                  className="min-h-9 px-2.5 text-xs text-slate-500 hover:text-slate-800"
                 >
                   {t("tour.btn.pause")}
                 </Button>
@@ -547,10 +559,10 @@ export function DemoTour({ role }: { role: Role }) {
                   variant="ghost"
                   size="sm"
                   onClick={restartTour}
-                  className="h-8 px-2 text-xs text-slate-500 hover:text-slate-800"
+                  className="min-h-9 px-2 text-slate-500 hover:text-slate-800"
                   title="Restart from beginning"
                 >
-                  <RotateCcw className="size-3" />
+                  <RotateCcw className="size-3.5" />
                 </Button>
               </div>
 
@@ -560,19 +572,19 @@ export function DemoTour({ role }: { role: Role }) {
                     variant="outline"
                     size="sm"
                     onClick={back}
-                    className="min-h-8 gap-1 rounded-lg text-xs"
+                    className="min-h-9 sm:min-h-10 px-3 sm:px-4 gap-1.5 rounded-xl text-xs sm:text-sm font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
                   >
                     <ArrowLeft className="size-3.5" />
-                    {t("tour.btn.back")}
+                    <span>{t("tour.btn.back")}</span>
                   </Button>
                 )}
                 <Button
                   size="sm"
                   onClick={next}
-                  className="min-h-8 gap-1.5 rounded-lg bg-teal-700 text-xs font-semibold text-white hover:bg-teal-800"
+                  className="min-h-9 sm:min-h-10 px-4 sm:px-5 gap-1.5 sm:gap-2 rounded-xl bg-emerald-600 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-700/25 hover:bg-emerald-700 active:bg-emerald-800 ring-1 ring-emerald-500 transition-all"
                 >
-                  {isLast ? t("tour.btn.finish") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}
-                  {!isLast && <ArrowRight className="size-3.5" />}
+                  <span>{isLast ? t("tour.btn.finish") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}</span>
+                  {isLast ? <CheckCircle2 className="size-4" /> : <ArrowRight className="size-4" />}
                 </Button>
               </div>
             </div>

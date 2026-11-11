@@ -454,6 +454,7 @@ export function useUpdateTourState() {
       paused?: boolean;
       taskCompleted?: string;
       restart?: boolean;
+      reset?: boolean;
     }) => api.post<{ ok: boolean; state: Partial<TourStateData> }>("/api/user/tour", update),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["user-tour-state"] });

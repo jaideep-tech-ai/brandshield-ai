@@ -597,16 +597,16 @@ I am your real-time compliance assistant, wired directly to your organization's 
                         {msg.citations.map((c, i) => (
                           <div
                             key={i}
-                            className="rounded-lg border border-teal-100 bg-teal-50/50 p-2 text-[11px] leading-snug text-slate-700"
+                            className="rounded-lg border border-teal-100 bg-teal-50/50 p-2 text-[11px] leading-snug text-slate-700 break-words"
                           >
-                            <span className="font-semibold text-teal-900">{c.documentTitle}</span>
+                            <span className="font-semibold text-teal-900 break-words">{c.documentTitle}</span>
                             <span className="text-slate-400"> · Page {c.pageNumber}</span>
                             {c.ruleTag && (
                               <Badge variant="outline" className="ml-1.5 border-teal-200 bg-white text-[9px] font-bold text-teal-800">
                                 {c.ruleTag}
                               </Badge>
                             )}
-                            <p className="mt-0.5 italic text-slate-500">&ldquo;{c.textSnippet}&rdquo;</p>
+                            <p className="mt-0.5 italic text-slate-500 break-words">&ldquo;{c.textSnippet}&rdquo;</p>
                           </div>
                         ))}
                       </div>

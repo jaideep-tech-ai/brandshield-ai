@@ -108,6 +108,7 @@ export async function POST(req: NextRequest) {
       paused?: boolean;
       taskCompleted?: string;
       restart?: boolean;
+      reset?: boolean;
     };
 
     const dbUser = await db.user.findUnique({
@@ -124,14 +125,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (body.restart) {
+    if (body.restart || body.reset) {
       current = {
         completed: false,
         stepIndex: 0,
         dismissed: false,
         paused: false,
         role: dbUser?.role ?? user.role,
-        tasksCompleted: current.tasksCompleted ?? [],
+        tasksCompleted: [],
       };
     } else {
       if (typeof body.completed === "boolean") current.completed = body.completed;
