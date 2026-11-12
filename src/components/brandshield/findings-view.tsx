@@ -166,7 +166,7 @@ export function FindingsView() {
               )}
             >
               {s.title}
-              <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", s.id === selectedId ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500")}>
+              <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", s.id === selectedId ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700")}>
                 {s.findings?.filter((f) => f.status === "open").length ?? 0}
               </span>
             </button>
@@ -296,7 +296,7 @@ export function FindingsView() {
                     onClick={() => setSevFilter(s)}
                     className={cn(
                       "rounded-full px-2.5 py-1 text-[11px] font-medium transition",
-                      sevFilter === s ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      sevFilter === s ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
                     )}
                   >
                     {s === "all" ? t("findings.filter.all") : t(`common.severity.${s}`)}
@@ -703,11 +703,11 @@ function FindingCard({
             <Badge variant="outline" className={cn("gap-1 border text-[10px] font-semibold uppercase tracking-wide", meta.border, meta.bg, meta.text)}>
               {t(`common.severity.${f.severity}`).split(" — ")[0]}
             </Badge>
-            <Badge variant="outline" className="gap-1 border-slate-200 bg-white text-[10px] text-slate-500">
+            <Badge variant="outline" className="gap-1 border-slate-200 bg-white text-[10px] text-slate-600">
               {CATEGORY_ICON[f.category]} {t(`common.category.${f.category}`)}
             </Badge>
-            {f.stage === "deterministic" && <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-400">{t("common.stage.deterministic")}</Badge>}
-            {f.stage === "vision" && <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-400"><Eye className="mr-0.5 inline h-3 w-3" />{t("common.stage.vision")}</Badge>}
+            {f.stage === "deterministic" && <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-600">{t("common.stage.deterministic")}</Badge>}
+            {f.stage === "vision" && <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-600"><Eye className="mr-0.5 inline h-3 w-3" />{t("common.stage.vision")}</Badge>}
           </div>
           {f.status !== "open" && (
             <Badge variant="outline" className={cn("shrink-0 text-[10px]", f.status === "resolved" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-orange-200 bg-orange-50 text-orange-600")}>

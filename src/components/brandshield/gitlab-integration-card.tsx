@@ -288,7 +288,7 @@ export function GitLabIntegrationCard() {
                         {data.projectPath || data.projectName}
                       </span>
                       {data.projectVisibility && (
-                        <Badge variant="outline" className="text-[10px] uppercase font-mono text-slate-500">
+                        <Badge variant="outline" className="text-[10px] uppercase font-mono text-slate-600">
                           {data.projectVisibility}
                         </Badge>
                       )}
@@ -566,7 +566,7 @@ export function GitLabIntegrationCard() {
                         <span className="font-mono text-xs font-bold text-slate-900 truncate">
                           {p.pathWithNamespace}
                         </span>
-                        <Badge variant="outline" className="text-[10px] font-mono uppercase text-slate-500">
+                        <Badge variant="outline" className="text-[10px] font-mono uppercase text-slate-600">
                           {p.visibility}
                         </Badge>
                       </div>

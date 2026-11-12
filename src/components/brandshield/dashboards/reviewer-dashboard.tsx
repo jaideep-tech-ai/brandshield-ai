@@ -208,7 +208,7 @@ export function ReviewerDashboard() {
                         "shrink-0 gap-1",
                         waitingOver24h(s)
                           ? "border-amber-200 bg-amber-50 text-amber-700"
-                          : "border-slate-200 bg-slate-50 text-slate-500"
+                          : "border-slate-200 bg-slate-50 text-slate-700 font-medium"
                       )}
                     >
                       <Clock className="h-3 w-3" /> {timeAgo(s.updatedAt, lang)}
@@ -300,7 +300,7 @@ export function ReviewerDashboard() {
                         <span className="block truncate text-sm font-medium text-slate-800">{actionLabel(a.action)}</span>
                         <span className="block truncate text-xs text-slate-500">{a.actorName ?? a.actorId}</span>
                       </span>
-                      <code className="hidden shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 sm:block">
+                      <code className="hidden shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-700 sm:block">
                         {shortHash(a.contentHash)}
                       </code>
                       <button

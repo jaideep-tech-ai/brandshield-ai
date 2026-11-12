@@ -174,11 +174,12 @@ async function runChatbotScrollLayoutTests() {
   });
 
   // ─── TASK 6 & 7: LIVE API & FUNCTIONAL VERIFICATION ─────────────────────
-  console.log("\n--- 3. Local API & Functional Verification (http://localhost:3000) ---");
+  const baseUrl = process.env.TEST_URL || "https://brandshield-ai-five.vercel.app";
+  console.log(`\n--- 3. API & Functional Verification (${baseUrl}) ---`);
 
   try {
     // 1. Auto-login
-    const loginRes = await fetch("http://localhost:3000/api/auth/auto-login", { method: "POST" });
+    const loginRes = await fetch(`${baseUrl}/api/auth/auto-login`, { method: "POST" });
     assert(loginRes.status === 200, "CHAT-12.1", "POST /api/auth/auto-login returns HTTP 200");
     const loginData = await loginRes.json();
     const token = loginData.token;
@@ -191,10 +192,11 @@ async function runChatbotScrollLayoutTests() {
     };
 
     // 2. Send first message
-    const sendRes1 = await fetch("http://localhost:3000/api/chat", {
+    const sendRes1 = await fetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers,
       body: JSON.stringify({ message: "What claims and words are strictly prohibited in our brand guidelines?" }),
+      signal: AbortSignal.timeout(15000),
     });
     assert(sendRes1.status === 200, "CHAT-01.API", "POST /api/chat initial message returns HTTP 200");
     const data1 = await sendRes1.json();
@@ -202,20 +204,24 @@ async function runChatbotScrollLayoutTests() {
     assert(data1.reply?.length > 30, "CHAT-04.API", "Received substantive AI response with guidelines");
 
     // 3. Send long follow-up
-    const sendRes2 = await fetch("http://localhost:3000/api/chat", {
+    const sendRes2 = await fetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers,
       body: JSON.stringify({
         sessionId: data1.sessionId,
         message: "Provide an exhaustive list of color contrast WCAG guidelines for brand buttons.",
       }),
+      signal: AbortSignal.timeout(15000),
     });
     assert(sendRes2.status === 200, "CHAT-07.API", "POST /api/chat follow-up message returns HTTP 200");
     const data2 = await sendRes2.json();
     assert(data2.sessionId === data1.sessionId, "CHAT-12.3", "Preserved conversation sessionId across multi-turn");
 
     // 4. Retrieve session messages
-    const histRes = await fetch(`http://localhost:3000/api/chat?sessionId=${data1.sessionId}`, { headers });
+    const histRes = await fetch(`${baseUrl}/api/chat?sessionId=${data1.sessionId}`, {
+      headers,
+      signal: AbortSignal.timeout(15000),
+    });
     assert(histRes.status === 200, "CHAT-12.4", "GET /api/chat?sessionId=... retrieves full conversation history");
     const histData = await histRes.json();
     assert(histData.messages?.length >= 4, "CHAT-12.5", `Retrieved ${histData.messages?.length} messages in conversation`);

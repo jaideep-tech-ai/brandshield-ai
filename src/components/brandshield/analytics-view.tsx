@@ -247,7 +247,7 @@ export function AnalyticsView() {
                 <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="rounded-xl border border-amber-200/70 bg-white p-4">
                   <div className="flex items-start justify-between gap-2">
                     <p className="line-clamp-2 text-xs font-medium leading-relaxed text-slate-700">{p.rule}</p>
-                    <Badge variant="outline" className={cn("shrink-0 text-[10px]", p.frictionScore >= 0.6 ? "border-red-200 bg-red-50 text-red-600" : p.frictionScore >= 0.35 ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-50 text-slate-500")}>
+                    <Badge variant="outline" className={cn("shrink-0 text-[10px]", p.frictionScore >= 0.6 ? "border-red-200 bg-red-50 text-red-700 font-semibold" : p.frictionScore >= 0.35 ? "border-amber-200 bg-amber-50 text-amber-700 font-semibold" : "border-slate-200 bg-slate-50 text-slate-700 font-medium")}>
                       {p.frictionScore >= 0.6 ? t("analytics.frictionAmbiguous") : p.frictionScore >= 0.35 ? t("analytics.frictionHigh") : t("analytics.frictionWatch")}
                     </Badge>
                   </div>

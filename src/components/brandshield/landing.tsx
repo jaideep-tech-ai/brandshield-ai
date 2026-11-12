@@ -307,7 +307,7 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
                   <LogoMark className="size-6 rounded-md" />
                   <span className="text-sm font-semibold text-slate-900">{t("landing.mock.title")}</span>
                 </div>
-                <Badge variant="outline" className="border-slate-200 text-xs text-slate-500">
+                <Badge variant="outline" className="border-slate-200 text-xs text-slate-700 font-medium">
                   {t("landing.mock.draft")}
                 </Badge>
               </div>

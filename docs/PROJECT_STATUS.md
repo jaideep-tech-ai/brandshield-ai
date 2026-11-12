@@ -1,10 +1,8 @@
 # BrandShield AI — Project Status & Technical Inventory
 
-**Last Updated**: 2026-11-10  
+**Last Updated**: 2026-11-12  
 **Current Branch**: `main` (synchronized across local, GitHub `origin`, and GitLab `gitlab`)  
 **Production URL**: https://brandshield-ai-five.vercel.app  
-**Latest Deployment**: `dpl_ERXMe3P4Tg13akbPigwu4r6fvYGr` (Status: ● Ready)  
-**Database**: Neon PostgreSQL (Synced live with all tables)  
 **Lead Engineer / Architect**: AI Engineering Partner
 
 ---
@@ -18,7 +16,10 @@ All core subsystems, zero-touch automated access, pre-publishing webhook receive
 - **ESLint (`bun run lint`)**: 0 errors, 0 warnings
 - **i18n Translation Integrity (`bun scripts/check-i18n.ts`)**: 910/910 keys resolved across 136 files (100% type-checked bilingual EN ⇄ HI)
 - **Feature Verification Test Suite (`bun scripts/verify-features.mjs`)**: 112/112 tests passed across 16 comprehensive suites
-- **Next.js Production Build (`bun run build`)**: 42/42 static pages and dynamic API routes compiled successfully
+- **Next.js Production Build (`bun run build`)**: 44/44 static pages and dynamic API routes compiled successfully
+- **Chatbot Layout & Scroll Suite (`bun tests/test-chatbot-scroll-layout.mjs`)**: 28/28 tests passed
+- **Vector RAG & Chatbot Test Suite (`bun tests/test-rag-and-chatbot.mjs`)**: 30/30 tests passed
+- **WCAG 2.1 AA Accessibility & Contrast**: 100% compliant ($\ge 6.15:1$ to $9.90:1$ across all secondary and muted badges, eliminating previous 4.0:1 defects)
 - **GitLab CI/CD Pipeline (`.gitlab-ci.yml`)**: Validated via GitLab CI Lint API (`valid: true, errors: []`)
 
 ---

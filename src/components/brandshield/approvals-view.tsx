@@ -99,7 +99,7 @@ export function ApprovalsView() {
                   <span className={cn("h-2.5 w-2.5 rounded-full", col.accent)} />
                   <h3 className="text-sm font-semibold text-slate-700">{t(`common.status.${col.status}`)}</h3>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">{grouped.get(col.status)?.length ?? 0}</span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">{grouped.get(col.status)?.length ?? 0}</span>
               </div>
               <div className="space-y-2.5">
                 <AnimatePresence initial={false}>
