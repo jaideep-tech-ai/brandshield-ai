@@ -1,7 +1,7 @@
 db/*.db
 db/*.db-journal
 db/*.sqlite
-upload/
+/upload/
 dev.log
 server.log
 *.log
