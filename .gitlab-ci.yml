@@ -65,7 +65,6 @@ unit-tests:
     - if: $CI_PIPELINE_SOURCE == "push"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   before_script:
-    - apk add --no-cache openssl
     - bun install --frozen-lockfile || bun install
     - DATABASE_URL="file:./test.db" bun x prisma generate --schema prisma/schema.prisma
     - bun x prisma validate --schema prisma/schema.prisma
@@ -82,7 +81,6 @@ production-build:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
   before_script:
-    - apk add --no-cache openssl
     - bun install --frozen-lockfile || bun install
     - DATABASE_URL="file:./test.db" bun x prisma generate --schema prisma/schema.prisma
   script:
