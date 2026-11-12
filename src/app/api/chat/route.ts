@@ -449,7 +449,7 @@ ${
             temperature: 0.2,
             max_tokens: 1200,
           }),
-          signal: AbortSignal.timeout(28000),
+          signal: AbortSignal.timeout(6000),
         });
 
         if (aiResponse.ok) {
@@ -466,6 +466,48 @@ ${
               ruleTag: p.ruleTag,
               textSnippet: p.text.slice(0, 240).trim(),
             }));
+          }
+        } else if (baseUrl.includes("generativelanguage.googleapis.com")) {
+          // Fallback to native Gemini generateContent endpoint
+          try {
+            const nativeContents = [
+              ...conversationHistory.map((m) => ({
+                role: m.role === "assistant" ? "model" : "user",
+                parts: [{ text: m.content }],
+              })),
+              { role: "user", parts: [{ text: message }] },
+            ];
+            const nativeRes = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  systemInstruction: { parts: [{ text: systemPrompt }] },
+                  contents: nativeContents,
+                  generationConfig: { temperature: 0.2 },
+                }),
+                signal: AbortSignal.timeout(6000),
+              }
+            );
+            if (nativeRes.ok) {
+              const nativeData = (await nativeRes.json()) as {
+                candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+              };
+              const nativeContent = nativeData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              if (nativeContent) {
+                reply = nativeContent;
+                aiProvider = "gemini";
+                citations = passages.slice(0, 4).map((p) => ({
+                  documentTitle: p.documentTitle,
+                  pageNumber: p.pageNumber,
+                  ruleTag: p.ruleTag,
+                  textSnippet: p.text.slice(0, 240).trim(),
+                }));
+              }
+            }
+          } catch {
+            // ignore and proceed to deterministic synthesis
           }
         } else {
           console.warn(`[ChatAPI] External AI provider error (${aiResponse.status}). Falling back to deterministic synthesis.`);
