@@ -7,9 +7,9 @@ import { appendAuditLog } from "@/lib/brandshield/server/engine";
 
 export const maxDuration = 60;
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getSessionUser();
+    const user = await getSessionUser(req);
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     requireRole(user, "admin");
 
