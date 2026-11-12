@@ -22,6 +22,7 @@ import {
   Sparkles,
   GraduationCap,
   HelpCircle,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import { useLogout, useSession } from "@/lib/brandshield/client";
@@ -179,7 +180,7 @@ function IconNavButton({
 
 export function Shell({ children }: { children: ReactNode }) {
   const session = useSession();
-  const { view, setView, sidebarCollapsed, toggleSidebar, setTourOpen } = useUIStore();
+  const { view, setView, sidebarCollapsed, toggleSidebar, setTourOpen, setChatbotOpen } = useUIStore();
   const { t } = useLang();
   const logout = useLogout();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -369,6 +370,17 @@ export function Shell({ children }: { children: ReactNode }) {
                   <HelpCircle className="size-4 text-teal-600 shrink-0" />
                   <span>{t("help.modal.title")}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    setChatbotOpen(true);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-teal-50 hover:text-teal-700 transition min-h-[44px]"
+                >
+                  <MessageSquare className="size-4 text-teal-600 shrink-0" />
+                  <span>Conversational Chatbot</span>
+                </button>
               </div>
             </SheetContent>
           </Sheet>
@@ -424,6 +436,17 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               <HelpCircle className="size-4" />
               <span className="hidden sm:inline">{t("help.trigger.btn")}</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setChatbotOpen(true)}
+              className="hidden sm:inline-flex gap-1.5 rounded-lg border-teal-200 bg-teal-50/60 font-semibold text-teal-800 hover:bg-teal-100 hover:text-teal-900 shadow-2xs"
+              aria-label="Open AI Chatbot"
+            >
+              <MessageSquare className="size-3.5 text-teal-600" />
+              <span>Chatbot</span>
             </Button>
 
             <DropdownMenu>

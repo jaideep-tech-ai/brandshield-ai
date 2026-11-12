@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
-import { searchKnowledgeHybrid } from "@/lib/brandshield/server/vector-rag";
+import { searchKnowledgeHybrid, getEmbeddingStatus } from "@/lib/brandshield/server/vector-rag";
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getSessionUser();
+    const user = await getSessionUser(req);
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -30,10 +30,18 @@ export async function POST(req: NextRequest) {
       minSimilarity: typeof body.minSimilarity === "number" ? body.minSimilarity : 0.35,
     });
 
+    const hasVector = passages.some((p) => p.matchType === "vector" || p.matchType === "hybrid");
+    const embeddingStatus = getEmbeddingStatus();
+
     return NextResponse.json({
       passages,
       total: passages.length,
       query,
+      searchMode: hasVector ? "hybrid_vector" : "lexical_fallback",
+      vectorActive: hasVector,
+      embeddingProvider: embeddingStatus.provider,
+      embeddingModel: embeddingStatus.model,
+      embeddingDimensions: embeddingStatus.dimensions,
     });
   } catch (e) {
     return jsonError(e);

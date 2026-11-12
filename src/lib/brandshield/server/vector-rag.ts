@@ -122,6 +122,24 @@ export interface EmbeddingConfig {
   dimensions: number;
 }
 
+export function getEmbeddingStatus(): {
+  configured: boolean;
+  provider: "openai" | "gemini" | null;
+  model: string | null;
+  dimensions: number | null;
+} {
+  const cfg = getEmbeddingConfig();
+  if (!cfg) {
+    return { configured: false, provider: null, model: null, dimensions: null };
+  }
+  return {
+    configured: true,
+    provider: cfg.provider,
+    model: cfg.model,
+    dimensions: cfg.dimensions,
+  };
+}
+
 export function getEmbeddingConfig(): EmbeddingConfig | null {
   const openAiKey =
     process.env.OPENAI_API_KEY?.trim() ||
@@ -146,7 +164,7 @@ export function getEmbeddingConfig(): EmbeddingConfig | null {
       apiKey: geminiKey,
       baseUrl: "https://generativelanguage.googleapis.com/v1beta",
       model: "models/gemini-embedding-001",
-      dimensions: 3072,
+      dimensions: 1536,
     };
   }
 
@@ -155,7 +173,7 @@ export function getEmbeddingConfig(): EmbeddingConfig | null {
 
 /**
  * Generate dimensional embeddings for a batch of text strings.
- * Supports OpenAI text-embedding-3-small (1536-dim) and Google Gemini gemini-embedding-001 (3072-dim).
+ * Supports OpenAI text-embedding-3-small (1536-dim) and Google Gemini gemini-embedding-001 (1536-dim).
  * Includes exponential backoff retries and batch chunking (max 32 texts/request).
  * Strict: Never returns fake, random, or mock embeddings.
  */
@@ -164,7 +182,7 @@ export async function generateEmbeddings(
 ): Promise<{ embeddings: (number[] | null)[]; model: string; dimensions: number } | null> {
   const config = getEmbeddingConfig();
   if (!config) {
-    console.warn("Embedding credentials not configured (OPENAI_API_KEY / EMBEDDING_API_KEY / GEMINI_API_KEY absent).");
+    console.warn("[VectorRAG] Embedding credentials not configured (OPENAI_API_KEY / EMBEDDING_API_KEY / GEMINI_API_KEY absent). Operating in BM25 lexical fallback mode.");
     return null;
   }
 
@@ -188,6 +206,7 @@ export async function generateEmbeddings(
               requests: batch.map((t) => ({
                 model: "models/gemini-embedding-001",
                 content: { parts: [{ text: t.slice(0, 8000) }] },
+                outputDimensionality: 1536,
               })),
             }),
           });
@@ -206,36 +225,28 @@ export async function generateEmbeddings(
           }
           batchSuccess = true;
         } else {
-          const endpoint = `${config.baseUrl.replace(/\/+$/, "")}/embeddings`;
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${config.apiKey}`,
-            },
-            body: JSON.stringify({
-              model: config.model,
-              input: batch.map((t) => t.slice(0, 8000)), // Limit individual input tokens
-            }),
+          // Official OpenAI SDK integration
+          const OpenAI = (await import("openai")).default;
+          const openai = new OpenAI({
+            apiKey: config.apiKey,
+            baseURL: config.baseUrl,
+            timeout: 25000,
           });
 
-          if (!res.ok) {
-            const errText = await res.text().catch(() => "");
-            throw new Error(`Embedding API returned status ${res.status}: ${errText}`);
-          }
+          const resp = await openai.embeddings.create({
+            model: config.model,
+            input: batch.map((t) => t.slice(0, 8000)),
+            ...(config.model.includes("text-embedding-3") ? { dimensions: config.dimensions } : {}),
+          });
 
-          const data = (await res.json()) as {
-            data: { embedding: number[]; index: number }[];
-          };
-
-          const sorted = data.data.sort((a, b) => a.index - b.index);
+          const sorted = resp.data.sort((a, b) => a.index - b.index);
           for (const item of sorted) {
             allEmbeddings.push(item.embedding);
           }
           batchSuccess = true;
         }
       } catch (err) {
-        console.error(`Embedding generation attempt ${attempts} failed:`, err);
+        console.error(`[VectorRAG] Embedding generation attempt ${attempts} failed:`, err);
         if (attempts >= 3) {
           // Push nulls for failed batch rather than crashing
           for (let j = 0; j < batch.length; j++) allEmbeddings.push(null);
