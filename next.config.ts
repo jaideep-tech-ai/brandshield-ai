@@ -13,9 +13,6 @@ const nextConfig: NextConfig = {
   // Production hardening for hosting platforms
   poweredByHeader: false,
   compress: true,
-  turbopack: {
-    root: __dirname,
-  },
   async headers() {
     return [
       {
