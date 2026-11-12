@@ -67,8 +67,8 @@ unit-tests:
   before_script:
     - bun install --frozen-lockfile || bun install
     - DATABASE_URL="file:./test.db" bun x prisma generate --schema prisma/schema.prisma
-    - bun x prisma validate --schema prisma/schema.prisma
-    - bun x prisma validate --schema prisma/schema.postgres.prisma
+    - DATABASE_URL="file:./test.db" bun x prisma validate --schema prisma/schema.prisma
+    - DATABASE_URL="postgresql://test:test@localhost:5432/testdb" bun x prisma validate --schema prisma/schema.postgres.prisma
     - DATABASE_URL="file:./test.db" bun x prisma db push --schema prisma/schema.prisma --skip-generate
   script:
     - bun x tsc --noEmit
