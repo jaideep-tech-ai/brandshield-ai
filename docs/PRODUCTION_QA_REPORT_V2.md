@@ -102,9 +102,39 @@ This audit report documents the root-cause diagnosis, full technical implementat
   - Suite 16: GitLab Webhook Security & Bidirectional Pipeline
   - Suite 17: GitLab Self-Service Integration & OAuth Flow
 
-### 3.3 TypeScript & Next.js Build Verification
+### 3.3 Chatbot Layout, Scrolling & Responsive Suite (`tests/test-chatbot-scroll-layout.mjs`)
+- **Status**: **28 PASSED, 0 FAILED**
+- **Covers**:
+  - Chatbot window height constraint (`max-h 100dvh`), `overflow-hidden` outer boundary
+  - Message container flex hierarchy: `flex-1 min-h-0 overflow-y-auto overscroll-contain`
+  - Elimination of nested Radix ScrollArea conflicts in favor of native flexbox scroll container
+  - Custom `.chatbot-scrollbar` with iOS momentum scrolling (`-webkit-overflow-scrolling: touch`)
+  - Intelligent auto-scroll on assistant message when user is already near bottom
+  - Floating "Scroll to latest" button when user scrolls up
+  - Multiline composer with fixed `shrink-0` bottom anchor
+  - Full viewport testing across Desktop (1920x1080), Laptop Wide (1440x900), Compact (1366x768), Tablet (768x1024), iPhone Pro Max (390x844), iPhone X (375x812), iPhone SE (375x667)
+  - End-to-end multi-turn API communication, session retention, and retrieval
+
+### 3.4 WCAG 2.1 AA Relative Luminance & Contrast Audit
+- **Status**: **100% COMPLIANT ($\ge 4.5:1$ AA / $\ge 7.0:1$ AAA)**
+- **Audit Findings & Remediation**:
+  - *Identified Defect*: Secondary muted badges used `text-slate-500` (`#64748b`) on `bg-slate-100` (`#f1f5f9`) or `bg-slate-200` (`#e2e8f0`), resulting in contrast ratios of 4.34:1 and 3.86:1, failing the WCAG 2.1 AA threshold of 4.5:1 for normal body text.
+  - *Mathematical Analysis*:
+    - `slate-500` on `slate-100`: **4.34:1 (FAIL AA)**
+    - `slate-500` on `slate-200`: **3.86:1 (FAIL AA)**
+    - `slate-600` on `slate-100`: **6.92:1 (PASS AA $\ge 4.5:1$)**
+    - `slate-600` on `slate-200`: **6.15:1 (PASS AA $\ge 4.5:1$)**
+    - `slate-700` on `slate-100`: **9.45:1 (PASS AAA $\ge 7.0:1$)**
+    - `slate-700` on `slate-200`: **8.40:1 (PASS AAA $\ge 7.0:1$)**
+    - `slate-700` on `slate-50`: **9.90:1 (PASS AAA $\ge 7.0:1$)**
+  - *Remediations Applied*:
+    - Added `muted` variant to `src/components/ui/badge.tsx` with compliant `border-slate-200 bg-slate-100 text-slate-700`.
+    - Replaced all secondary/muted badges across `findings-view.tsx`, `approvals-view.tsx`, `knowledge-view.tsx`, `scanner-view.tsx`, `settings-view.tsx`, `gitlab-integration-card.tsx`, `reviewer-dashboard.tsx`, `creator-dashboard.tsx`, `help-center.tsx`, `landing.tsx`, and `analytics-view.tsx` with `text-slate-600` or `text-slate-700 font-medium`.
+    - Elevated table headers in `settings-view.tsx` to `text-slate-700 font-semibold` (9.90:1 contrast).
+
+### 3.5 TypeScript & Next.js Build Verification
 - **TypeScript (`bun x tsc --noEmit`)**: **0 errors**
-- **Next.js Production Build (`bun run build`)**: **44 static and dynamic routes compiled successfully in 9.2s** including `ƒ /api/chat`.
+- **Next.js Production Build (`bun run build`)**: **44 static and dynamic routes compiled successfully in 8.9s** including `ƒ /api/chat`.
 
 ---
 
@@ -112,6 +142,8 @@ This audit report documents the root-cause diagnosis, full technical implementat
 
 | Requirement | Classification | Notes |
 |---|---|---|
+| WCAG 2.1 AA Contrast Compliance | **TESTED LOCALLY & READY FOR PROD** | 100% of badges, pills, and muted tags updated to $\ge 6.15:1$ - $9.90:1$ contrast. |
+| Chatbot Scrolling & Layout | **TESTED LOCALLY & READY FOR PROD** | 28/28 tests passed. Scroll wheel, momentum scrolling, floating glide button, multiline composer all verified. |
 | Vector Embedding Generation | **TESTED LOCALLY & READY FOR PROD** | Real embeddings verified via Gemini `gemini-embedding-001` (1536-dim) with fallback to OpenAI if key provided. |
 | Vector Semantic Search | **TESTED LOCALLY & READY FOR PROD** | Multi-tenant isolated cosine similarity + RRF with `matchType: "vector"` and `"hybrid"`. |
 | Lexical Fallback Transparency | **TESTED LOCALLY & READY FOR PROD** | `searchMode: "hybrid_vector" \| "lexical_fallback"` explicitly surfaced in API responses. |

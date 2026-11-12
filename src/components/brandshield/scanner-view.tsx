@@ -347,7 +347,7 @@ export function ScannerView() {
                           <li key={i} className="rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-xs">
                             <div className="flex items-start justify-between gap-2">
                               <span className="font-medium text-slate-700">{v.claim.slice(0, 70)}{v.claim.length > 70 ? "…" : ""}</span>
-                              <Badge variant="outline" className={cn("shrink-0 text-[10px]", v.verdict === "SUPPORTED" && "border-emerald-200 bg-emerald-50 text-emerald-700", v.verdict === "UNSUPPORTED" && "border-red-200 bg-red-50 text-red-700", v.verdict === "UNVERIFIABLE" && "border-slate-200 bg-slate-50 text-slate-500")}>{t(`common.verdict.${v.verdict}`)}</Badge>
+                              <Badge variant="outline" className={cn("shrink-0 text-[10px]", v.verdict === "SUPPORTED" && "border-emerald-200 bg-emerald-50 text-emerald-700", v.verdict === "UNSUPPORTED" && "border-red-200 bg-red-50 text-red-700", v.verdict === "UNVERIFIABLE" && "border-slate-200 bg-slate-50 text-slate-700 font-medium")}>{t(`common.verdict.${v.verdict}`)}</Badge>
                             </div>
                             {v.citation && <p className="mt-1 text-[11px] italic text-slate-500">“{v.citation.slice(0, 110)}{v.citation.length > 110 ? "…" : ""}”</p>}
                           </li>
@@ -565,7 +565,7 @@ export function ScannerView() {
 function PipelineRow({ active, done, icon, label, detail, delay = 0 }: { active: boolean; done: boolean; icon: React.ReactNode; label: string; detail: string; delay?: number }) {
   return (
     <motion.div initial={{ opacity: 0, x: -8 }} animate={active ? { opacity: 1, x: 0 } : { opacity: 0.45, x: 0 }} transition={{ delay }} className="flex items-center gap-3">
-      <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg", done ? "bg-emerald-100 text-emerald-700" : active ? "bg-teal-100 text-teal-700" : "bg-slate-100 text-slate-400")}>
+      <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg", done ? "bg-emerald-100 text-emerald-700" : active ? "bg-teal-100 text-teal-700" : "bg-slate-100 text-slate-700 font-semibold")}>
         {done ? <CircleCheck className="h-4 w-4" /> : active ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
       </span>
       <div className="min-w-0">
@@ -621,7 +621,7 @@ function StageACard({ stageA }: { stageA: StageAResult }) {
       <CardContent className="p-5">
         <h3 className="flex items-center justify-between text-sm font-semibold text-slate-800">
           <span className="flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" /> {t("scanner.pipe.stageA.label")}</span>
-          <Badge variant="outline" className="text-[10px] text-slate-500">{stageA.durationMs} ms</Badge>
+          <Badge variant="outline" className="text-[10px] text-slate-600 font-mono font-medium">{stageA.durationMs} ms</Badge>
         </h3>
         <ul className="mt-3 space-y-1.5">
           {stageA.checks.map((c) => (

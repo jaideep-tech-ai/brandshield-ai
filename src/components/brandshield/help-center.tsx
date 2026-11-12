@@ -286,7 +286,7 @@ export function HelpCenterModal({
                         "flex size-8 shrink-0 items-center justify-center rounded-lg transition",
                         active
                           ? "bg-teal-600 text-white"
-                          : "bg-slate-100 text-slate-500 group-hover:text-slate-700"
+                          : "bg-slate-100 text-slate-700 group-hover:text-slate-900"
                       )}
                     >
                       <Icon className="size-4" />

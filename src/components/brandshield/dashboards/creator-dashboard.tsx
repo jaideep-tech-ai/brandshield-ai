@@ -214,8 +214,8 @@ export function CreatorDashboard() {
             </div>
 
             {mode === "banner" && (
-              <p className="mb-3 flex items-start gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <p className="mb-3 flex items-start gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
                 {t("dash.creator.composer.bannerNote")}
               </p>
             )}

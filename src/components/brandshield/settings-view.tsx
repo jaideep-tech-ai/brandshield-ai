@@ -400,7 +400,7 @@ export function SettingsView() {
               ))}
             </div>
           ) : members.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
+            <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-600">
               {t("settings.team.noMembers")}
             </p>
           ) : (
@@ -410,9 +410,9 @@ export function SettingsView() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-slate-100 bg-slate-50/60 hover:bg-slate-50/60">
-                      <TableHead className="text-slate-500">{t("settings.team.colName")}</TableHead>
-                      <TableHead className="text-slate-500">{t("settings.team.colRole")}</TableHead>
-                      <TableHead className="text-slate-500">{t("settings.team.colDepartment")}</TableHead>
+                      <TableHead className="text-slate-700 font-semibold">{t("settings.team.colName")}</TableHead>
+                      <TableHead className="text-slate-700 font-semibold">{t("settings.team.colRole")}</TableHead>
+                      <TableHead className="text-slate-700 font-semibold">{t("settings.team.colDepartment")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -473,9 +473,9 @@ export function SettingsView() {
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-100 bg-slate-50/60 hover:bg-slate-50/60">
-                  <TableHead className="min-w-44 text-slate-500">{t("settings.perm.colCapability")}</TableHead>
+                  <TableHead className="min-w-44 text-slate-700 font-semibold">{t("settings.perm.colCapability")}</TableHead>
                   {ROLE_ORDER.map((role) => (
-                    <TableHead key={role} className="min-w-20 text-center text-slate-500">
+                    <TableHead key={role} className="min-w-20 text-center text-slate-700 font-semibold">
                       {t(`common.role.${role}`)}
                     </TableHead>
                   ))}
@@ -530,7 +530,7 @@ export function SettingsView() {
                 <Briefcase className="h-3 w-3 text-slate-400" /> {session.department}
               </Badge>
             ) : (
-              <Badge variant="outline" className="border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-500">
+              <Badge variant="outline" className="border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600 font-medium">
                 {t("settings.session.noDept")}
               </Badge>
             )}

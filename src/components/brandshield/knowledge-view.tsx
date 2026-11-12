@@ -507,7 +507,7 @@ export function KnowledgeView() {
                           <Badge variant="outline" className={cn("border", meta?.cls ?? DOC_TYPE_DEFAULT_CLS)}>
                             {docTypeLabel(doc.docType)}
                           </Badge>
-                          <Badge variant="outline" className="border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-500">
+                          <Badge variant="outline" className="border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-600">
                             v{doc.version}
                           </Badge>
                           {doc.status === "processing" ? (
@@ -662,7 +662,7 @@ export function KnowledgeView() {
                   <span className="text-xs text-slate-400">({colorTokens.length})</span>
                 </div>
                 {colorTokens.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
+                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-600">
                     {t("knowledge.tokens.emptyColor")}
                   </p>
                 ) : (
@@ -694,7 +694,7 @@ export function KnowledgeView() {
                               {token.secondary && (
                                 <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
                                   <span className="h-2.5 w-2.5 rounded-full border border-black/10" style={{ backgroundColor: token.secondary }} />
-                                  <span className="font-mono text-[10px] text-slate-500">{token.secondary.toUpperCase()}</span>
+                                  <span className="font-mono text-[10px] text-slate-700 font-medium">{token.secondary.toUpperCase()}</span>
                                 </span>
                               )}
                             </div>
@@ -715,7 +715,7 @@ export function KnowledgeView() {
                   <span className="text-xs text-slate-400">({typographyTokens.length})</span>
                 </div>
                 {typographyTokens.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
+                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-600">
                     {t("knowledge.tokens.emptyTypography")}
                   </p>
                 ) : (
@@ -761,7 +761,7 @@ export function KnowledgeView() {
                   <span className="text-xs text-slate-400">({logoTokens.length})</span>
                 </div>
                 {logoTokens.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-500">
+                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-xs text-slate-600">
                     {t("knowledge.tokens.emptyLogo")}
                   </p>
                 ) : (
@@ -1027,10 +1027,10 @@ export function KnowledgeView() {
                   <Badge variant="outline" className={cn("border", DOC_TYPE_META[fullDoc.docType]?.cls ?? DOC_TYPE_DEFAULT_CLS)}>
                     {docTypeLabel(fullDoc.docType)}
                   </Badge>
-                  <Badge variant="outline" className="border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-500">
+                  <Badge variant="outline" className="border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-600">
                     v{fullDoc.version}
                   </Badge>
-                  <Badge variant="outline" className="border-slate-200 bg-slate-50 text-[10px] text-slate-500">
+                  <Badge variant="outline" className="border-slate-200 bg-slate-50 text-[10px] text-slate-600">
                     {t("knowledge.docs.chunks", { count: fullDoc.chunkCount })}
                   </Badge>
                 </div>
