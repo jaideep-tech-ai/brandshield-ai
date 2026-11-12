@@ -13,7 +13,7 @@ const dict = {
     "submissions.empty": "No submissions yet — run a pre-flight scan first.",
 
     // Workspace
-    "loading": "Loading workspace…",
+    "loading": "Loading compliance findings…",
     "unassigned": "Unassigned",
 
     // Toolbar
@@ -75,7 +75,7 @@ const dict = {
     "submissions.empty": "अभी कोई सबमिशन नहीं — पहले प्री-फ़्लाइट स्कैन चलाएँ।",
 
     // Workspace
-    "loading": "वर्कस्पेस लोड हो रहा है…",
+    "loading": "अनुपालन निष्कर्ष लोड हो रहे हैं…",
     "unassigned": "अनअसाइंड",
 
     // Toolbar

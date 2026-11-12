@@ -182,7 +182,7 @@ export function extractFigmaTokens(nodes: FigmaNode[]): {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getSessionUser();
+    const user = await getSessionUser(req);
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }

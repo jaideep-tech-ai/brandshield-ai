@@ -299,9 +299,9 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
           >
             <div
               aria-hidden
-              className="absolute inset-0 translate-x-3 translate-y-3 rounded-2xl border border-teal-100 bg-teal-50/60"
+              className="absolute inset-0 translate-x-1 translate-y-1 sm:translate-x-3 sm:translate-y-3 rounded-2xl border border-teal-100 bg-teal-50/60"
             />
-            <div className="relative z-10 rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-teal-900/5 sm:p-6">
+            <div className="relative z-10 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-teal-900/5 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <LogoMark className="size-6 rounded-md" />
@@ -344,9 +344,9 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
               <div className="mt-5">
                 <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                   <span>{t("landing.mock.complianceScore")}</span>
-                  <span className="text-slate-900">62/100</span>
+                  <span className="text-slate-900 font-semibold">62/100</span>
                 </div>
-                <Progress value={62} className="mt-2 h-2 bg-slate-100 [&>div]:bg-amber-500" />
+                <Progress value={62} aria-label={t("landing.mock.complianceScore")} className="mt-2 h-2 bg-slate-100 [&>div]:bg-amber-500" />
               </div>
             </div>
 
@@ -354,9 +354,9 @@ export function Landing({ onGetStarted }: { onGetStarted: () => void }) {
             <motion.div
               animate={{ y: [0, -10, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -right-2 -top-5 z-20 sm:-right-6"
+              className="absolute right-0 -top-4 z-20 sm:-right-4"
             >
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs font-medium text-teal-700 shadow-md shadow-teal-900/5">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-medium text-teal-700 shadow-md shadow-teal-900/5">
                 <BadgeCheck className="size-3.5" />
                 {t("landing.mock.citationsVerified")}
               </span>

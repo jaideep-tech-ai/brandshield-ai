@@ -53,6 +53,7 @@ import "@/lib/brandshield/i18n/dict-shell";
 import "@/lib/brandshield/i18n/dict-help";
 import { RoleSwitcher } from "@/components/brandshield/role-switcher";
 import { HelpCenterModal, openHelpCenter } from "@/components/brandshield/help-center";
+import { GlobalChatbotWidget } from "@/components/brandshield/global-chatbot";
 
 // ─── Navigation model (role-gated) ───────────────────────────────────────────
 
@@ -407,7 +408,7 @@ export function Shell({ children }: { children: ReactNode }) {
               variant="ghost"
               size="sm"
               onClick={startTour}
-              className="gap-1.5 rounded-lg text-slate-500 hover:bg-teal-50 hover:text-teal-700"
+              className="hidden md:inline-flex gap-1.5 rounded-lg text-slate-500 hover:bg-teal-50 hover:text-teal-700"
               aria-label={t("shell.header.tourAria")}
             >
               <GraduationCap className="size-4" />
@@ -418,7 +419,7 @@ export function Shell({ children }: { children: ReactNode }) {
               variant="ghost"
               size="sm"
               onClick={() => openHelpCenter()}
-              className="gap-1.5 rounded-lg text-slate-500 hover:bg-teal-50 hover:text-teal-700"
+              className="hidden md:inline-flex gap-1.5 rounded-lg text-slate-500 hover:bg-teal-50 hover:text-teal-700"
               aria-label={t("help.trigger.aria")}
             >
               <HelpCircle className="size-4" />
@@ -584,6 +585,9 @@ export function Shell({ children }: { children: ReactNode }) {
 
       {/* Global bilingual Help Center with 10 comprehensive guides */}
       <HelpCenterModal onNavigate={(v) => goTo(v as ViewKey)} />
+
+      {/* Global 24/7 conversational compliance chatbot */}
+      <GlobalChatbotWidget />
     </div>
   );
 }

@@ -115,6 +115,7 @@ export function chunkDocumentPages(
 // ─── Phase 4: Embedding Provider & Batch Generation ───────────────────────────
 
 export interface EmbeddingConfig {
+  provider: "openai" | "gemini";
   apiKey: string;
   baseUrl: string;
   model: string;
@@ -122,26 +123,39 @@ export interface EmbeddingConfig {
 }
 
 export function getEmbeddingConfig(): EmbeddingConfig | null {
-  const apiKey =
+  const openAiKey =
     process.env.OPENAI_API_KEY?.trim() ||
     process.env.EMBEDDING_API_KEY?.trim() ||
     process.env.ZAI_API_KEY?.trim();
 
-  const baseUrl =
-    process.env.OPENAI_BASE_URL?.trim() ||
-    process.env.EMBEDDING_BASE_URL?.trim() ||
-    process.env.ZAI_BASE_URL?.trim() ||
-    "https://api.openai.com/v1";
+  if (openAiKey) {
+    const baseUrl =
+      process.env.OPENAI_BASE_URL?.trim() ||
+      process.env.EMBEDDING_BASE_URL?.trim() ||
+      process.env.ZAI_BASE_URL?.trim() ||
+      "https://api.openai.com/v1";
+    const model = process.env.EMBEDDING_MODEL?.trim() || "text-embedding-3-small";
+    const dimensions = parseInt(process.env.EMBEDDING_DIMENSIONS || "1536", 10);
+    return { provider: "openai", apiKey: openAiKey, baseUrl, model, dimensions };
+  }
 
-  const model = process.env.EMBEDDING_MODEL?.trim() || "text-embedding-3-small";
-  const dimensions = parseInt(process.env.EMBEDDING_DIMENSIONS || "1536", 10);
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  if (geminiKey) {
+    return {
+      provider: "gemini",
+      apiKey: geminiKey,
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      model: "models/gemini-embedding-001",
+      dimensions: 3072,
+    };
+  }
 
-  if (!apiKey) return null;
-  return { apiKey, baseUrl, model, dimensions };
+  return null;
 }
 
 /**
- * Generate 1536-dimensional embeddings for a batch of text strings.
+ * Generate dimensional embeddings for a batch of text strings.
+ * Supports OpenAI text-embedding-3-small (1536-dim) and Google Gemini gemini-embedding-001 (3072-dim).
  * Includes exponential backoff retries and batch chunking (max 32 texts/request).
  * Strict: Never returns fake, random, or mock embeddings.
  */
@@ -150,7 +164,7 @@ export async function generateEmbeddings(
 ): Promise<{ embeddings: (number[] | null)[]; model: string; dimensions: number } | null> {
   const config = getEmbeddingConfig();
   if (!config) {
-    console.warn("Embedding credentials not configured (OPENAI_API_KEY / ZAI_API_KEY absent).");
+    console.warn("Embedding credentials not configured (OPENAI_API_KEY / EMBEDDING_API_KEY / GEMINI_API_KEY absent).");
     return null;
   }
 
@@ -165,33 +179,61 @@ export async function generateEmbeddings(
     while (attempts < 3 && !batchSuccess) {
       attempts++;
       try {
-        const endpoint = `${config.baseUrl.replace(/\/+$/, "")}/embeddings`;
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: config.model,
-            input: batch.map((t) => t.slice(0, 8000)), // Limit individual input tokens
-          }),
-        });
+        if (config.provider === "gemini") {
+          const endpoint = `${config.baseUrl}/models/gemini-embedding-001:batchEmbedContents?key=${config.apiKey}`;
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requests: batch.map((t) => ({
+                model: "models/gemini-embedding-001",
+                content: { parts: [{ text: t.slice(0, 8000) }] },
+              })),
+            }),
+          });
 
-        if (!res.ok) {
-          const errText = await res.text().catch(() => "");
-          throw new Error(`Embedding API returned status ${res.status}: ${errText}`);
+          if (!res.ok) {
+            const errText = await res.text().catch(() => "");
+            throw new Error(`Gemini Embedding API returned status ${res.status}: ${errText}`);
+          }
+
+          const data = (await res.json()) as {
+            embeddings: { values: number[] }[];
+          };
+
+          for (const item of data.embeddings || []) {
+            allEmbeddings.push(item.values);
+          }
+          batchSuccess = true;
+        } else {
+          const endpoint = `${config.baseUrl.replace(/\/+$/, "")}/embeddings`;
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${config.apiKey}`,
+            },
+            body: JSON.stringify({
+              model: config.model,
+              input: batch.map((t) => t.slice(0, 8000)), // Limit individual input tokens
+            }),
+          });
+
+          if (!res.ok) {
+            const errText = await res.text().catch(() => "");
+            throw new Error(`Embedding API returned status ${res.status}: ${errText}`);
+          }
+
+          const data = (await res.json()) as {
+            data: { embedding: number[]; index: number }[];
+          };
+
+          const sorted = data.data.sort((a, b) => a.index - b.index);
+          for (const item of sorted) {
+            allEmbeddings.push(item.embedding);
+          }
+          batchSuccess = true;
         }
-
-        const data = (await res.json()) as {
-          data: { embedding: number[]; index: number }[];
-        };
-
-        const sorted = data.data.sort((a, b) => a.index - b.index);
-        for (const item of sorted) {
-          allEmbeddings.push(item.embedding);
-        }
-        batchSuccess = true;
       } catch (err) {
         console.error(`Embedding generation attempt ${attempts} failed:`, err);
         if (attempts >= 3) {

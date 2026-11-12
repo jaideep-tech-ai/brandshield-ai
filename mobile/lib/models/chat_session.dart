@@ -42,3 +42,4 @@ class ChatSession {
         'messageCount': messageCount,
       };
 }
+

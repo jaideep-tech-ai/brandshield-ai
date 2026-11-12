@@ -6,7 +6,7 @@ import { appendAuditLog } from "@/lib/brandshield/server/engine";
 import { OAUTH_NONCE_COOKIE } from "@/lib/brandshield/server/google";
 
 export async function POST(req: NextRequest) {
-  const user = await getSessionUser();
+  const user = await getSessionUser(req);
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }

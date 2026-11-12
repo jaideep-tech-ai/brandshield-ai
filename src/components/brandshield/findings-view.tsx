@@ -178,8 +178,8 @@ export function FindingsView() {
         <ContextualHelpButton guideKey="findings" labelKey="help.needHelp.findings" className="hidden sm:inline-flex shrink-0" />
       </div>
 
-      {submissions.isLoading ? (
-        <div className="flex h-64 flex-col items-center justify-center text-slate-400 gap-2">
+      {submissions.isLoading || (submissions.data && submissions.data.length > 0 && isLoading && !sub) ? (
+        <div className="flex h-64 flex-col items-center justify-center text-slate-500 gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
           <span className="text-xs sm:text-sm font-medium">{t("findings.loading")}</span>
         </div>

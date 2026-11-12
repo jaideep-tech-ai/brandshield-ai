@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getSessionUser } from "@/lib/brandshield/server/auth";
+import { requireUser } from "@/lib/brandshield/server/auth";
 import { jsonError } from "@/lib/brandshield/server/json";
 
 export interface TourStatePayload {
@@ -14,10 +14,9 @@ export interface TourStatePayload {
   updatedAt?: string;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const user = await getSessionUser();
-    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    const user = await requireUser(req);
 
     const dbUser = await db.user.findUnique({
       where: { id: user.id },
@@ -98,8 +97,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getSessionUser();
-    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    const user = await requireUser(req);
 
     const body = (await req.json().catch(() => ({}))) as {
       completed?: boolean;

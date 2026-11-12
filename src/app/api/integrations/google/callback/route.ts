@@ -8,7 +8,7 @@ import {
 } from "@/lib/brandshield/server/google";
 
 export async function GET(req: NextRequest) {
-  const user = await getSessionUser();
+  const user = await getSessionUser(req);
   if (!user) {
     return NextResponse.redirect(new URL("/?auth=error&reason=unauthenticated", req.url));
   }

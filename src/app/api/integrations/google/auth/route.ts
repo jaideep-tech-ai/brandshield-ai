@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/brandshield/server/auth";
 import { generateGoogleOAuthState, OAUTH_NONCE_COOKIE } from "@/lib/brandshield/server/google";
 
 export async function GET(req: NextRequest) {
-  const user = await getSessionUser();
+  const user = await getSessionUser(req);
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }

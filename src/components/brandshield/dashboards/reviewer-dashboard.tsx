@@ -195,9 +195,9 @@ export function ReviewerDashboard() {
                     key={s.id}
                     className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-100 bg-white px-4 py-3 transition hover:border-amber-200 hover:bg-amber-50/30"
                   >
-                    <span className="min-w-0 flex-1 basis-48">
+                    <span className="min-w-0 flex-1 basis-full sm:basis-48">
                       <span className="block truncate text-sm font-medium text-slate-800">{s.title}</span>
-                      <span className="block truncate text-xs text-slate-400">
+                      <span className="block truncate text-xs text-slate-500">
                         {s.authorName ?? "—"} · {s.department ?? "—"}
                       </span>
                     </span>
@@ -296,9 +296,9 @@ export function ReviewerDashboard() {
                       key={a.id}
                       className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-slate-100 bg-white px-3 py-2.5"
                     >
-                      <span className="min-w-0 flex-1 basis-32">
+                      <span className="min-w-0 flex-1 basis-full sm:basis-32">
                         <span className="block truncate text-sm font-medium text-slate-800">{actionLabel(a.action)}</span>
-                        <span className="block truncate text-xs text-slate-400">{a.actorName ?? a.actorId}</span>
+                        <span className="block truncate text-xs text-slate-500">{a.actorName ?? a.actorId}</span>
                       </span>
                       <code className="hidden shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 sm:block">
                         {shortHash(a.contentHash)}

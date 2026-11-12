@@ -124,6 +124,10 @@ export function useSession(options?: Partial<UseQueryOptions<SessionUser | null>
   return useQuery<SessionUser | null>({
     queryKey: ["session"],
     queryFn: async () => {
+      // Prevent unnecessary 401 console logs for anonymous landing page visitors
+      if (typeof window !== "undefined" && !hasAuthHint() && !getStoredToken()) {
+        return null;
+      }
       try {
         const user = await api.get<SessionUser>("/api/auth/me");
         if (user.token) setStoredToken(user.token);
@@ -135,6 +139,7 @@ export function useSession(options?: Partial<UseQueryOptions<SessionUser | null>
       }
     },
     staleTime: 60_000,
+    retry: false,
     ...options,
   });
 }
@@ -256,9 +261,15 @@ export function useUploadGuidelinePdf() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (formData: FormData) => {
+      const token = getStoredToken();
+      const headers: Record<string, string> = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
       const res = await fetch("/api/guidelines/upload", {
         method: "POST",
+        headers,
         body: formData,
+        credentials: "same-origin",
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

@@ -81,8 +81,8 @@ function buildSteps(role: Role): TourStep[] {
         { view: "dashboard", target: "[data-tour='queue']", icon: ListOrdered, titleKey: "tour.reviewer.s1.title", bodyKey: "tour.reviewer.s1.body" },
         { view: "knowledge", target: null, icon: Database, titleKey: "tour.reviewer.s2.title", bodyKey: "tour.reviewer.s2.body" },
         { view: "findings", target: null, icon: FileSearch, titleKey: "tour.reviewer.s3.title", bodyKey: "tour.reviewer.s3.body" },
-        { view: "findings", target: null, icon: Wand2, titleKey: "tour.reviewer.s4.title", bodyKey: "tour.reviewer.s4.body" },
-        { view: "approvals", target: null, icon: ClipboardCheck, titleKey: "tour.reviewer.s5.title", bodyKey: "tour.reviewer.s5.body" },
+        { view: "approvals", target: null, icon: Wand2, titleKey: "tour.reviewer.s4.title", bodyKey: "tour.reviewer.s4.body" },
+        { view: "analytics", target: null, icon: ClipboardCheck, titleKey: "tour.reviewer.s5.title", bodyKey: "tour.reviewer.s5.body" },
       ];
 
     case "creator":
@@ -134,9 +134,9 @@ export function DemoTour({ role }: { role: Role }) {
   }, []);
 
   const steps = useMemo(() => buildSteps(role), [role]);
-  const isLast = stepIndex === steps.length;
   const total = steps.length;
-  const step = steps[Math.min(stepIndex, steps.length - 1)];
+  const isLast = stepIndex >= total - 1;
+  const step = steps[Math.min(stepIndex, total - 1)];
   const roleLabel = t(`common.role.${role}`);
 
   // Restore step from database on initial mount only once (prevents tour from repeatedly popping up)
@@ -148,7 +148,8 @@ export function DemoTour({ role }: { role: Role }) {
     const isDismissed =
       typeof window !== "undefined" &&
       (sessionStorage.getItem("brandshield:tour-dismissed") === "true" ||
-        localStorage.getItem("brandshield:tour-dismissed") === "true");
+        localStorage.getItem("brandshield:tour-dismissed") === "true" ||
+        localStorage.getItem("brandshield:tour-completed") === "true");
 
     if (isDismissed) return;
 
@@ -157,15 +158,18 @@ export function DemoTour({ role }: { role: Role }) {
       if (typeof window !== "undefined") {
         localStorage.setItem("brandshield:tour-dismissed", "true");
         sessionStorage.setItem("brandshield:tour-dismissed", "true");
+        if (s.completed) {
+          localStorage.setItem("brandshield:tour-completed", "true");
+        }
       }
       return;
     }
 
     const timer = setTimeout(() => {
       if (typeof s.stepIndex === "number" && s.stepIndex > 0) {
-        if (s.stepIndex >= steps.length) {
-          // If stored step is from obsolete 16-step tour, clamp and finish
-          saveStepToDb(steps.length, true, false, false);
+        if (s.stepIndex >= steps.length - 1) {
+          // If stored step is from obsolete tour or at/past end, mark completed & do not auto-open
+          saveStepToDb(steps.length, true, false, true);
           setStepIndex(0);
           setShowWelcome(false);
           setTourOpen(false);
@@ -198,13 +202,14 @@ export function DemoTour({ role }: { role: Role }) {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("brandshield:tour-dismissed", "true");
       localStorage.setItem("brandshield:tour-dismissed", "true");
+      localStorage.setItem("brandshield:tour-completed", "true");
     }
     saveStepToDb(steps.length, true, false, false);
     setTourOpen(false);
     setShowWelcome(false);
     setView("dashboard");
-    toast.success(t("tour.allSet"));
-  }, [steps.length, saveStepToDb, setTourOpen, setView, t]);
+    toast.success(lang === "hi" ? "टूर संपन्न हुआ! आप पूरी तरह तैयार हैं।" : "You're all set! Replay this tour anytime from the header button.");
+  }, [steps.length, saveStepToDb, setTourOpen, setView, lang]);
 
   const pauseTour = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -231,6 +236,7 @@ export function DemoTour({ role }: { role: Role }) {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("brandshield:tour-dismissed");
       localStorage.removeItem("brandshield:tour-dismissed");
+      localStorage.removeItem("brandshield:tour-completed");
     }
     setShowWelcome(false);
     setStepIndex(0);
@@ -242,6 +248,7 @@ export function DemoTour({ role }: { role: Role }) {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("brandshield:tour-dismissed");
       localStorage.removeItem("brandshield:tour-dismissed");
+      localStorage.removeItem("brandshield:tour-completed");
     }
     setStepIndex(0);
     setShowWelcome(false);
@@ -256,6 +263,7 @@ export function DemoTour({ role }: { role: Role }) {
       if (typeof window !== "undefined") {
         sessionStorage.removeItem("brandshield:tour-dismissed");
         localStorage.removeItem("brandshield:tour-dismissed");
+        localStorage.removeItem("brandshield:tour-completed");
       }
       setStepIndex(0);
       setShowWelcome(false);
@@ -338,43 +346,41 @@ export function DemoTour({ role }: { role: Role }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") pauseTour();
       else if (e.key === "ArrowRight") {
-        if (!isLast) {
-          setStepIndex((i) => {
-            const next = Math.min(i + 1, total - 1);
-            saveStepToDb(next);
-            return next;
-          });
+        if (stepIndex >= total - 1) {
+          finish();
+        } else {
+          const nextIndex = stepIndex + 1;
+          setStepIndex(nextIndex);
+          saveStepToDb(nextIndex);
         }
       } else if (e.key === "ArrowLeft") {
-        setStepIndex((i) => {
-          const prev = Math.max(i - 1, 0);
-          saveStepToDb(prev);
-          return prev;
-        });
+        if (stepIndex > 0) {
+          const prevIndex = stepIndex - 1;
+          setStepIndex(prevIndex);
+          saveStepToDb(prevIndex);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tourOpen, isLast, total, pauseTour, saveStepToDb]);
+  }, [tourOpen, isLast, total, stepIndex, pauseTour, saveStepToDb, finish]);
 
   const next = () => {
-    if (isLast) {
+    if (stepIndex >= total - 1) {
       finish();
     } else {
-      setStepIndex((i) => {
-        const n = Math.min(i + 1, total - 1);
-        saveStepToDb(n);
-        return n;
-      });
+      const nextIndex = stepIndex + 1;
+      setStepIndex(nextIndex);
+      saveStepToDb(nextIndex);
     }
   };
 
   const back = () => {
-    setStepIndex((i) => {
-      const p = Math.max(i - 1, 0);
-      saveStepToDb(p);
-      return p;
-    });
+    if (stepIndex > 0) {
+      const prevIndex = stepIndex - 1;
+      setStepIndex(prevIndex);
+      saveStepToDb(prevIndex);
+    }
   };
 
   // Card positioning logic (desktop only)
@@ -440,11 +446,15 @@ export function DemoTour({ role }: { role: Role }) {
             </Button>
             <Button
               onClick={startTour}
-              className="min-h-[46px] px-6 gap-2.5 rounded-xl bg-[#22c55e] hover:bg-[#16a34a] active:bg-[#15803d] text-xs sm:text-sm font-black text-white shadow-[0_4px_22px_rgba(34,197,94,0.7)] ring-2 ring-[#86efac] transition-all cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
-              style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
+              className="min-h-[46px] px-6 gap-2.5 rounded-xl text-xs sm:text-sm font-black text-white transition-all cursor-pointer transform hover:scale-[1.03] active:scale-[0.98] ring-2 ring-emerald-300 ring-offset-2 ring-offset-white"
+              style={{
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                color: "#ffffff",
+                boxShadow: "0 0 24px rgba(16, 185, 129, 0.7), 0 4px 14px rgba(5, 150, 105, 0.45)",
+              }}
             >
               <Play className="size-4 fill-white text-white stroke-[2.5]" />
-              <span className="text-white font-black tracking-wide">{t("tour.welcome.cta")}</span>
+              <span className="text-white font-black tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">{t("tour.welcome.cta")}</span>
             </Button>
           </div>
         </motion.div>
@@ -511,14 +521,14 @@ export function DemoTour({ role }: { role: Role }) {
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-1 min-w-0 items-start gap-3">
                 <span className="flex size-9 sm:size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70">
-                  {isLast ? <PartyPopper className="size-4.5 sm:size-5" /> : <step.icon className="size-4.5 sm:size-5" />}
+                  {isLast ? <CheckCircle2 className="size-4.5 sm:size-5" /> : <step.icon className="size-4.5 sm:size-5" />}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-700">
-                    {isLast ? t("tour.allSet") : t("tour.stepCounter", { x: stepIndex + 1, y: total })}
+                    {t("tour.stepCounter", { x: stepIndex + 1, y: total })}
                   </p>
                   <h3 className="mt-0.5 text-sm sm:text-base font-bold text-slate-900 leading-snug break-words">
-                    {isLast ? t("tour.complete.title") : t(step.titleKey, { role: roleLabel })}
+                    {t(step.titleKey, { role: roleLabel })}
                   </h3>
                 </div>
               </div>
@@ -545,21 +555,19 @@ export function DemoTour({ role }: { role: Role }) {
 
             {/* Step Body - readable, smooth line wrapping without broken words */}
             <p className="mt-2.5 sm:mt-3 text-xs sm:text-sm leading-relaxed text-slate-600 break-words font-normal">
-              {isLast
-                ? t(`tour.${role}.done.body`, { role: roleLabel })
-                : t(step.bodyKey, { role: roleLabel })}
+              {t(step.bodyKey, { role: roleLabel })}
             </p>
 
             {/* Progress Bar & Dots */}
             <div className="mt-3.5 sm:mt-4 space-y-1.5">
-              <div className="flex items-center justify-between text-[10px] sm:text-xs font-medium text-slate-400">
+              <div className="flex items-center justify-between text-[10px] sm:text-xs font-medium text-slate-500">
                 <span>{roleLabel} Tour</span>
-                <span>{Math.round(((stepIndex + (isLast ? 0 : 1)) / total) * 100)}%</span>
+                <span>{Math.round(((stepIndex + 1) / total) * 100)}%</span>
               </div>
-              <Progress value={Math.min(100, Math.round(((stepIndex + (isLast ? 0 : 1)) / total) * 100))} className="h-1.5 sm:h-2 bg-slate-100" />
+              <Progress value={Math.min(100, Math.round(((stepIndex + 1) / total) * 100))} className="h-1.5 sm:h-2 bg-slate-100" />
             </div>
 
-            {/* Action Buttons with Vibrant Glowing Emerald Green CTA */}
+            {/* Action Buttons with Ultra-Bright Glowing Emerald Green CTA */}
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 sm:pt-3.5">
               <div className="flex items-center gap-1">
                 <Button
@@ -596,11 +604,15 @@ export function DemoTour({ role }: { role: Role }) {
                 <Button
                   size="sm"
                   onClick={next}
-                  className="min-h-11 px-6 sm:px-7 gap-2.5 rounded-xl bg-[#22c55e] hover:bg-[#16a34a] active:bg-[#15803d] text-white font-black text-sm tracking-wide shadow-[0_4px_22px_rgba(34,197,94,0.7)] ring-2 ring-[#86efac] transition-all cursor-pointer transform hover:scale-[1.03] active:scale-[0.98]"
-                  style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
+                  className="min-h-11 px-6 sm:px-7 gap-2.5 rounded-xl text-white font-black text-sm tracking-wide transition-all cursor-pointer transform hover:scale-[1.04] active:scale-[0.98] ring-2 ring-emerald-300 ring-offset-2 ring-offset-white"
+                  style={{
+                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    color: "#ffffff",
+                    boxShadow: "0 0 24px rgba(16, 185, 129, 0.7), 0 4px 14px rgba(5, 150, 105, 0.45)",
+                  }}
                 >
-                  <span className="text-white font-black tracking-wide text-sm drop-shadow">
-                    {isLast ? t("tour.btn.finish") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}
+                  <span className="text-white font-black tracking-wide text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
+                    {isLast ? (lang === "hi" ? "टूर समाप्त करें" : "Finish Tour") : stepIndex === 0 ? t("tour.btn.go") : t("tour.btn.next")}
                   </span>
                   {isLast ? (
                     <CheckCircle2 className="size-5 text-white stroke-[3.5] drop-shadow" />
