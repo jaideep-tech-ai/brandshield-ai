@@ -125,3 +125,24 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Sleek custom scrollbar for chatbot message area and drawers */
+.chatbot-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.chatbot-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.chatbot-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chatbot-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+.chatbot-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.65);
+}
